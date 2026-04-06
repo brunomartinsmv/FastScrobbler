@@ -2,7 +2,7 @@
 
 **Effective date:** February 26, 2026
 
-FastScrobbler is an iOS and macOS app that helps you submit (“scrobble”) your Apple Music / Music app listening activity to your Last.fm account. This policy explains what information the app accesses, stores, and shares.
+FastScrobbler is an iOS and macOS app that helps you submit ("scrobble") your Apple Music / Music app listening activity to your Last.fm account. This policy explains what information the app accesses, stores, and shares.
 
 ## Summary
 
@@ -19,7 +19,7 @@ With your permission, FastScrobbler can access Apple Music (Media Library) infor
 - Track metadata (artist, title, album)
 - Album artist (when available)
 - Track duration
-- Playback timestamps (e.g., “last played” time)
+- Playback timestamps (e.g., "last played" time)
 - Local media identifiers (e.g., persistent IDs)
 
 FastScrobbler uses this information to determine what to submit to Last.fm. Local media identifiers are used only on-device.
@@ -35,7 +35,7 @@ If you deny Automation permission, the macOS app cannot read what’s playing an
 
 ### Apple Music favorites (optional, on-device)
 
-FastScrobbler can infer whether the current track is favorited in Apple Music (for example via the “Favorite Songs” playlist). If you enable the “Love Apple Music favourites on Last.fm” setting, FastScrobbler may use this on-device favorite status to decide whether to also send a `track.love` request to Last.fm after scrobbling.
+FastScrobbler can infer whether the current track is favorited in Apple Music (for example via the "Favorite Songs" playlist). If you enable the "Love Apple Music favourites on Last.fm" setting, FastScrobbler may use this on-device favorite status to decide whether to also send a `track.love` request to Last.fm after scrobbling.
 
 ### Last.fm account connection
 
@@ -103,7 +103,7 @@ FastScrobbler is not directed to children and does not knowingly collect persona
 
 ## Changes to this policy
 
-If this policy changes, the “Effective date” above will be updated.
+If this policy changes, the "Effective date" above will be updated.
 
 ## Contact
 

@@ -8,7 +8,7 @@ enum WhatsNewRelease {
     }
 
     /// Present the current release notes automatically once for users updating to this version.
-    static let version = "3.3"
+    static let version = "4.0"
 
     static func currentAppVersion() -> String? {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -59,6 +59,27 @@ struct WhatsNewView: View {
 
     private let currentSections: [VersionSection] = [
         VersionSection(
+            id: "4.0",
+            version: "4.0",
+            features: [
+                Feature(
+                    systemImage: "textformat.abc",
+                    title: "Text replacement feature: Find and replace keywords when scrobbling",
+                    showsProBadge: true
+                ),
+                Feature(
+                    systemImage: "plus.circle",
+                    title: "Manual scrobbling feature",
+                    showsProBadge: false
+                ),
+                Feature(
+                    systemImage: "hand.tap",
+                    title: "Tap and hold on a scrobbled song to scrobble it again",
+                    showsProBadge: false
+                )
+            ]
+        ),
+        VersionSection(
             id: "3.3",
             version: "3.3",
             features: [
@@ -80,6 +101,9 @@ struct WhatsNewView: View {
                 )
             ]
         ),
+    ]
+
+    private let previousSections: [VersionSection] = [
         VersionSection(
             id: "3.0",
             version: "3.0",
@@ -95,10 +119,7 @@ struct WhatsNewView: View {
                     showsProBadge: false
                 )
             ]
-        )
-    ]
-
-    private let previousSections: [VersionSection] = [
+        ),
         VersionSection(
             id: "2.0",
             version: "2.0",

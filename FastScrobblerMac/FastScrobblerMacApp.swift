@@ -1,5 +1,4 @@
 import AppKit
-import ObjectiveC.runtime
 import SwiftUI
 
 @main
@@ -19,6 +18,7 @@ struct FastScrobblerMacApp: App {
                 .environmentObject(ProPurchaseManager.shared)
                 .environmentObject(appLanguage)
         }
+
     }
 }
 
@@ -79,9 +79,9 @@ final class AppLanguageStore: ObservableObject {
 
     @Published var selection: AppLanguage = .system {
         didSet {
-            guard selection != oldValue else { return }
+            guard selection != oldValue, !isInitializing else { return }
             persistSelection()
-            Self.apply(selection)
+            Self.relaunchApp()
         }
     }
 
@@ -89,14 +89,15 @@ final class AppLanguageStore: ObservableObject {
         selection.locale
     }
 
+    private var isInitializing = true
+
     private init() {
         if let rawValue = UserDefaults.standard.string(forKey: Keys.selectedLanguage),
            let storedSelection = AppLanguage(rawValue: rawValue) {
             selection = storedSelection
         }
 
-        Self.installBundleOverrideIfNeeded()
-        Self.apply(selection)
+        isInitializing = false
     }
 
     private func persistSelection() {
@@ -109,24 +110,12 @@ final class AppLanguageStore: ObservableObject {
         }
     }
 
-    private static func installBundleOverrideIfNeeded() {
-        guard object_getClass(Bundle.main) !== LocalizedBundle.self else { return }
-        object_setClass(Bundle.main, LocalizedBundle.self)
-    }
-
-    private static func apply(_ language: AppLanguage) {
-        objc_setAssociatedObject(
-            Bundle.main,
-            &localizedBundleOverrideKey,
-            language.overrideBundle,
-            .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-        )
-        objc_setAssociatedObject(
-            Bundle.main,
-            &forcedEnglishLocalizationKey,
-            language == .english ? NSNumber(value: true) : nil,
-            .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-        )
+    private static func relaunchApp() {
+        let bundleURL = URL(fileURLWithPath: Bundle.main.bundlePath)
+        let config = NSWorkspace.OpenConfiguration()
+        config.createsNewApplicationInstance = true
+        NSWorkspace.shared.openApplication(at: bundleURL, configuration: config)
+        NSApp.terminate(nil)
     }
 }
 
@@ -174,48 +163,5 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .simplifiedChinese:
             return "简体中文"
         }
-    }
-
-    fileprivate var overrideBundle: Bundle? {
-        switch self {
-        case .system, .english:
-            return nil
-        case .spanish:
-            return localizedBundle(named: "es")
-        case .french:
-            return localizedBundle(named: "fr")
-        case .japanese:
-            return localizedBundle(named: "ja")
-        case .simplifiedChinese:
-            return localizedBundle(named: "zh-Hans")
-        }
-    }
-
-    private func localizedBundle(named languageCode: String) -> Bundle? {
-        guard let path = Bundle.main.path(forResource: languageCode, ofType: "lproj") else {
-            return nil
-        }
-        return Bundle(path: path)
-    }
-}
-
-private var localizedBundleOverrideKey: UInt8 = 0
-private var forcedEnglishLocalizationKey: UInt8 = 0
-
-private final class LocalizedBundle: Bundle, @unchecked Sendable {
-    override func localizedString(forKey key: String, value: String?, table tableName: String?) -> String {
-        if let forcedEnglish = objc_getAssociatedObject(self, &forcedEnglishLocalizationKey) as? NSNumber,
-           forcedEnglish.boolValue {
-            guard let value, !value.isEmpty else {
-                return key
-            }
-            return value
-        }
-
-        if let bundle = objc_getAssociatedObject(self, &localizedBundleOverrideKey) as? Bundle {
-            return bundle.localizedString(forKey: key, value: value, table: tableName)
-        }
-
-        return super.localizedString(forKey: key, value: value, table: tableName)
     }
 }

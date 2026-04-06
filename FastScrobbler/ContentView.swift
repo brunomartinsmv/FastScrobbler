@@ -22,11 +22,13 @@ struct ContentView: View {
 
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
 
+    @State private var currentDate: Date = .now
     @State private var errorText: String?
     @State private var isShowingSetup = false
     @State private var isShowingWhatsNew = false
     @State private var isShowingHelp = false
     @State private var isShowingSettings = false
+    @State private var isShowingManualScrobble = false
 #if os(iOS)
     @State private var isShowingProUpgrade = false
     @State private var inAppBrowserURL: URL?
@@ -136,10 +138,9 @@ struct ContentView: View {
 #if os(macOS)
                     macAttentionBanner
 #endif
+                    controls
                     statusCard
                     trackCard
-                    controls
-                        .padding(.top, 12)
                     scrobbleLogCard
                     if let errorText {
                         Text(errorText)
@@ -152,6 +153,9 @@ struct ContentView: View {
                 // Leave room for the top-right popover buttons.
                 .padding(.top, MacFloatingBarLayout.contentTopPadding)
 #endif
+                .animation(.easeInOut(duration: 0.3), value: observer.track)
+                .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
+                .animation(.easeInOut(duration: 0.3), value: engine.statusText)
             }
 
 #if os(macOS)
@@ -173,18 +177,18 @@ struct ContentView: View {
                 .accessibilityLabel("FastScrobbler Pro")
 
                 Button {
-                    isShowingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .accessibilityLabel("Settings")
-
-                Button {
                     isShowingHelp = true
                 } label: {
                     Image(systemName: "questionmark.circle")
                 }
                 .accessibilityLabel("Help")
+
+                Button {
+                    isShowingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
+                .accessibilityLabel("Settings")
             }
 #endif
         }
@@ -206,16 +210,6 @@ struct ContentView: View {
         MacCapsuleBar {
             HStack(spacing: 10) {
                 Button {
-                    isShowingSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 16, weight: .semibold))
-                        .padding(6)
-                }
-                .help("Settings")
-                .accessibilityLabel("Settings")
-
-                Button {
                     isShowingHelp = true
                 } label: {
                     Image(systemName: "questionmark.circle")
@@ -224,6 +218,16 @@ struct ContentView: View {
                 }
                 .help("Help")
                 .accessibilityLabel("Help")
+
+                Button {
+                    isShowingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .semibold))
+                        .padding(6)
+                }
+                .help("Settings")
+                .accessibilityLabel("Settings")
             }
         }
     }
@@ -240,8 +244,9 @@ struct ContentView: View {
             }
             engineStatusText(engine.statusText)
                 .font(.footnote)
-                .foregroundColor(.secondary)
         }
+        .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
+        .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.thinMaterial)
@@ -259,7 +264,7 @@ struct ContentView: View {
             if let t = observer.track {
                 Text("\(t.artist) - \(t.title)")
                 if let album = t.album, !album.isEmpty {
-                    Text(album).foregroundColor(.secondary)
+                    Text(album)
                 }
                 if let d = t.durationSeconds {
                     Text(
@@ -270,16 +275,15 @@ struct ContentView: View {
                         )
                     )
                         .font(.footnote)
-                        .foregroundColor(.secondary)
                 }
                 Text("State: \(playbackStateText(observer.playbackState))")
                     .font(.footnote)
-                    .foregroundColor(.secondary)
             } else {
                 Text("No track detected.")
-                    .foregroundColor(.secondary)
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: observer.track)
+        .animation(.easeInOut(duration: 0.3), value: observer.playbackState)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(.thinMaterial)
@@ -290,9 +294,9 @@ struct ContentView: View {
     private var controls: some View {
         let actionButtonHeight: CGFloat = {
 #if os(macOS)
-            return 40
+            return 32
 #else
-            return 48
+            return 44
 #endif
         }()
         let actionButtonSpacing: CGFloat = 12
@@ -303,13 +307,14 @@ struct ContentView: View {
                     openURL(url)
                 }
             } label: {
-                Label("Open Music App", systemImage: "music.note")
+                Label(NSLocalizedString("Open Music App", comment: ""), systemImage: "music.note")
                     .font(.body.weight(.bold))
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
             }
             .buttonStyle(.borderedProminent)
             .pillButtonBorder()
             .tint(.red)
+            .buttonGlow(.red)
 
             HStack(spacing: actionButtonSpacing) {
                 Button {
@@ -325,26 +330,28 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
                 .pillButtonBorder()
                 .tint(engine.isUserPaused ? .green : .orange)
+                .buttonGlow(engine.isUserPaused ? .green : .orange)
                 .disabled(auth.sessionKey == nil)
 
                 if auth.sessionKey == nil {
                     Button {
                         Task { await connectTapped() }
                     } label: {
-                        Label("Sign In", systemImage: "person.crop.circle")
+                        Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
                             .font(.body.weight(.bold))
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
                     .buttonStyle(.borderedProminent)
                     .pillButtonBorder()
                     .tint(.blue)
+                    .buttonGlow(.blue)
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
                     } label: {
                         HStack(alignment: .center, spacing: 8) {
                             Image(systemName: "memories.badge.plus")
-                            Text("Scrobble Now")
+                            Text(NSLocalizedString("Scrobble Now", comment: ""))
                                 .multilineTextAlignment(.center)
                                 .lineLimit(2)
                                 .minimumScaleFactor(0.6)
@@ -356,6 +363,7 @@ struct ContentView: View {
                     .buttonStyle(.borderedProminent)
                     .pillButtonBorder()
                     .tint(.purple)
+                    .buttonGlow(.purple)
                     .disabled(engine.isUserPaused)
                 }
             }
@@ -370,25 +378,41 @@ struct ContentView: View {
 #endif
                     }
                 } label: {
-                    Label("View Profile in Last.fm", systemImage: "person.circle")
+                    Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
                         .font(.body.weight(.bold))
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.borderedProminent)
                 .pillButtonBorder()
                 .tint(.blue)
+                .buttonGlow(.blue)
                 .disabled(auth.profileURL == nil)
+
+                Button {
+                    isShowingManualScrobble = true
+                } label: {
+                    Label(NSLocalizedString("Manual Scrobble", comment: ""), systemImage: "plus.circle")
+                        .font(.body.weight(.bold))
+                        .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
+                }
+                .buttonStyle(.bordered)
+                .pillButtonBorder()
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
+#if os(iOS)
+        .sheet(isPresented: $isShowingManualScrobble) {
+            ManualScrobbleView()
+        }
+#endif
     }
 
 	#if os(macOS)
 	    @ViewBuilder
 	    private var macAttentionBanner: some View {
 	        let isLoggedOut = (auth.sessionKey == nil)
-	        let isMediaLibraryPermissionOff = (mediaLibraryStatus != .authorized)
-	        let isMusicControlPermissionOff = (observer.authorizationStatus != .authorized)
+	        let isMediaLibraryPermissionOff = (mediaLibraryStatus == .denied || mediaLibraryStatus == .restricted)
+	        let isMusicControlPermissionOff = (observer.authorizationStatus == .denied)
 	        if isLoggedOut || isMediaLibraryPermissionOff || isMusicControlPermissionOff {
 	            VStack(alignment: .leading, spacing: 10) {
 	                if isLoggedOut {
@@ -516,48 +540,17 @@ struct ContentView: View {
                 Text("No scrobbles yet.")
                     .foregroundColor(.secondary)
             } else {
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    let entries = Array(scrobbleLog.entries.prefix(30))
-                    VStack(spacing: 10) {
-                        ForEach(entries) { entry in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(entry.track.artist) — \(entry.track.title)")
-                                    .font(.subheadline.weight(.semibold))
-                                if let album = entry.track.album, !album.isEmpty {
-                                    Text(album)
-                                        .font(.footnote)
-                                        .foregroundColor(.secondary)
-                                }
-                                HStack(spacing: 8) {
-                                    Text(relativeHoursMinutes(from: entry.scrobbledAt, to: context.date))
-                                    if entry.lovedOnLastFM == true {
-                                        Text("Loved")
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 2)
-                                            .foregroundColor(.white)
-                                            .background(Color.red)
-                                            .clipShape(Capsule())
-                                    }
-                                    if entry.source != .live {
-                                        Text(sourceLabel(entry.source))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 2)
-                                            .background(Color.secondary.opacity(0.15))
-                                            .clipShape(Capsule())
-                                    }
-                                    Spacer()
-                                }
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-
-                            if entry.id != entries.last?.id {
-                                Divider()
-                            }
+                let entries = Array(scrobbleLog.entries.prefix(30))
+                VStack(spacing: 10) {
+                    ForEach(entries) { entry in
+                            ScrobbleLogRowView(
+                                entry: entry,
+                                isLast: entry.id == entries.last?.id,
+                                currentDate: currentDate,
+                                engine: engine
+                            )
                         }
                     }
-                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -565,14 +558,8 @@ struct ContentView: View {
         .background(.thinMaterial)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-    }
-
-    private func sourceLabel(_ source: ScrobbleLogStore.Source) -> String {
-        switch source {
-        case .live: return ""
-        case .backlog: return NSLocalizedString("Backlog", comment: "")
-        case .playbackHistory: return NSLocalizedString("Listening History", comment: "")
-        case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
+        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
+            currentDate = date
         }
     }
 
@@ -599,24 +586,6 @@ struct ContentView: View {
         }
     }
 
-    private func relativeHoursMinutes(from date: Date, to now: Date) -> String {
-        let delta = max(0, now.timeIntervalSince(date))
-        let totalMinutes = Int(delta / 60)
-        if totalMinutes < 60 {
-            return String.localizedStringWithFormat(NSLocalizedString("%lldm ago", comment: ""), Int64(totalMinutes))
-        }
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        if minutes == 0 {
-            return String.localizedStringWithFormat(NSLocalizedString("%lldh ago", comment: ""), Int64(hours))
-        }
-        return String.localizedStringWithFormat(
-            NSLocalizedString("%1$lldh %2$lldm ago", comment: ""),
-            Int64(hours),
-            Int64(minutes)
-        )
-    }
-
     private func engineStatusText(_ status: String) -> Text {
         let parts = status
             .split(separator: "|")
@@ -626,7 +595,9 @@ struct ContentView: View {
         for (idx, part) in parts.enumerated() {
             if idx > 0 { text = text + Text(" | ") }
             let segment = Text(part)
-            if part == NSLocalizedString("now playing sent", comment: "") || part == NSLocalizedString("scrobbled", comment: "") {
+            if part == NSLocalizedString("error scrobbling", comment: "") {
+                text = text + segment.fontWeight(.bold).foregroundColor(.red)
+            } else if part == NSLocalizedString("now playing sent", comment: "") || part == NSLocalizedString("scrobbled", comment: "") {
                 text = text + segment.fontWeight(.bold)
             } else {
                 text = text + segment
@@ -651,6 +622,152 @@ struct ContentView: View {
     private func dismissWhatsNew() {
         WhatsNewRelease.markSeen()
         isShowingWhatsNew = false
+    }
+}
+
+private struct ScrobbleLogRowView: View {
+    let entry: ScrobbleLogStore.Entry
+    let isLast: Bool
+    let currentDate: Date
+    let engine: ScrobbleEngine
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text("\(entry.track.artist) — \(entry.track.title)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                if entry.track.artist.isEmpty || entry.track.title.isEmpty {
+                    Text("Error")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .foregroundStyle(.white)
+                        .background(Color.orange)
+                        .clipShape(Capsule())
+                }
+            }
+            if let album = entry.track.album, !album.isEmpty {
+                Text(album)
+                    .font(.footnote)
+                    .foregroundStyle(.primary)
+            }
+            HStack(spacing: 8) {
+                Text(relativeHoursMinutes(from: entry.scrobbledAt, to: currentDate))
+                if entry.lovedOnLastFM == true {
+                    Text("Loved")
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .foregroundStyle(.white)
+                        .background(Color.red)
+                        .clipShape(Capsule())
+                }
+                if entry.source != .live {
+                    Text(sourceLabel(entry.source))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.primary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .transaction { $0.animation = nil }
+        .contentShape(Rectangle())
+        .contextMenu {
+            Button {
+                Task {
+                    try? await engine.submitManualScrobble(
+                        artist: entry.track.artist,
+                        title: entry.track.title,
+                        album: entry.track.album,
+                        albumArtist: entry.track.albumArtist,
+                        timestamp: Int(Date().timeIntervalSince1970)
+                    )
+                }
+            } label: {
+                Label("Scrobble Again", systemImage: "arrow.clockwise")
+            }
+        } preview: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text("\(entry.track.artist) — \(entry.track.title)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    if entry.track.artist.isEmpty || entry.track.title.isEmpty {
+                        Text("Error")
+                            .font(.caption.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .foregroundStyle(.white)
+                            .background(Color.orange)
+                            .clipShape(Capsule())
+                    }
+                }
+                if let album = entry.track.album, !album.isEmpty {
+                    Text(album)
+                        .font(.footnote)
+                        .foregroundStyle(.primary)
+                }
+                HStack(spacing: 8) {
+                    Text(relativeHoursMinutes(from: entry.scrobbledAt, to: .now))
+                    if entry.lovedOnLastFM == true {
+                        Text("Loved")
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .foregroundStyle(.white)
+                            .background(Color.red)
+                            .clipShape(Capsule())
+                    }
+                    if entry.source != .live {
+                        Text(sourceLabel(entry.source))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.secondary.opacity(0.15))
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
+                .font(.caption)
+                .foregroundStyle(.primary)
+            }
+            .padding()
+        }
+
+        if !isLast {
+            Divider()
+        }
+    }
+
+    private func sourceLabel(_ source: ScrobbleLogStore.Source) -> String {
+        switch source {
+        case .live: return ""
+        case .backlog: return NSLocalizedString("Backlog", comment: "")
+        case .playbackHistory: return NSLocalizedString("Listening History", comment: "")
+        case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
+        case .manual: return NSLocalizedString("Manual", comment: "")
+        }
+    }
+
+    private func relativeHoursMinutes(from date: Date, to now: Date) -> String {
+        let delta = max(0, now.timeIntervalSince(date))
+        let totalMinutes = Int(delta / 60)
+        if totalMinutes < 60 {
+            return String.localizedStringWithFormat(NSLocalizedString("%lldm ago", comment: ""), Int64(totalMinutes))
+        }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if minutes == 0 {
+            return String.localizedStringWithFormat(NSLocalizedString("%lldh ago", comment: ""), Int64(hours))
+        }
+        return String.localizedStringWithFormat(
+            NSLocalizedString("%1$lldh %2$lldm ago", comment: ""),
+            Int64(hours),
+            Int64(minutes)
+        )
     }
 }
 
@@ -736,6 +853,15 @@ extension View {
         self.buttonBorderShape(.capsule)
 #endif
     }
+
+    func buttonGlow(_ color: Color) -> some View {
+#if os(macOS)
+        self.shadow(color: color.opacity(0.30), radius: 6, x: 0, y: 0)
+#else
+        self.shadow(color: color.opacity(0.25), radius: 8, x: 0, y: 0)
+            .shadow(color: color.opacity(0.30), radius: 6, x: 0, y: 0)
+#endif
+    }
 }
 
 #if os(macOS)
@@ -796,7 +922,7 @@ struct MacFloatingCircleButton: View {
 extension ContentView {
     @ViewBuilder
     private var macModalOverlay: some View {
-        let isPresented = (isShowingSetup || isShowingHelp || isShowingSettings)
+        let isPresented = (isShowingSetup || isShowingHelp || isShowingSettings || isShowingManualScrobble)
         if isPresented {
             ZStack {
                 Color.black.opacity(0.18)
@@ -846,6 +972,8 @@ extension ContentView {
             }
         } else if isShowingSettings {
             SettingsView(onBack: { isShowingSettings = false })
+        } else if isShowingManualScrobble {
+            ManualScrobbleView(onBack: { isShowingManualScrobble = false })
         }
     }
 
@@ -854,6 +982,8 @@ extension ContentView {
             isShowingSettings = false
         } else if isShowingHelp {
             isShowingHelp = false
+        } else if isShowingManualScrobble {
+            isShowingManualScrobble = false
         } else if isShowingSetup {
             // Keep onboarding visible until the setup requirements are actually satisfied.
             return

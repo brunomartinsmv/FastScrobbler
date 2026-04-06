@@ -13,17 +13,20 @@ struct SettingsView: View {
     private static let writeReviewURL = URL(string: "https://apps.apple.com/app/id6759501541?action=write-review")!
     private static let linksSectionRed = Color(red: 0.72, green: 0.14, blue: 0.14)
 #if os(macOS)
-    private static let macSettingsButtonMinHeight: CGFloat = 34
+    private static let macSettingsButtonMinHeight: CGFloat = 28
 #else
     private static let iosLockedProNavigationBadgeTrailingInset: CGFloat = 24
     private static let iosLockedProToggleBadgeTrailingInset: CGFloat = 63
 #endif
 
+    private func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+
     @AppStorage(LiveActivityManager.enabledDefaultsKey) private var liveActivityEnabled = false
     @AppStorage(ProSettings.Keys.loveOnFavoriteEnabled, store: AppGroup.userDefaults) private var loveOnFavoriteEnabled = false
     @AppStorage(ProSettings.Keys.scrobbleThresholdIndex, store: AppGroup.userDefaults) private var scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
     @AppStorage(ProSettings.Keys.useAlbumArtistForScrobbling, store: AppGroup.userDefaults) private var useAlbumArtistForScrobbling = false
-    @AppStorage(ProSettings.Keys.stripEpAndSingleSuffixFromAlbum, store: AppGroup.userDefaults) private var stripEpAndSingleSuffixFromAlbum = false
     @AppStorage(ProSettings.Keys.removeBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
@@ -61,6 +64,7 @@ struct SettingsView: View {
     private enum SettingsRoute: Hashable {
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
+        case textReplacement
     }
 
     @State private var activeAlert: ActiveAlert?
@@ -73,6 +77,8 @@ struct SettingsView: View {
 #if os(macOS)
     @State private var startAtLoginEnabled = StartAtLoginManager.isEnabled
     @State private var startAtLoginErrorText: String?
+    @State private var isConfirmingReset = false
+    @State private var isConfirmingSignOut = false
 #endif
 #if os(macOS)
     let onBack: (() -> Void)?
@@ -91,6 +97,8 @@ struct SettingsView: View {
                         RemoveBracketsSettingsPage(target: .songTitles)
                     case .removeBracketsFromAlbumTitles:
                         RemoveBracketsSettingsPage(target: .albumTitles)
+                    case .textReplacement:
+                        TextReplacementSettingsPage()
                     }
                 }
 #if os(iOS)
@@ -127,7 +135,7 @@ struct SettingsView: View {
             case .resetConfirmation:
                 Alert(
                     title: Text("Reset Settings?"),
-                    message: Text("This resets settings back to their initial values (your Last.fm account stays connected)."),
+                    message: Text("This will restore all settings to their defaults."),
                     primaryButton: .destructive(Text("Reset"), action: resetToInitialSettings),
                     secondaryButton: .cancel()
                 )
@@ -165,7 +173,7 @@ struct SettingsView: View {
 #if os(macOS)
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Settings")
+                Text(localized("Settings"))
                     .font(.title.weight(.bold))
 
                 macGeneralCard
@@ -197,43 +205,17 @@ struct SettingsView: View {
         }
 #else
         Form {
-#if os(iOS)
-            Section("Live Activity (Beta)") {
-                Toggle("Show Live Activity (Beta)", isOn: $liveActivityEnabled)
-                    .onValueChange(of: liveActivityEnabled) { isEnabled in
-                        if isEnabled {
-                            LiveActivityManager.shared.startIfPossible()
-                        } else {
-                            Task { @MainActor in
-                                await LiveActivityManager.shared.stop()
-                            }
-                        }
-                    }
-
-                if #available(iOS 16.1, *) {
-                    if !ActivityAuthorizationInfo().areActivitiesEnabled {
-                        Text("Live Activities are disabled in iOS Settings for FastScrobbler.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Text("Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-#endif
-
             Section("Scrobble Controls") {
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Prevent duplicate scrobbles", isOn: $preventDuplicateScrobblesEnabled)
-                    Text("Avoids sending the same track to Last.fm more than once within a short time window.")
+                    Text("Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 scrobbleThresholdSlider()
                 removeBracketsNavigationLink(target: .songTitles)
                 removeBracketsNavigationLink(target: .albumTitles)
+                textReplacementNavigationLink
                 Toggle(isOn: proLockedBoolBinding($loveOnFavoriteEnabled, unlockedDefault: false)) {
                     HStack {
                         Text("Love Apple Music favourites on Last.fm")
@@ -258,23 +240,11 @@ struct SettingsView: View {
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
-                Toggle(isOn: proLockedBoolBinding($stripEpAndSingleSuffixFromAlbum, unlockedDefault: false)) {
-                    HStack {
-                        Text("Remove “- EP” / “- Single” from album name")
-                            .foregroundStyle(pro.isPro ? .primary : .secondary)
-                        Spacer()
-                        proFeatureBadgePlaceholder
-                    }
-                }
-                .disabled(!pro.isPro)
-                .overlay(alignment: .trailing) {
-                    lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
-                }
             }
 
 #if os(iOS)
             Section("Listening History") {
-                let allDevicesEnabled = scrobbleListeningHistoryEnabled && pro.isPro && scrobbleListeningHistoryFromAllDevicesEnabled
+                let allDevicesEnabled = scrobbleListeningHistoryEnabled && pro.isPro
 
                 Button {
                     Task { await scanListeningHistoryTapped() }
@@ -311,18 +281,42 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Toggle(isOn: proLockedBoolBinding($scrobbleListeningHistoryFromAllDevicesEnabled, unlockedDefault: false)) {
-                    HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: .constant(true)) {
                         Text("Scrobble Listening History from all devices")
-                            .foregroundStyle(pro.isPro ? .primary : .secondary)
-                        Spacer()
-                        proFeatureBadgePlaceholder
+                            .foregroundStyle(.secondary)
+                    }
+                    .disabled(true)
+
+                    Text(NSLocalizedString("This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History.", comment: ""))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section("Live Activity (Beta)") {
+                Toggle("Show Live Activity (Beta)", isOn: $liveActivityEnabled)
+                    .onValueChange(of: liveActivityEnabled) { isEnabled in
+                        if isEnabled {
+                            LiveActivityManager.shared.startIfPossible()
+                        } else {
+                            Task { @MainActor in
+                                await LiveActivityManager.shared.stop()
+                            }
+                        }
+                    }
+
+                if #available(iOS 16.1, *) {
+                    if !ActivityAuthorizationInfo().areActivitiesEnabled {
+                        Text("Live Activities are disabled in iOS Settings for FastScrobbler.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .disabled(!pro.isPro)
-                .overlay(alignment: .trailing) {
-                    lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
-                }
+
+                Text("Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 #endif
 
@@ -418,12 +412,12 @@ struct SettingsView: View {
     private var macGeneralCard: some View {
         let requiresApproval = (StartAtLoginManager.status == .requiresApproval)
         return VStack(alignment: .leading, spacing: 12) {
-            Text("General")
+            Text(localized("General"))
                 .font(.title3.weight(.semibold))
 
             HStack(alignment: .center, spacing: -20) {
-                Text("Language")
-                Picker("Language", selection: $appLanguage.selection) {
+                Text(localized("Language"))
+                Picker(localized("Language"), selection: $appLanguage.selection) {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.title).tag(language)
                     }
@@ -434,7 +428,7 @@ struct SettingsView: View {
             }
             .fixedSize()
 
-            Toggle("Start at Login", isOn: $startAtLoginEnabled)
+            Toggle(localized("Start at Login"), isOn: $startAtLoginEnabled)
                 .onValueChange(of: startAtLoginEnabled) { isEnabled in
                     Task { @MainActor in
                         do {
@@ -459,7 +453,7 @@ struct SettingsView: View {
         .background(.thinMaterial)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .alert("Couldn't update Start at Login", isPresented: Binding(
+        .alert(localized("Couldn't update Start at Login"), isPresented: Binding(
             get: { startAtLoginErrorText != nil },
             set: { isPresented in
                 if !isPresented {
@@ -467,7 +461,7 @@ struct SettingsView: View {
                 }
             }
         )) {
-            Button("OK", role: .cancel) {}
+            Button(localized("OK"), role: .cancel) {}
         } message: {
             Text(startAtLoginErrorText ?? "")
         }
@@ -475,19 +469,20 @@ struct SettingsView: View {
 
     private var macScrobbleControlsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Scrobble Controls")
+            Text(localized("Scrobble Controls"))
                 .font(.title3.weight(.semibold))
 
-            Toggle("Prevent duplicate scrobbles", isOn: $preventDuplicateScrobblesEnabled)
-            Text("Avoids sending the same track to Last.fm more than once within a short time window.")
+            Toggle(localized("Prevent duplicate scrobbles"), isOn: $preventDuplicateScrobblesEnabled)
+            Text(localized("Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             scrobbleThresholdSlider()
             removeBracketsNavigationLink(target: .songTitles)
             removeBracketsNavigationLink(target: .albumTitles)
+            textReplacementNavigationLink
             Toggle(isOn: proLockedBoolBinding($loveOnFavoriteEnabled, unlockedDefault: false)) {
                 HStack {
-                    Text("Love Apple Music favourites on Last.fm")
+                    Text(localized("Love Apple Music favourites on Last.fm"))
                         .foregroundStyle(pro.isPro ? .primary : .secondary)
                     Spacer()
                     ProFeatureBadge()
@@ -496,16 +491,7 @@ struct SettingsView: View {
             .disabled(!pro.isPro)
             Toggle(isOn: proLockedBoolBinding($useAlbumArtistForScrobbling, unlockedDefault: false)) {
                 HStack {
-                    Text("Replace song artist with album artist when scrobbling")
-                        .foregroundStyle(pro.isPro ? .primary : .secondary)
-                    Spacer()
-                    ProFeatureBadge()
-                }
-            }
-            .disabled(!pro.isPro)
-            Toggle(isOn: proLockedBoolBinding($stripEpAndSingleSuffixFromAlbum, unlockedDefault: false)) {
-                HStack {
-                    Text("Remove “- EP” / “- Single” from album name")
+                    Text(localized("Replace song artist with album artist when scrobbling"))
                         .foregroundStyle(pro.isPro ? .primary : .secondary)
                     Spacer()
                     ProFeatureBadge()
@@ -523,7 +509,7 @@ struct SettingsView: View {
     private var macAccountCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Account")
+                Text(localized("Account"))
                     .font(.title3.weight(.semibold))
                 Spacer()
                 Text(auth.sessionKey != nil ? NSLocalizedString("Connected", comment: "") : NSLocalizedString("Not connected", comment: ""))
@@ -532,7 +518,7 @@ struct SettingsView: View {
 
             if auth.sessionKey != nil {
                 HStack {
-                    Text("Username")
+                    Text(localized("Username"))
                         .foregroundStyle(.secondary)
                     Spacer()
                     Text(auth.username ?? NSLocalizedString("Loading…", comment: ""))
@@ -544,17 +530,19 @@ struct SettingsView: View {
             }
 
             HStack(spacing: 12) {
-                Button {
-                    if let url = auth.freshProfileURL() {
-                        openURL(url)
+                if !isConfirmingSignOut {
+                    Button {
+                        if let url = auth.freshProfileURL() {
+                            openURL(url)
+                        }
+                    } label: {
+                        Label(localized("View Profile"), systemImage: "person.circle")
+                            .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
                     }
-                } label: {
-                    Label("View Profile", systemImage: "person.circle")
-                        .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
+                    .buttonStyle(.bordered)
+                    .pillButtonBorder()
+                    .disabled(auth.sessionKey == nil || auth.profileURL == nil)
                 }
-                .buttonStyle(.bordered)
-                .pillButtonBorder()
-                .disabled(auth.sessionKey == nil || auth.profileURL == nil)
 
                 if auth.sessionKey == nil {
                     Button {
@@ -568,15 +556,37 @@ struct SettingsView: View {
                     .tint(.blue)
                     .disabled(isSigningInToLastFM)
                 } else {
-                    Button(role: .destructive) {
-                        activeAlert = .logoutConfirmation
-                    } label: {
-                        Label("Sign Out", systemImage: "power")
-                            .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
+                    if isConfirmingSignOut {
+                        HStack(spacing: 8) {
+                            Text("Sign out?")
+                                .foregroundStyle(.secondary)
+                                .font(.headline)
+                            Spacer()
+                            Button("Cancel") {
+                                isConfirmingSignOut = false
+                            }
+                            .buttonStyle(.bordered)
+                            .pillButtonBorder()
+                            Button("Sign Out") {
+                                isConfirmingSignOut = false
+                                performLogout()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .pillButtonBorder()
+                            .tint(.red)
+                        }
+                        .frame(minHeight: Self.macSettingsButtonMinHeight)
+                    } else {
+                        Button {
+                            isConfirmingSignOut = true
+                        } label: {
+                            Label(localized("Sign Out"), systemImage: "power")
+                                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
+                        }
+                        .buttonStyle(.bordered)
+                        .pillButtonBorder()
+                        .tint(.red)
                     }
-                    .buttonStyle(.bordered)
-                    .pillButtonBorder()
-                    .tint(.red)
                 }
             }
         }
@@ -624,7 +634,6 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.loveOnFavoriteEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.scrobbleThresholdIndex)
         defaults.removeObject(forKey: ProSettings.Keys.useAlbumArtistForScrobbling)
-        defaults.removeObject(forKey: ProSettings.Keys.stripEpAndSingleSuffixFromAlbum)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitleKeywords)
@@ -639,7 +648,6 @@ struct SettingsView: View {
         scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
         preventDuplicateScrobblesEnabled = true
         useAlbumArtistForScrobbling = false
-        stripEpAndSingleSuffixFromAlbum = false
         removeBracketsFromSongTitlesEnabled = false
         removeAllBracketsFromSongTitlesEnabled = false
         removeBracketsFromAlbumTitlesEnabled = false
@@ -717,7 +725,7 @@ struct SettingsView: View {
 
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text("Scrobble at \(percentText) of duration")
+                Text(String.localizedStringWithFormat(localized("Scrobble at %@ of duration"), percentText))
                 Spacer()
                 lockedProInlineBadge
             }
@@ -730,9 +738,9 @@ struct SettingsView: View {
                 locked: !pro.isPro
             )
             HStack {
-                Text("10%")
+                Text(localized("10%"))
                 Spacer()
-                Text("75%")
+                Text(localized("75%"))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -792,6 +800,42 @@ struct SettingsView: View {
         return NavigationLink(value: route) {
             HStack {
                 Text(target.settingsLabel)
+                    .foregroundStyle(pro.isPro ? .primary : .secondary)
+                Spacer()
+                proFeatureBadgePlaceholder
+            }
+        }
+        .disabled(!pro.isPro)
+        .overlay(alignment: .trailing) {
+            lockedProBadgeOverlay(trailingInset: Self.iosLockedProNavigationBadgeTrailingInset)
+        }
+#endif
+    }
+
+    @ViewBuilder
+    private var textReplacementNavigationLink: some View {
+#if os(macOS)
+        NavigationLink(value: SettingsRoute.textReplacement) {
+            HStack(spacing: 12) {
+                Text(localized("Text replacement"))
+                    .foregroundStyle(pro.isPro ? .primary : .secondary)
+                Spacer()
+                ProFeatureBadge()
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.primary.opacity(0.05))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!pro.isPro)
+#else
+        NavigationLink(value: SettingsRoute.textReplacement) {
+            HStack {
+                Text(localized("Text replacement"))
                     .foregroundStyle(pro.isPro ? .primary : .secondary)
                 Spacer()
                 proFeatureBadgePlaceholder
@@ -924,15 +968,39 @@ struct SettingsView: View {
     }
 
     private var macResetButton: some View {
-        Button(role: .destructive) {
-            activeAlert = .resetConfirmation
-        } label: {
-            Label("Reset Settings", systemImage: "arrow.counterclockwise")
-                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
+        Group {
+            if isConfirmingReset {
+                HStack(spacing: 8) {
+                    Text("Reset settings?")
+                        .foregroundStyle(.secondary)
+                        .font(.headline)
+                    Spacer()
+                    Button("Cancel") {
+                        isConfirmingReset = false
+                    }
+                    .buttonStyle(.bordered)
+                    .pillButtonBorder()
+                    Button("Reset") {
+                        isConfirmingReset = false
+                        resetToInitialSettings()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .pillButtonBorder()
+                    .tint(.red)
+                }
+                .frame(minHeight: Self.macSettingsButtonMinHeight)
+            } else {
+                Button {
+                    isConfirmingReset = true
+                } label: {
+                    Label("Reset Settings", systemImage: "arrow.counterclockwise")
+                        .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
+                }
+                .buttonStyle(.bordered)
+                .pillButtonBorder()
+                .tint(.red)
+            }
         }
-        .buttonStyle(.bordered)
-        .pillButtonBorder()
-        .tint(.red)
     }
 
     private enum StartAtLoginManager {

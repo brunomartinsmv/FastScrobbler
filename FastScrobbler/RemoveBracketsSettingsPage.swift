@@ -5,48 +5,52 @@ struct RemoveBracketsSettingsPage: View {
         case songTitles
         case albumTitles
 
-        var settingsLabel: LocalizedStringKey {
+        private func localized(_ key: String) -> String {
+            NSLocalizedString(key, comment: "")
+        }
+
+        var settingsLabel: String {
             switch self {
             case .songTitles:
-                "Remove brackets for song titles"
+                localized("Remove brackets for song titles")
             case .albumTitles:
-                "Remove brackets for album titles"
+                localized("Remove brackets for album titles")
             }
         }
 
-        var toggleLabel: LocalizedStringKey {
+        var toggleLabel: String {
             switch self {
             case .songTitles:
-                "Remove brackets for song titles"
+                localized("Remove brackets for song titles")
             case .albumTitles:
-                "Remove brackets for album titles"
+                localized("Remove brackets for album titles")
             }
         }
 
-        var descriptionText: LocalizedStringKey {
+        var descriptionText: String {
             switch self {
             case .songTitles:
-                "When enabled, brackets containing any of the keywords in the list below will be removed from song titles when scrobbling."
+                localized("When enabled, brackets containing any of the keywords in the list below will be removed from song titles when scrobbling.")
             case .albumTitles:
-                "When enabled, brackets containing any of the keywords in the list below will be removed from album titles when scrobbling."
+                localized("When enabled, brackets containing any of the keywords in the list below will be removed from album titles when scrobbling.")
             }
         }
 
-        var warningText: LocalizedStringKey {
+        var warningText: String {
             switch self {
             case .songTitles:
-                "This will affect song titles with any brackets in them."
+                localized("This will affect song titles with any brackets in them.")
             case .albumTitles:
-                "This will affect album titles with any brackets in them."
+                localized("This will affect album titles with any brackets in them.")
             }
         }
 
-        var addKeywordMessage: LocalizedStringKey {
+        var addKeywordMessage: String {
             switch self {
             case .songTitles:
-                "Enter a keyword to match inside song-title brackets when scrobbling."
+                localized("Enter a keyword to match inside song-title brackets when scrobbling.")
             case .albumTitles:
-                "Enter a keyword to match inside album-title brackets when scrobbling."
+                localized("Enter a keyword to match inside album-title brackets when scrobbling.")
             }
         }
 
@@ -84,8 +88,14 @@ struct RemoveBracketsSettingsPage: View {
     @State private var keywordDrafts: [KeywordDraft]
     @State private var newKeyword = ""
     @State private var isPresentingAddKeywordPrompt = false
+    @State private var isAddingKeywordInline = false
     @FocusState private var focusedKeywordID: UUID?
+    @FocusState private var isNewKeywordFieldFocused: Bool
     @Environment(\.dismiss) private var dismiss
+
+    private func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
 
     init(target: Target) {
         self.target = target
@@ -125,6 +135,12 @@ struct RemoveBracketsSettingsPage: View {
             .onDisappear {
                 normalizeAndPersistKeywords()
             }
+            .onChange(of: isPresentingAddKeywordPrompt) { _, isPresenting in
+                if !isPresenting {
+                    newKeyword = ""
+                }
+            }
+#if os(iOS)
             .alert("Add Custom Keyword", isPresented: $isPresentingAddKeywordPrompt) {
                 TextField("Custom keyword", text: $newKeyword)
                 Button("Add") {
@@ -136,6 +152,7 @@ struct RemoveBracketsSettingsPage: View {
             } message: {
                 Text(target.addKeywordMessage)
             }
+#endif
     }
 
     @ViewBuilder
@@ -153,8 +170,8 @@ struct RemoveBracketsSettingsPage: View {
         .overlay(alignment: .topLeading) {
             MacFloatingCircleButton(
                 systemImage: "chevron.left",
-                help: "Back",
-                accessibilityLabel: "Back",
+                help: localized("Back"),
+                accessibilityLabel: localized("Back"),
                 action: {
                     dismiss()
                 }
@@ -169,9 +186,9 @@ struct RemoveBracketsSettingsPage: View {
             Section {
                 keywordSectionContent
             } header: {
-                Text("Keywords")
+                Text(localized("Keywords"))
             } footer: {
-                Text("Keywords are matched case-insensitively and only as whole words inside () and [].")
+                Text(localized("Keywords are matched case-insensitively and only as whole words inside () and []."))
             }
             .disabled(areKeywordsDisabled)
             .opacity(areKeywordsDisabled ? 0.5 : 1)
@@ -185,7 +202,7 @@ struct RemoveBracketsSettingsPage: View {
         Text(target.descriptionText)
             .font(.footnote)
             .foregroundStyle(.secondary)
-        Toggle("Remove ALL brackets", isOn: removeAllBracketsEnabledBinding)
+        Toggle(localized("Remove ALL brackets"), isOn: removeAllBracketsEnabledBinding)
             .disabled(!removeBracketsEnabledBinding.wrappedValue)
             .tint(.red)
         Text(target.warningText)
@@ -195,8 +212,8 @@ struct RemoveBracketsSettingsPage: View {
 
     @ViewBuilder
     private var keywordSectionContent: some View {
-        ForEach(Array(keywordDrafts.indices), id: \.self) { index in
-            keywordRow(index: index)
+        ForEach($keywordDrafts) { $draft in
+            keywordRow(draft: $draft)
         }
 
         addKeywordRow
@@ -216,12 +233,12 @@ struct RemoveBracketsSettingsPage: View {
 
     private var keywordsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Keywords")
+            Text(localized("Keywords"))
                 .font(.title3.weight(.semibold))
 
             keywordSectionContent
 
-            Text("Keywords are matched case-insensitively and only as whole words inside () and [].")
+            Text(localized("Keywords are matched case-insensitively and only as whole words inside () and []."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -236,10 +253,10 @@ struct RemoveBracketsSettingsPage: View {
 #endif
 
     @ViewBuilder
-    private func keywordRow(index: Int) -> some View {
+    private func keywordRow(draft: Binding<KeywordDraft>) -> some View {
         HStack(spacing: 12) {
-            TextField("Keyword", text: $keywordDrafts[index].text)
-                .focused($focusedKeywordID, equals: keywordDrafts[index].id)
+            TextField("Keyword", text: draft.text)
+                .focused($focusedKeywordID, equals: draft.id)
                 .onSubmit {
                     normalizeAndPersistKeywords()
                 }
@@ -248,7 +265,7 @@ struct RemoveBracketsSettingsPage: View {
 #endif
 
             Button(role: .destructive) {
-                removeKeyword(at: index)
+                removeKeyword(id: draft.id)
             } label: {
                 Image(systemName: "minus.circle.fill")
                     .foregroundStyle(.red)
@@ -260,6 +277,39 @@ struct RemoveBracketsSettingsPage: View {
     }
 
     private var addKeywordRow: some View {
+#if os(macOS)
+        Group {
+            if isAddingKeywordInline {
+                HStack(spacing: 8) {
+                    TextField("Custom keyword", text: $newKeyword)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($isNewKeywordFieldFocused)
+                        .onSubmit {
+                            addKeyword(from: newKeyword)
+                            isAddingKeywordInline = false
+                        }
+                    Button("Add") {
+                        addKeyword(from: newKeyword)
+                        isAddingKeywordInline = false
+                    }
+                    .disabled(newKeyword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Cancel") {
+                        newKeyword = ""
+                        isAddingKeywordInline = false
+                    }
+                }
+            } else {
+                Button {
+                    isAddingKeywordInline = true
+                    isNewKeywordFieldFocused = true
+                } label: {
+                    Label("Add Custom Keyword", systemImage: "plus.circle.fill")
+                        .foregroundStyle(.blue)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+#else
         Button {
             isPresentingAddKeywordPrompt = true
         } label: {
@@ -267,6 +317,7 @@ struct RemoveBracketsSettingsPage: View {
                 .foregroundStyle(.blue)
         }
         .buttonStyle(.plain)
+#endif
     }
 
     private func addKeyword(from source: String) {
@@ -285,11 +336,9 @@ struct RemoveBracketsSettingsPage: View {
         normalizeAndPersistKeywords()
     }
 
-    private func removeKeyword(at index: Int) {
-        guard keywordDrafts.indices.contains(index) else { return }
-        let removedID = keywordDrafts[index].id
-        keywordDrafts.remove(at: index)
-        if focusedKeywordID == removedID {
+    private func removeKeyword(id: UUID) {
+        keywordDrafts.removeAll { $0.id == id }
+        if focusedKeywordID == id {
             focusedKeywordID = nil
         }
         normalizeAndPersistKeywords()

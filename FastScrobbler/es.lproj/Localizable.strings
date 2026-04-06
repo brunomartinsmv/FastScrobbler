@@ -4,7 +4,7 @@
 "10%" = "10%";
 "75%" = "75%";
 "Account" = "Cuenta";
-"Avoids sending the same track to Last.fm more than once within a short time window." = "Evita enviar la misma pista a Last.fm más de una vez dentro de un corto intervalo de tiempo.";
+"Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs." = "Evita enviar la misma pista a Last.fm más de una vez dentro de un corto intervalo de tiempo. Desactívalo si tienes problemas con canciones en bucle.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Función beta: muestra el estado del scrobbling en la pantalla de bloqueo y en Dynamic Island.";
 "Connected" = "Conectado";
 "Done" = "Listo";
@@ -49,13 +49,13 @@
 "Enter a keyword to match inside brackets when scrobbling." = "Introduce una palabra clave para buscar dentro del texto entre corchetes al hacer scrobble.";
 "Enter a keyword to match inside song-title brackets when scrobbling." = "Introduce una palabra clave para buscar dentro del texto entre corchetes de los títulos de canciones al hacer scrobble.";
 "Enter a keyword to match inside album-title brackets when scrobbling." = "Introduce una palabra clave para buscar dentro del texto entre corchetes de los títulos de álbumes al hacer scrobble.";
-"Remove “- EP” / “- Single” from album name" = "Eliminar \"- EP\" / \"- Single\" del nombre del álbum";
+"Remove \"- EP\" / \"- Single\" from album name" = "Eliminar \"- EP\" / \"- Single\" del nombre del álbum";
 "Reset" = "Restablecer";
 "Reset Settings?" = "¿Restablecer ajustes?";
 "Scrobble at %@ of duration" = "Hacer scrobble al %@ de la duración";
 "Scrobble Controls" = "Controles de scrobble";
 "Scrobble Listening History from all devices" = "Hacer scrobble del historial de reproducción de todos los dispositivos";
-"Scrobble Now" = "Scrobblear ahora";
+"Scrobble Now" = "Hacer scrobble ahora";
 "Settings" = "Ajustes";
 "Setup" = "Configuración";
 "Sign Out" = "Cerrar sesión";
@@ -67,7 +67,7 @@
 "Replace song artist with album artist when scrobbling" = "Reemplazar el artista de la canción por el artista del álbum al hacer scrobble";
 "Username" = "Nombre de usuario";
 "You’ll need to sign in again to scrobble." = "Tendrás que iniciar sesión de nuevo para hacer scrobble.";
-"You’re upgraded." = "Has mejorado.";
+"You’re upgraded." = "Has actualizado.";
 "You’ve unlocked FastScrobbler Pro!\nYour upgrade helps support future development of FastScrobbler." = "¡Has desbloqueado FastScrobbler Pro!\nTu mejora ayuda a apoyar el desarrollo futuro de FastScrobbler.";
 "%lldm ago" = "hace %lld min";
 "%lldh ago" = "hace %lld h";
@@ -170,7 +170,7 @@
 "Sign In to Last.fm" = "Iniciar sesión en Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "Inicia sesión para empezar a hacer scrobble en tu cuenta de Last.fm.";
 "Signing In…" = "Iniciando sesión…";
-"Sends the currently playing track to Last.fm as “Now Playing”." = "Envía la pista que se está reproduciendo a Last.fm como «Now Playing».";
+"Sends the currently playing track to Last.fm as \"Now Playing\"." = "Envía la pista que se está reproduciendo a Last.fm como «Now Playing».";
 "Shortcuts & Control Center" = "Atajos y Centro de control";
 "Start Playing Music" = "Empezar a reproducir música";
 "Start at Login" = "Iniciar al iniciar sesión";
@@ -196,7 +196,7 @@
 "Upgrade" = "Mejorar";
 "Upgrade for %@" = "Mejorar por %@";
 "Remove brackets from song and album titles by matching keywords, or optionally remove all brackets." = "Elimina de los títulos de canciones y álbumes los segmentos entre corchetes mediante palabras clave, o elimina todos los corchetes.";
-"Replace song artist with album artist when scrobbling, and remove “- EP” / “- Single” from album names." = "Reemplaza el artista de la canción por el artista del álbum al hacer scrobble y elimina «- EP» / «- Single» de los nombres de álbum.";
+"Replace song artist with album artist when scrobbling, and remove \"- EP\" / \"- Single\" from album names." = "Reemplaza el artista de la canción por el artista del álbum al hacer scrobble y elimina «- EP» / «- Single» de los nombres de álbum.";
 "View Profile" = "Ver perfil";
 "View Profile in Last.fm" = "Ver perfil en Last.fm";
 "When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "Cuando macOS te pida permitir que FastScrobbler controle Música, pulsa Permitir. Esto permite que FastScrobbler lea lo que se está reproduciendo para hacer scrobbling.";
@@ -204,7 +204,7 @@
 "all devices" = "todos los dispositivos";
 "interrupted" = "interrumpido";
 "loved" = "loved";
-"now playing sent" = "now playing enviado";
+"now playing sent" = "en reproducción enviado";
 "paused" = "pausado";
 "played %llds" = "reproducido %lld s";
 "playing" = "reproduciendo";
@@ -217,3 +217,33 @@
 "Previous Versions" = "Versiones anteriores";
 "View Previous Versions" = "Ver versiones anteriores";
 "What's New" = "Novedades";
+
+/* Manual Scrobble */
+"Manual Scrobble" = "Scrobble manual";
+"Artist" = "Artista";
+"Song title" = "Título de la canción";
+"Album" = "Álbum";
+"Album artist" = "Artista del álbum";
+"Timestamp" = "Marca de tiempo";
+"Now" = "Ahora";
+"Custom…" = "Personalizado…";
+"Date & Time" = "Fecha y hora";
+"Last.fm will reject scrobbles older than two weeks." = "Last.fm rechazará los scrobbles con más de dos semanas de antigüedad.";
+"Submit Scrobble" = "Enviar scrobble";
+"Submitted" = "Enviado";
+"Manual Scrobble Log" = "Registro de scrobbles manuales";
+"Manual" = "Manual";
+
+/* Text Replacement */
+"Text Replacement" = "Reemplazo de texto";
+"Text replacement" = "Reemplazo de texto";
+"Find and replace keywords to automatically clean up track, album, or artist names before scrobbling." = "Busca y reemplaza palabras clave para limpiar automáticamente los nombres de pista, álbum o artista antes de hacer scrobble.";
+"Add Rule" = "Añadir regla";
+"Rules" = "Reglas";
+"Each rule replaces all exact occurrences of the \"Find\" text in the selected fields before scrobbling. All keywords are case-sensitive." = "Cada regla reemplaza todas las ocurrencias exactas del texto de «Buscar» en los campos seleccionados antes de hacer scrobble. Todas las palabras clave distinguen mayúsculas de minúsculas.";
+"Find" = "Buscar";
+"Blank" = "En blanco";
+"Replace with" = "Reemplazar con";
+"Song" = "Canción";
+"This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History." = "Esta opción no está disponible temporalmente debido a problemas que afectan a la fiabilidad del scrobbling desde el Historial de reproducción.";
+"This will restore all settings to their defaults." = "Esto restaurará todos los ajustes a sus valores predeterminados.";

@@ -196,6 +196,8 @@ final class AppModel {
             return .playbackHistory
         case .recentlyPlayed:
             return .recentlyPlayed
+        case .manual:
+            return .manual
         case .live, .none:
             return .backlog
         }

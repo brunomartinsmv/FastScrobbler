@@ -106,7 +106,7 @@ private enum ShortcutsPlaybackReader {
 
 struct SendNowPlayingIntent: AppIntent {
     static let title: LocalizedStringResource = "Send Now Playing"
-    static let description = IntentDescription("Sends the currently playing track to Last.fm as “Now Playing”.")
+    static let description = IntentDescription("Sends the currently playing track to Last.fm as \"Now Playing\".")
     static let openAppWhenRun: Bool = false
 
     init() {}

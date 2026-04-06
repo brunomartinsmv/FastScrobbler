@@ -4,7 +4,7 @@
 "10%" = "10%";
 "75%" = "75%";
 "Account" = "账户";
-"Avoids sending the same track to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一首歌曲。";
+"Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs." = "避免在短时间内向 Last.fm 重复发送同一首歌曲。如果您在循环播放歌曲时遇到问题，请禁用此功能。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
 "Connected" = "已连接";
 "Done" = "完成";
@@ -18,7 +18,7 @@
 "Listening History" = "播放历史";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobbler 的实时活动已在 iOS 设置中关闭。";
 "Love Apple Music favourites on Last.fm" = "在 Last.fm 上同步喜爱 Apple Music 收藏歌曲";
-"Loved" = "已喜欢";
+"Loved" = "Loved";
 "No scrobbles yet." = "还没有 scrobble。";
 "No track detected." = "未检测到歌曲。";
 "Not connected" = "未连接";
@@ -49,7 +49,7 @@
 "Enter a keyword to match inside brackets when scrobbling." = "请输入一个在 scrobble 时用于匹配括号内容的关键词。";
 "Enter a keyword to match inside song-title brackets when scrobbling." = "请输入一个在 scrobble 时用于匹配歌曲标题括号内容的关键词。";
 "Enter a keyword to match inside album-title brackets when scrobbling." = "请输入一个在 scrobble 时用于匹配专辑标题括号内容的关键词。";
-"Remove “- EP” / “- Single” from album name" = "从专辑名称中移除 “- EP” / “- Single”";
+"Remove \"- EP\" / \"- Single\" from album name" = "从专辑名称中移除 \"- EP\" / \"- Single\"";
 "Reset" = "重置";
 "Reset Settings?" = "要重置设置吗？";
 "Scrobble at %@ of duration" = "在播放到 %@ 时 scrobble";
@@ -81,7 +81,7 @@
 "Connect Last.fm to scrobble." = "连接 Last.fm 以开始 scrobble。";
 "Connect your account in Settings to start scrobbling." = "在设置中连接你的账户以开始 scrobble。";
 "Couldn't sign in to Last.fm" = "无法登录 Last.fm";
-"Couldn't update Start at Login" = "无法更新“登录时启动”设置";
+"Couldn't update Start at Login" = "无法更新\"登录时启动\"设置";
 "Continue" = "继续";
 "Favourited tracks in Apple Music are also marked as Loved on Last.fm." = "在 Apple Music 中收藏的歌曲也会在 Last.fm 上标记为 Loved。";
 "Help" = "帮助";
@@ -155,7 +155,7 @@
 "Scrobbled: %@ — %@" = "已 Scrobble：%@ — %@";
 "Scrobbling from Listening History may be affected when AutoMix is on." = "启用自动过渡时，从播放历史进行 scrobble 可能会受到影响。";
 "Scrobbling…" = "Scrobble 中…";
-"Note" = "提示";
+"Note" = "注意";
 "Issues Scrobbling?" = "Scrobble 有问题？";
 "Questions or Bug Reports?" = "有问题或要报告错误？";
 "Submit a post to r/FastScrobbler" = "在 r/FastScrobbler 发帖";
@@ -163,15 +163,15 @@
 ", and FastScrobbler will respond to your post." = "，FastScrobbler 会回复你的帖子。";
 "Try signing out of Last.fm and signing in again." = "请先退出 Last.fm 账号，然后重新登录。";
 "Search" = "搜索";
-"Send Now Playing" = "发送“正在播放”";
-"Send the current track to Last.fm as now playing." = "将当前歌曲作为“正在播放”发送到 Last.fm。";
-"Sent now playing: %@ — %@" = "已发送“正在播放”：%@ — %@";
+"Send Now Playing" = "发送\"正在播放\"";
+"Send the current track to Last.fm as now playing." = "将当前歌曲作为\"正在播放\"发送到 Last.fm。";
+"Sent now playing: %@ — %@" = "已发送\"正在播放\"：%@ — %@";
 "Show Live Activity (Beta)" = "显示实时活动（Beta）";
 "Sign In" = "登录";
 "Sign In to Last.fm" = "登录 Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "登录后即可开始向你的 Last.fm 账户 scrobble。";
 "Signing In…" = "登录中…";
-"Sends the currently playing track to Last.fm as “Now Playing”." = "将当前播放的歌曲作为“Now Playing”发送到 Last.fm。";
+"Sends the currently playing track to Last.fm as \"Now Playing\"." = "将当前播放的歌曲作为\"Now Playing\"发送到 Last.fm。";
 "Shortcuts & Control Center" = "快捷指令与控制中心";
 "Start Playing Music" = "开始播放音乐";
 "Start at Login" = "登录时启动";
@@ -197,14 +197,14 @@
 "Upgrade" = "升级";
 "Upgrade for %@" = "以 %@ 升级";
 "Remove brackets from song and album titles by matching keywords, or optionally remove all brackets." = "通过匹配关键词移除歌曲和专辑标题中的括号内容，或选择移除所有括号。";
-"Replace song artist with album artist when scrobbling, and remove “- EP” / “- Single” from album names." = "Scrobble 时用专辑艺人替换歌曲艺人，并从专辑名中移除 “- EP” / “- Single”。";
+"Replace song artist with album artist when scrobbling, and remove \"- EP\" / \"- Single\" from album names." = "Scrobble 时用专辑艺人替换歌曲艺人，并从专辑名中移除 \"- EP\" / \"- Single\"。";
 "View Profile" = "查看个人资料";
 "View Profile in Last.fm" = "在 Last.fm 中查看个人资料";
-"When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "当 macOS 请求允许 FastScrobbler 控制“音乐”时，请点击“允许”。这样 FastScrobbler 才能读取当前播放内容并进行 scrobble。";
+"When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "当 macOS 请求允许 FastScrobbler 控制\"音乐\"时，请点击\"允许\"。这样 FastScrobbler 才能读取当前播放内容并进行 scrobble。";
 "You’re signed out of Last.fm." = "你已退出 Last.fm 登录。";
 "all devices" = "所有设备";
 "interrupted" = "已中断";
-"loved" = "已喜欢";
+"loved" = "Loved";
 "now playing sent" = "已发送正在播放";
 "paused" = "已暂停";
 "played %llds" = "已播放 %lld 秒";
@@ -218,3 +218,33 @@
 "Previous Versions" = "旧版本";
 "View Previous Versions" = "查看旧版本";
 "What's New" = "新功能";
+
+/* Manual Scrobble */
+"Manual Scrobble" = "手动 Scrobble";
+"Artist" = "艺人";
+"Song title" = "歌曲标题";
+"Album" = "专辑";
+"Album artist" = "专辑艺人";
+"Timestamp" = "时间戳";
+"Now" = "现在";
+"Custom…" = "自定义…";
+"Date & Time" = "日期与时间";
+"Last.fm will reject scrobbles older than two weeks." = "Last.fm 将拒绝超过两周的 scrobble。";
+"Submit Scrobble" = "提交 Scrobble";
+"Submitted" = "已提交";
+"Manual Scrobble Log" = "手动 Scrobble 记录";
+"Manual" = "手动";
+
+/* Text Replacement */
+"Text Replacement" = "文本替换";
+"Text replacement" = "文本替换";
+"Find and replace keywords to automatically clean up track, album, or artist names before scrobbling." = "通过查找和替换关键词，在 scrobble 前自动清理曲目、专辑或艺人名称。";
+"Add Rule" = "添加规则";
+"Rules" = "规则";
+"Each rule replaces all exact occurrences of the \"Find\" text in the selected fields before scrobbling. All keywords are case-sensitive." = "每条规则会在 scrobble 前，将所选字段中所有完全匹配的\"查找\"文本替换掉。所有关键词区分大小写。";
+"Find" = "查找";
+"Blank" = "空白";
+"Replace with" = "替换为";
+"Song" = "歌曲";
+"This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History." = "由于影响播放历史 scrobble 可靠性的问题，此开关暂时不可用。";
+"This will restore all settings to their defaults." = "这将把所有设置恢复为默认值。";

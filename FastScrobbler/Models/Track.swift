@@ -61,6 +61,7 @@ enum ProSettings {
         static let removeBracketsFromAlbumTitleKeywords = "FastScrobbler.Pro.removeBracketsFromAlbumTitleKeywords"
         static let preventDuplicateScrobblesEnabled = "FastScrobbler.Pro.preventDuplicateScrobblesEnabled"
         static let scrobbleListeningHistoryFromAllDevicesEnabled = "FastScrobbler.Pro.scrobbleListeningHistoryFromAllDevicesEnabled"
+        static let textReplacementRules = "FastScrobbler.Pro.textReplacementRules"
     }
 
     static let scrobbleThresholdOptions: [Double] = [0.10, 0.25, 0.50, 0.75]
@@ -185,6 +186,33 @@ enum ProSettings {
         AppGroup.userDefaults.set(data, forKey: Keys.removeBracketsFromAlbumTitleKeywords)
     }
 
+    static let builtInRuleIDs: Set<UUID> = [
+        UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+        UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+    ]
+    private static let builtInRules: [TextReplacementRule] = [
+        TextReplacementRule(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, find: "- Single", replace: "", scope: .album, isEnabled: false),
+        TextReplacementRule(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, find: "- EP", replace: "", scope: .album, isEnabled: false),
+    ]
+
+    static func textReplacementRules() -> [TextReplacementRule] {
+        let saved = AppGroup.userDefaults.data(forKey: Keys.textReplacementRules)
+            .flatMap { try? JSONDecoder().decode([TextReplacementRule].self, from: $0) } ?? []
+        var pinned = builtInRules
+        for (i, rule) in pinned.enumerated() {
+            if let savedRule = saved.first(where: { $0.id == rule.id }) {
+                pinned[i].isEnabled = savedRule.isEnabled
+            }
+        }
+        let userRules = saved.filter { !builtInRuleIDs.contains($0.id) }
+        return pinned + userRules
+    }
+
+    static func setTextReplacementRules(_ rules: [TextReplacementRule]) {
+        guard let data = try? JSONEncoder().encode(rules) else { return }
+        AppGroup.userDefaults.set(data, forKey: Keys.textReplacementRules)
+    }
+
     static func sanitizedRemoveBracketsKeywords(_ keywords: [String]) -> [String] {
         var seen = Set<String>()
         var sanitized: [String] = []
@@ -199,6 +227,38 @@ enum ProSettings {
         }
 
         return sanitized
+    }
+}
+
+enum TextReplacementScope: String, Codable, CaseIterable, Sendable {
+    case all
+    case artist
+    case track
+    case album
+
+    var displayName: String {
+        switch self {
+        case .all: return NSLocalizedString("All", comment: "Text replacement scope: all fields")
+        case .artist: return NSLocalizedString("Artist", comment: "Text replacement scope: artist field")
+        case .track: return NSLocalizedString("Song", comment: "Text replacement scope: track/song field")
+        case .album: return NSLocalizedString("Album", comment: "Text replacement scope: album field")
+        }
+    }
+}
+
+struct TextReplacementRule: Codable, Identifiable, Sendable {
+    var id: UUID
+    var find: String
+    var replace: String
+    var scope: TextReplacementScope
+    var isEnabled: Bool
+
+    init(id: UUID, find: String, replace: String, scope: TextReplacementScope, isEnabled: Bool = true) {
+        self.id = id
+        self.find = find
+        self.replace = replace
+        self.scope = scope
+        self.isEnabled = isEnabled
     }
 }
 
@@ -283,10 +343,6 @@ extension Track {
             copy = copy.applyingAlbumArtistAsArtistIfAvailable()
         }
 
-        if ProSettings.stripEpAndSingleSuffixFromAlbum() {
-            copy = copy.strippingEpAndSingleSuffixFromAlbumIfPresent()
-        }
-
         if ProSettings.removeBracketsFromAlbumTitlesEnabled() {
             copy = copy.removingConfiguredParentheticalAlbumSegments()
         }
@@ -295,6 +351,31 @@ extension Track {
             copy = copy.removingConfiguredParentheticalTitleSegments()
         }
 
+        let replacementRules = ProSettings.textReplacementRules()
+        if !replacementRules.isEmpty {
+            copy = copy.applyingTextReplacements(replacementRules)
+        }
+
+        return copy
+    }
+
+    func applyingTextReplacements(_ rules: [TextReplacementRule]) -> Track {
+        var copy = self
+        for rule in rules {
+            guard !rule.find.isEmpty, rule.isEnabled else { continue }
+            switch rule.scope {
+            case .all:
+                copy.artist = copy.artist.replacingOccurrences(of: rule.find, with: rule.replace)
+                copy.title = copy.title.replacingOccurrences(of: rule.find, with: rule.replace)
+                copy.album = copy.album?.replacingOccurrences(of: rule.find, with: rule.replace)
+            case .artist:
+                copy.artist = copy.artist.replacingOccurrences(of: rule.find, with: rule.replace)
+            case .track:
+                copy.title = copy.title.replacingOccurrences(of: rule.find, with: rule.replace)
+            case .album:
+                copy.album = copy.album?.replacingOccurrences(of: rule.find, with: rule.replace)
+            }
+        }
         return copy
     }
 
@@ -366,8 +447,10 @@ extension Track {
 
         var workingValue = value
         var removedAnySegment = false
+        var passesRemaining = 5
 
-        while true {
+        while passesRemaining > 0 {
+            passesRemaining -= 1
             let matches = regex.matches(
                 in: workingValue,
                 range: NSRange(workingValue.startIndex..<workingValue.endIndex, in: workingValue)

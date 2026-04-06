@@ -2,7 +2,7 @@
 
 FastScrobbler is a lightweight scrobbler for Apple Music that sends:
 
-- `track.updateNowPlaying` (shows as “currently playing” on Last.fm)
+- `track.updateNowPlaying` (shows as "currently playing" on Last.fm)
 - `track.scrobble` once you’ve listened long enough (threshold is configurable)
 
 It comprises:
@@ -12,7 +12,7 @@ It comprises:
 
 ## App Store
 
-**Download on the iOS and macOS App Store:**
+**Download on the App Store for iOS and macOS:**
 https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
 
 ## iOS Screenshots
@@ -35,18 +35,19 @@ https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
 
 - **Now Playing → Last.fm**: sends now playing as soon as playback is detected.
 - **Auto-scrobble with threshold**: scrobbles after 10% / 25% / 50% / 75% of track duration (default 50%).
-- **Manual “Scrobble Now”**: scrobble the current track immediately from the app.
+- **Manual "Scrobble Now"**: scrobble the current track immediately from the app.
+- **Manual Scrobble**: submit a scrobble for any track by entering artist, song, album, and an optional custom timestamp (up to two weeks in the past). Includes a log of the last 30 manual scrobbles.
 - **Pause/Resume scrobbling**: stops all sending while paused.
 - **Offline / failure tolerant**: queues scrobbles locally and retries with exponential-ish backoff.
-- **Listening History import (iOS)**: scans the device’s Apple Music “Playback History” playlist and imports missed plays (best-effort; this device only).
+- **Listening History import (iOS)**: uses the Apple Music app's Listening History functionality as a scrobbling backlog.
 - **Apple Music favourites → Last.fm love (optional)**: when enabled, favouriting a song in Apple Music can trigger `track.love` after scrobbling.
 - **Scrobble metadata controls**:
   - Use **Album Artist** as scrobble artist (when available, except compilation albums).
-  - Strip “`- EP`” / “`- Single`” suffixes from album names.
   - **Remove brackets from song and album titles when scrobbling**: remove all parenthetical / bracketed title segments, or only segments whose contents match configurable keywords (case-insensitive whole-word matching).
+  - **Text Replacement**: define find-and-replace rules applied to artist, song, and/or album fields before scrobbling. Rules support exact text matching and can be scoped to specific fields. Built-in rules for stripping `- Single` / `- EP` are included.
 - **Live Activity (iOS 16.1+)**: shows scrobbling status on Lock Screen / Dynamic Island.
 - **Shortcuts (iOS)**:
-  - **Send Now Playing** (updates Last.fm “currently playing”)
+  - **Send Now Playing** (updates Last.fm "currently playing")
   - **Scrobble Song** (immediate scrobble)
 - **Control Center buttons (iOS 18+)**: Control Widgets that run the same actions without opening the app.
 - **macOS menu bar UI**: no dock icon/windows; click the menu bar icon to open the popover UI.
@@ -117,7 +118,7 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 
 - Background scrobbling is **best-effort**. iOS can suspend apps aggressively; FastScrobbler uses `BGAppRefreshTask` / `BGProcessingTask`, but always-on behavior is not guaranteed.
 - Scrobbling requires a track duration. If Apple Music doesn’t provide a duration, FastScrobbler can still send **Now Playing**, but may not auto-scrobble.
-- Listening History import uses the device’s “Playback History” playlist; it’s best-effort and intentionally avoids importing plays synced from other devices.
+- Listening History import uses the Apple Music app's Listening History functionality, which only records songs added to the user's library. 
 - Live Activities, Shortcuts, and Control Center widgets may update with a delay (iOS can throttle background/intent execution).
 
 ## Troubleshooting
@@ -125,7 +126,7 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - **No track detected (iOS)**: make sure Apple Music is playing and Media Library permission is granted.
 - **No scrobbles while locked/backgrounded (iOS)**: keep the app open occasionally; ensure Background App Refresh is enabled.
 - **Issue scrobbling looped songs**: ensure that "Prevent duplicate scrobbles" is turned off in the app's settings 
-- **macOS shows “permission” errors**: enable Automation permission for Music in System Settings.
+- **macOS shows "permission" errors**: enable Automation permission for Music in System Settings.
 - **Auth callback issues**: `LastFMSecrets.callbackScheme` must match `CFBundleURLTypes` in `FastScrobbler/Info.plist`.
 
 ## Privacy

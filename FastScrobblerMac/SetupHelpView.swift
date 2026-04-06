@@ -36,6 +36,10 @@ struct SetupHelpView: View {
     @State private var isSigningInToLastFM = false
     @State private var lastFMErrorText: String?
 
+    private func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+
     private var canFinishSetup: Bool {
         auth.sessionKey != nil && observer.authorizationStatus == .authorized
     }
@@ -144,7 +148,7 @@ struct SetupHelpView: View {
                 }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 20)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
@@ -156,7 +160,7 @@ struct SetupHelpView: View {
         private var statusBadge: some View {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
-                Text("Enabled")
+                Text(NSLocalizedString("Enabled", comment: ""))
                     .lineLimit(1)
             }
             .font(.caption.weight(.semibold))
@@ -298,7 +302,7 @@ struct SetupHelpView: View {
                 .disabled(mode == .onboarding && !canFinishSetup)
 
                 if mode == .onboarding && !canFinishSetup {
-                    Text("Connect Last.fm and allow Music control before continuing.")
+                    Text(localized("Connect Last.fm and allow Music control before continuing."))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -341,9 +345,9 @@ struct SetupHelpView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Text("Setup")
+            Text(localized("Setup"))
                 .font(.system(size: 34, weight: .bold))
-            Text("A quick checklist to get scrobbling working reliably.")
+            Text(localized("A quick checklist to get scrobbling working reliably."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

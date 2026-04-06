@@ -8,6 +8,7 @@ final class ScrobbleLogStore: ObservableObject {
         case backlog
         case playbackHistory
         case recentlyPlayed
+        case manual
     }
 
     struct Entry: Identifiable, Codable, Hashable, Sendable {
@@ -60,6 +61,10 @@ final class ScrobbleLogStore: ObservableObject {
     func clear() {
         entries = []
         save()
+    }
+
+    func isMostRecentScrobble(dedupeKey: String) -> Bool {
+        entries.first?.track.dedupeKey == dedupeKey
     }
 
     func containsSimilar(track: Track, around startTimestamp: Int, toleranceSeconds: Int) -> Bool {

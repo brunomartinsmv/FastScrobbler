@@ -6,6 +6,7 @@ actor ScrobbleBacklog {
         case live
         case playbackHistory
         case recentlyPlayed
+        case manual
     }
 
     struct Item: Codable, Hashable {
@@ -96,6 +97,11 @@ actor ScrobbleBacklog {
         await save()
     }
 
+    func isMostRecentScrobble(dedupeKey: String) async -> Bool {
+        await loadIfNeeded()
+        return items.sorted(by: { $0.startTimestamp > $1.startTimestamp }).first?.track.dedupeKey == dedupeKey
+    }
+
     func containsSimilar(track: Track, around startTimestamp: Int, toleranceSeconds: Int) async -> Bool {
         await loadIfNeeded()
         let tol = max(0, toleranceSeconds)
@@ -168,6 +174,7 @@ actor ScrobbleBacklog {
                 var item = items[idx]
 
                 if item.startTimestamp <= 0 || item.attemptCount >= 10 {
+                    logger.warning("discarding backlog item after \(item.attemptCount, privacy: .public) attempts: \(item.track.artist, privacy: .public) – \(item.track.title, privacy: .public)")
                     items.remove(at: idx)
                     continue
                 }
@@ -217,7 +224,7 @@ actor ScrobbleBacklog {
                         // Item was already removed (or the backlog was mutated unexpectedly while awaiting).
                     }
                     logger.warning("backlog scrobble failed: \(error.localizedDescription, privacy: .public)")
-                    break
+                    idx += 1
                 }
             }
         } catch {

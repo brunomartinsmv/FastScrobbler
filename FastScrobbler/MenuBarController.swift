@@ -139,7 +139,13 @@
 
     private func togglePopover(_ sender: Any?) {
         if popover.isShown {
-            popover.performClose(sender)
+            let popoverWindow = popover.contentViewController?.view.window
+            if popoverWindow?.isKeyWindow == true {
+                popover.performClose(sender)
+            } else {
+                NSApp.activate(ignoringOtherApps: true)
+                popoverWindow?.makeKey()
+            }
         } else {
             showPopover()
         }
@@ -149,6 +155,8 @@
 	        guard let button = statusItem.button else { return }
 	        NSApp.activate(ignoringOtherApps: true)
 	        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        // Make the popover window key so SwiftUI renders buttons with full colour
+        popover.contentViewController?.view.window?.makeKey()
         installDismissMonitors()
 	        // Post after presenting so any refresh work can't delay the popover from appearing.
 	        DispatchQueue.main.async {
@@ -184,8 +192,7 @@
                     return nil
                 }
 
-                let popoverWindow = self.popover.contentViewController?.view.window
-                if event.window !== popoverWindow {
+                if !self.isWindowPopoverOrDescendant(event.window) {
                     self.closePopoverIfShown()
                 }
                 return event
@@ -208,6 +215,19 @@
     private func closePopoverIfShown() {
         guard popover.isShown else { return }
         popover.performClose(nil)
+    }
+
+    // Walk up the NSWindow parent chain to check if `window` is the popover window
+    // or any descendant of it (e.g. a SwiftUI Alert panel presented over the popover).
+    private func isWindowPopoverOrDescendant(_ window: NSWindow?) -> Bool {
+        guard let window else { return false }
+        let popoverWindow = popover.contentViewController?.view.window
+        var candidate: NSWindow? = window
+        while let w = candidate {
+            if w === popoverWindow { return true }
+            candidate = w.parent
+        }
+        return false
     }
 
     @objc private func quit() {
