@@ -108,6 +108,7 @@ struct ManualScrobbleView: View {
                         .animation(.easeOut(duration: 0.25), value: isSubmitted)
                     }
                     .listRowBackground(isSubmitted ? Color.green : Color.accentColor)
+                    .opacity(canSubmit ? 1 : 0.4)
                     .disabled(!canSubmit)
                 }
 

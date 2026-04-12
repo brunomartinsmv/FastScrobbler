@@ -186,7 +186,7 @@ struct SetupHelpView: View {
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var mediaStatus: MPMediaLibraryAuthorizationStatus = .notDetermined
+    @State private var mediaStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
     @State private var backgroundRefreshStatus: UIBackgroundRefreshStatus = .restricted
     @State private var isSigningInToLastFM = false
     @State private var isShowingWhatsNew = false

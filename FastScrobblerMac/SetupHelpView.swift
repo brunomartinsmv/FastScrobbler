@@ -270,13 +270,13 @@ struct SetupHelpView: View {
 
                     HelpRow(
                         icon: "play.circle.fill",
-                        title: NSLocalizedString("Start Playing Music", comment: ""),
+                        title: NSLocalizedString("Start playing music", comment: ""),
                         subtitle: NSLocalizedString("Start playing music! FastScrobbler will show Now Playing and scrobble when eligible.", comment: "")
                     )
 
                     HelpRow(
                         icon: "power.circle",
-                        title: NSLocalizedString("Start at Login", comment: ""),
+                        title: NSLocalizedString("Start at login", comment: ""),
                         subtitle: NSLocalizedString("Optional: turn this on in Settings if you want FastScrobbler to launch when you sign in to your Mac.", comment: ""),
                         isChecked: startAtLoginEnabled
                     )

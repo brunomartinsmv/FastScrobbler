@@ -135,18 +135,18 @@ struct WhatsNewView: View {
                     showsProBadge: false
                 )
             ]
-        ),
-        VersionSection(
-            id: "1.2",
-            version: "1.2",
-            features: [
-                Feature(
-                    systemImage: "clock.arrow.circlepath",
-                    title: "\"Scrobble Listening History from all devices\" feature",
-                    showsProBadge: true
-                )
-            ]
         )
+        // VersionSection(
+        //     id: "1.2",
+        //     version: "1.2",
+        //     features: [
+        //         Feature(
+        //             systemImage: "clock.arrow.circlepath",
+        //             title: "\"Scrobble Listening History from all devices\" feature",
+        //             showsProBadge: true
+        //         )
+        //     ]
+        // )
     ]
 
     let onContinue: () -> Void

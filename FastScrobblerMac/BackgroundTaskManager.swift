@@ -10,5 +10,7 @@ final class BackgroundTaskManager {
     func scheduleAppRefresh() {}
 
     func scheduleProcessingIfNeeded() {}
+
+    func scheduleProcessing() {}
 }
 

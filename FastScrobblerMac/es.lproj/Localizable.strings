@@ -15,7 +15,7 @@
 "Engine: " = "Motor: ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "General";
-"Imports plays from Apple Music Playback History (%@)." = "Importa reproducciones del historial de reproducción de Apple Music (%@).";
+"Imports plays from your Music app Listening History (%@)." = "Importa reproducciones del historial de reproducción de la app Música (%@).";
 "Last.fm" = "Last.fm";
 "Listening History" = "Historial de reproducción";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "Las Actividades en Vivo están desactivadas en Ajustes de iOS para FastScrobbler.";
@@ -82,7 +82,7 @@
 "Connect Last.fm to scrobble." = "Conecta Last.fm para hacer scrobble.";
 "Connect your account in Settings to start scrobbling." = "Conecta tu cuenta en Ajustes para empezar a hacer scrobble.";
 "Couldn't sign in to Last.fm" = "No se pudo iniciar sesión en Last.fm";
-"Couldn't update Start at Login" = "No se pudo actualizar Iniciar al iniciar sesión";
+"Couldn't update Start at login" = "No se pudo actualizar Iniciar al iniciar sesión";
 "Continue" = "Continuar";
 "Favourited tracks in Apple Music are also marked as Loved on Last.fm." = "Las pistas marcadas como favoritas en Apple Music también se marcan como Loved en Last.fm.";
 "Help" = "Ayuda";
@@ -98,7 +98,7 @@
 "Last.fm callback did not include an auth token." = "La devolución de llamada de Last.fm no incluyó un token de autenticación.";
 "Language" = "Idioma";
 "Launches FastScrobbler when you sign in." = "Inicia FastScrobbler cuando inicias sesión.";
-"Live Activity (Beta)" = "Actividad en Vivo (Beta)";
+"Live Activity" = "Actividad en Vivo";
 "Loading…" = "Cargando…";
 "Love favourites on Last.fm" = "Marcar favoritos en Last.fm";
 "Loved on Last.fm" = "Loved en Last.fm";
@@ -167,9 +167,9 @@
 "Signing In…" = "Iniciando sesión…";
 "Sends the currently playing track to Last.fm as \"Now Playing\"." = "Envía la pista que se está reproduciendo a Last.fm como «Now Playing».";
 "Shortcuts & Control Center" = "Atajos y Centro de control";
-"Start Playing Music" = "Empezar a reproducir música";
+"Start playing music" = "Empezar a reproducir música";
 "Start playing music! FastScrobbler will show Now Playing and scrobble when eligible." = "Empieza a reproducir música. FastScrobbler mostrará En reproducción y hará scrobble cuando corresponda.";
-"Start at Login" = "Iniciar al iniciar sesión";
+"Start at login" = "Iniciar al iniciar sesión";
 "Stopped" = "Detenido";
 "Support development of the app" = "Apoyar el desarrollo de la app";
 "System" = "Sistema";

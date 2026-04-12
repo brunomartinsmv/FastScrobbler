@@ -15,7 +15,7 @@
 "Engine: " = "引擎：";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "通用";
-"Imports plays from Apple Music Playback History (%@)." = "从 Apple Music 播放历史记录（%@）导入播放记录。";
+"Imports plays from your Music app Listening History (%@)." = "从音乐 App 播放历史记录（%@）导入播放记录。";
 "Last.fm" = "Last.fm";
 "Listening History" = "播放历史";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobbler 的实时活动已在 iOS 设置中关闭。";
@@ -82,7 +82,7 @@
 "Connect Last.fm to scrobble." = "连接 Last.fm 以开始 scrobble。";
 "Connect your account in Settings to start scrobbling." = "在设置中连接你的账户以开始 scrobble。";
 "Couldn't sign in to Last.fm" = "无法登录 Last.fm";
-"Couldn't update Start at Login" = "无法更新\"登录时启动\"设置";
+"Couldn't update Start at login" = "无法更新\"登录时启动\"设置";
 "Continue" = "继续";
 "Favourited tracks in Apple Music are also marked as Loved on Last.fm." = "在 Apple Music 中收藏的歌曲也会在 Last.fm 上标记为 Loved。";
 "Help" = "帮助";
@@ -98,7 +98,7 @@
 "Last.fm callback did not include an auth token." = "Last.fm 回调中未包含身份验证令牌。";
 "Language" = "语言";
 "Launches FastScrobbler when you sign in." = "在你登录时启动 FastScrobbler。";
-"Live Activity (Beta)" = "实时活动（Beta）";
+"Live Activity" = "实时活动";
 "Loading…" = "加载中…";
 "Love favourites on Last.fm" = "在 Last.fm 上标记喜爱";
 "Loved on Last.fm" = "已在 Last.fm 标记 Loved";
@@ -168,9 +168,9 @@
 "Signing In…" = "登录中…";
 "Sends the currently playing track to Last.fm as \"Now Playing\"." = "将当前播放的歌曲作为\"Now Playing\"发送到 Last.fm。";
 "Shortcuts & Control Center" = "快捷指令与控制中心";
-"Start Playing Music" = "开始播放音乐";
+"Start playing music" = "开始播放音乐";
 "Start playing music! FastScrobbler will show Now Playing and scrobble when eligible." = "开始播放音乐！符合条件时，FastScrobbler 会显示\"正在播放\"并进行 scrobble。";
-"Start at Login" = "登录时启动";
+"Start at login" = "登录时启动";
 "Stopped" = "已停止";
 "Support development of the app" = "支持应用开发";
 "System" = "系统";

@@ -261,7 +261,7 @@ struct SettingsView: View {
                 Text(
                     scrobbleListeningHistoryEnabled
                         ? String.localizedStringWithFormat(
-                            NSLocalizedString("Imports plays from Apple Music Playback History (%@).", comment: ""),
+                            NSLocalizedString("Imports plays from your Music app Listening History (%@).", comment: ""),
                             allDevicesEnabled
                                 ? NSLocalizedString("all devices", comment: "")
                                 : NSLocalizedString("this device only", comment: "")
@@ -276,7 +276,7 @@ struct SettingsView: View {
                         .onValueChange(of: scrobbleListeningHistoryEnabled) { isEnabled in
                             Task { await AppModel.shared.handleListeningHistoryScrobblingChanged(isEnabled: isEnabled) }
                         }
-                    Text("When off, FastScrobbler won’t import or scrobble plays from Apple Music Playback History.")
+                    Text("When off, FastScrobbler won’t import or scrobble plays from your Music app Listening History.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -294,7 +294,7 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Live Activity (Beta)") {
+            Section("Live Activity") {
                 Toggle("Show Live Activity (Beta)", isOn: $liveActivityEnabled)
                     .onValueChange(of: liveActivityEnabled) { isEnabled in
                         if isEnabled {
@@ -428,7 +428,7 @@ struct SettingsView: View {
             }
             .fixedSize()
 
-            Toggle(localized("Start at Login"), isOn: $startAtLoginEnabled)
+            Toggle(localized("Start at login"), isOn: $startAtLoginEnabled)
                 .onValueChange(of: startAtLoginEnabled) { isEnabled in
                     Task { @MainActor in
                         do {
@@ -453,7 +453,7 @@ struct SettingsView: View {
         .background(.thinMaterial)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .alert(localized("Couldn't update Start at Login"), isPresented: Binding(
+        .alert(localized("Couldn't update Start at login"), isPresented: Binding(
             get: { startAtLoginErrorText != nil },
             set: { isPresented in
                 if !isPresented {
@@ -730,43 +730,28 @@ struct SettingsView: View {
                 lockedProInlineBadge
             }
             .foregroundStyle(pro.isPro ? .primary : .secondary)
+            #if os(macOS)
             Slider(value: sliderValue, in: 0...Double(ProSettings.scrobbleThresholdOptions.count - 1), step: 1)
                 .disabled(!pro.isPro)
-            sliderStepMarkers(
-                count: ProSettings.scrobbleThresholdOptions.count,
-                activeIndex: effectiveIndex,
-                locked: !pro.isPro
-            )
+                .frame(maxWidth: .infinity)
+            #else
+            Slider(value: sliderValue, in: 0...Double(ProSettings.scrobbleThresholdOptions.count - 1), step: 1) {
+                Text(localized("Scrobble threshold"))
+            }
+            .disabled(!pro.isPro)
+            .frame(maxWidth: .infinity)
+            #endif
             HStack {
                 Text(localized("10%"))
+                Spacer()
+                Text(localized("25%"))
+                Spacer()
+                Text(localized("50%"))
                 Spacer()
                 Text(localized("75%"))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
-        }
-    }
-
-    private func sliderStepMarkers(count: Int, activeIndex: Int, locked: Bool) -> some View {
-        HStack(spacing: 0) {
-            ForEach(0..<count, id: \.self) { index in
-                Circle()
-                    .fill(markerColor(isActive: index == activeIndex, locked: locked))
-                    .frame(width: 4, height: 4)
-                if index != count - 1 {
-                    Spacer(minLength: 0)
-                }
-            }
-        }
-        .padding(.horizontal, 8)
-        .accessibilityHidden(true)
-    }
-
-    private func markerColor(isActive: Bool, locked: Bool) -> Color {
-        if isActive {
-            return Color.primary.opacity(locked ? 0.22 : 0.32)
-        } else {
-            return Color.primary.opacity(0.14)
         }
     }
 

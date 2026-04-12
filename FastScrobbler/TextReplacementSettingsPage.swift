@@ -223,6 +223,7 @@ struct TextReplacementSettingsPage: View {
             } else {
                 Toggle("", isOn: draft.isEnabled)
                     .labelsHidden()
+                    .scaleEffect(0.85)
                     .frame(width: 51)
                     .onChange(of: draft.wrappedValue.isEnabled) { _, _ in persist() }
                     .transition(.move(edge: .leading).combined(with: .opacity))

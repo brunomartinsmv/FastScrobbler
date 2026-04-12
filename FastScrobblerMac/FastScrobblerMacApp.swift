@@ -41,6 +41,12 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
             await model.startIfNeeded()
             await ProPurchaseManager.shared.startIfNeeded()
         }
+
+        Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
+            Task { @MainActor in
+                await AppModel.shared.periodicFlush()
+            }
+        }
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {

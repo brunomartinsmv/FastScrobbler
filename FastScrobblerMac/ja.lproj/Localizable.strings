@@ -15,7 +15,7 @@
 "Engine: " = "エンジン: ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "一般";
-"Imports plays from Apple Music Playback History (%@)." = "Apple Musicの再生履歴（%@）から再生を取り込みます。";
+"Imports plays from your Music app Listening History (%@)." = "ミュージックアプリの再生履歴（%@）から再生を取り込みます。";
 "Last.fm" = "Last.fm";
 "Listening History" = "再生履歴";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobblerのライブアクティビティがiOSの設定で無効になっています。";
@@ -82,7 +82,7 @@
 "Connect Last.fm to scrobble." = "スクロブルするにはLast.fmに接続してください。";
 "Connect your account in Settings to start scrobbling." = "スクロブルを始めるには設定でアカウントを接続してください。";
 "Couldn't sign in to Last.fm" = "Last.fmにサインインできませんでした";
-"Couldn't update Start at Login" = "ログイン時に起動を更新できませんでした";
+"Couldn't update Start at login" = "ログイン時に起動を更新できませんでした";
 "Continue" = "続ける";
 "Favourited tracks in Apple Music are also marked as Loved on Last.fm." = "Apple Musicでお気に入りにした曲もLast.fmでLovedにします。";
 "Help" = "ヘルプ";
@@ -98,7 +98,7 @@
 "Last.fm callback did not include an auth token." = "Last.fmのコールバックに認証トークンが含まれていませんでした。";
 "Language" = "言語";
 "Launches FastScrobbler when you sign in." = "サインイン時にFastScrobblerを起動します。";
-"Live Activity (Beta)" = "ライブアクティビティ（ベータ）";
+"Live Activity" = "ライブアクティビティ";
 "Loading…" = "読み込み中…";
 "Love favourites on Last.fm" = "お気に入りをLast.fmでLovedにする";
 "Loved on Last.fm" = "Last.fmでLoved";
@@ -166,9 +166,9 @@
 "Signing In…" = "サインイン中…";
 "Sends the currently playing track to Last.fm as \"Now Playing\"." = "再生中の曲をLast.fmへ「Now Playing」として送信します。";
 "Shortcuts & Control Center" = "ショートカットとコントロールセンター";
-"Start Playing Music" = "音楽の再生を開始";
+"Start playing music" = "音楽の再生を開始";
 "Start playing music! FastScrobbler will show Now Playing and scrobble when eligible." = "音楽を再生しましょう。条件を満たすと、FastScrobbler が「再生中」を表示してスクロブルします。";
-"Start at Login" = "ログイン時に起動";
+"Start at login" = "ログイン時に起動";
 "Stopped" = "停止";
 "Support development of the app" = "アプリ開発を支援";
 "System" = "システム";

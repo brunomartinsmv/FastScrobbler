@@ -78,7 +78,7 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 
 ## Permissions / OS prompts
 
-- **iOS**: Media Library / Apple Music permission is used to read now-playing metadata and (optionally) Playback History and favorites status.
+- **iOS**: Media Library / Apple Music permission is used to read now-playing metadata and (optionally) Listening History and favorites status.
 - **macOS**: Automation (Apple Events) permission is used to read now-playing metadata from the Music app.
 
 ## Build & run (from source)
@@ -146,6 +146,16 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 
 - The app expects a **non-consumable** IAP with product ID `com.kevin.FastScrobbler.pro` (see `FastScrobbler/Models/Track.swift` and `FastScrobbler/Pro.swift`).
 - **Don’t set price in code.** Pricing is configured in **App Store Connect** for the IAP product.
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=kevinlim512%2FFastScrobbler&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=kevinlim512/FastScrobbler&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=kevinlim512/FastScrobbler&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=kevinlim512/FastScrobbler&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## License
 

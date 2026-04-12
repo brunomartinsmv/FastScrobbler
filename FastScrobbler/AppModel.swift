@@ -101,6 +101,12 @@ final class AppModel {
 #endif
         observer.stop()
         engine.pauseForBackground()
+
+        // If music is actively playing, schedule a processing task so iOS can wake us
+        // soon after the scrobble lands in the backlog (which may happen post-suspend).
+        if observer.playbackState == .playing {
+            BackgroundTaskManager.shared.scheduleProcessing()
+        }
     }
 
     func backgroundTick() async {
@@ -154,6 +160,11 @@ final class AppModel {
     func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
         guard !isEnabled else { return }
         await backlog.removeAll(origin: .playbackHistory)
+    }
+
+    func periodicFlush() async {
+        guard let sessionKey = auth.sessionKey else { return }
+        await flushBacklogIfNeeded(sessionKey: sessionKey)
     }
 
     private func flushBacklogIfNeeded(sessionKey: String, force: Bool = false) async {

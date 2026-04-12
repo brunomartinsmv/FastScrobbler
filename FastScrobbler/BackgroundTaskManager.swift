@@ -45,7 +45,7 @@ final class BackgroundTaskManager {
 
     func scheduleAppRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: BackgroundTaskIdentifiers.appRefresh)
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        request.earliestBeginDate = nil // Let iOS decide; don't impose extra delay
 
         do {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundTaskIdentifiers.appRefresh)
@@ -60,7 +60,7 @@ final class BackgroundTaskManager {
         // Always reschedule, since iOS schedules are one-shot.
         scheduleAppRefresh()
 
-        runBGTask(task, softTimeoutSeconds: 20) {
+        runBGTask(task, softTimeoutSeconds: 25) {
             await AppModel.shared.backgroundTick()
         }
     }
@@ -76,11 +76,11 @@ final class BackgroundTaskManager {
         }
     }
 
-    private func scheduleProcessing() {
+    func scheduleProcessing() {
         let request = BGProcessingTaskRequest(identifier: BackgroundTaskIdentifiers.processing)
         request.requiresNetworkConnectivity = true
         request.requiresExternalPower = false
-        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        request.earliestBeginDate = nil // Let iOS decide; don't impose extra delay
 
         do {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundTaskIdentifiers.processing)
