@@ -6,12 +6,13 @@
 "A quick checklist to get scrobbling working reliably." = "スクロブルを安定して動かすための簡単なチェックリストです。";
 "Account" = "アカウント";
 "Allow Music Control" = "ミュージックの操作を許可";
-"Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs." = "同じ曲を短時間に複数回Last.fmへ送信しないようにします。曲をループする際に問題が発生している場合は無効にしてください。";
+"Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
 "Connected" = "接続済み";
 "Done" = "完了";
 "Duration: %@s | Playback: %@s" = "再生時間: %1$@秒 | 再生位置: %2$@秒";
 "Enabled" = "有効";
+"Not Enabled" = "無効";
 "Engine: " = "エンジン: ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "一般";
@@ -31,8 +32,8 @@
 "Recent Scrobbles" = "最近のスクロブル";
 /* Remove brackets screen */
 "Remove brackets" = "括弧を削除";
-"Remove brackets for song titles" = "曲名の括弧を削除";
-"Remove brackets for album titles" = "アルバム名の括弧を削除";
+"Remove brackets in song titles" = "曲名の括弧を削除";
+"Remove brackets in album titles" = "アルバム名の括弧を削除";
 "When enabled, brackets containing any of the keywords in the list below will be removed when scrobbling." = "オンにすると、以下のリスト内のいずれかのキーワードを含む括弧はスクロブル時に削除されます。";
 "When enabled, brackets containing any of the keywords in the list below will be removed from song titles when scrobbling." = "オンにすると、以下のリスト内のいずれかのキーワードを含む曲名の括弧はスクロブル時に削除されます。";
 "When enabled, brackets containing any of the keywords in the list below will be removed from album titles when scrobbling." = "オンにすると、以下のリスト内のいずれかのキーワードを含むアルバム名の括弧はスクロブル時に削除されます。";
@@ -63,6 +64,7 @@
 "Sign Out of Last.fm?" = "Last.fmからサインアウトしますか？";
 "State: %@" = "状態: %@";
 "Thank you!" = "ありがとうございます！";
+"Thank you! ^_^" = "ありがとうございます！ ^_^";
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "設定を初期値に戻します（Last.fmアカウントは接続されたままです）。";
 "Upgrade to unlock more scrobble controls." = "アップグレードして、さらに多くのスクロブル設定を利用できるようにします。";
 "Replace song artist with album artist when scrobbling" = "スクロブル時に曲アーティストをアルバムアーティストに置き換える";
@@ -179,7 +181,7 @@
 "Unknown" = "不明";
 "Upgrade" = "アップグレード";
 "Upgrade for %@" = "%@でアップグレード";
-"Remove brackets from song and album titles by matching keywords, or optionally remove all brackets." = "キーワードに一致する曲名とアルバム名の括弧を削除したり、必要に応じてすべての括弧を削除したりできます。";
+"Remove brackets in song and album titles by matching keywords, or remove all brackets entirely." = "キーワードに一致する曲名とアルバム名の括弧を削除したり、すべての括弧を完全に削除したりできます。";
 "Replace song artist with album artist when scrobbling, and remove \"- EP\" / \"- Single\" from album names." = "スクロブル時に曲アーティストをアルバムアーティストに置き換え、アルバム名から「- EP」「- Single」を削除します。";
 "View Profile" = "プロフィールを見る";
 "View Profile in Last.fm" = "Last.fmでプロフィールを見る";
@@ -219,7 +221,7 @@
 /* Text Replacement */
 "Text Replacement" = "テキスト置換";
 "Text replacement" = "テキスト置換";
-"Find and replace keywords to automatically clean up track, album, or artist names before scrobbling." = "スクロブル前にキーワードの検索と置換を行い、曲名・アルバム名・アーティスト名を自動的に整理します。";
+"Find and replace keywords to automatically clean up artist, song, and album titles when scrobbling. Also removes \"- EP\" and \"- Single\" from album titles." = "スクロブル時にキーワードの検索・置換でアーティスト名、曲名、アルバムタイトルを自動整理します。アルバムタイトルから「- EP」「- Single」も削除します。";
 "Add Rule" = "ルールを追加";
 "Rules" = "ルール";
 "Each rule replaces all exact occurrences of the \"Find\" text in the selected fields before scrobbling. All keywords are case-sensitive." = "各ルールは、スクロブル前に選択したフィールド内の「検索」テキストと完全に一致する箇所をすべて置き換えます。すべてのキーワードは大文字と小文字を区別します。";
@@ -227,5 +229,9 @@
 "Blank" = "空白";
 "Replace with" = "置換後";
 "Song" = "曲";
-"This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History." = "再生履歴からのスクロブルの信頼性に影響する問題のため、このトグルは一時的に利用できません。";
+"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "再生履歴からのスクロブルの信頼性に影響する問題のため、このトグルは現在利用できません。";
 "This will restore all settings to their defaults." = "すべての設定をデフォルト値に戻します。";
+"Scrobble looped tracks" = "ループした曲をスクロブル";
+"Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "曲がループまたは再スタートしたときに再度スクロブルします。曲を繰り返し聴いて各回をカウントしたい場合はオンにしてください。";
+"View Pro features" = "Pro機能を見る";
+"Upgrade to Pro" = "Proにアップグレード";

@@ -22,12 +22,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        Task { @MainActor in
-            AppModel.shared.prepareForBackground()
+    func applicationWillTerminate(_ application: UIApplication) {
+        if #available(iOS 16.2, *) {
+            Task { @MainActor in
+                await LiveActivityManager.shared.stop()
+            }
         }
-        BackgroundTaskManager.shared.scheduleAppRefresh()
-        BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
     }
 
     func application(

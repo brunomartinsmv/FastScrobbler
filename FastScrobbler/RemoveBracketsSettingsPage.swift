@@ -12,18 +12,18 @@ struct RemoveBracketsSettingsPage: View {
         var settingsLabel: String {
             switch self {
             case .songTitles:
-                localized("Remove brackets for song titles")
+                localized("Remove brackets in song titles")
             case .albumTitles:
-                localized("Remove brackets for album titles")
+                localized("Remove brackets in album titles")
             }
         }
 
         var toggleLabel: String {
             switch self {
             case .songTitles:
-                localized("Remove brackets for song titles")
+                localized("Remove brackets in song titles")
             case .albumTitles:
-                localized("Remove brackets for album titles")
+                localized("Remove brackets in album titles")
             }
         }
 
@@ -80,6 +80,8 @@ struct RemoveBracketsSettingsPage: View {
 
     let target: Target
 
+    @EnvironmentObject private var pro: ProPurchaseManager
+
     @AppStorage(ProSettings.Keys.removeBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
@@ -135,7 +137,7 @@ struct RemoveBracketsSettingsPage: View {
             .onDisappear {
                 normalizeAndPersistKeywords()
             }
-            .onChange(of: isPresentingAddKeywordPrompt) { _, isPresenting in
+            .onValueChange(of: isPresentingAddKeywordPrompt) { isPresenting in
                 if !isPresenting {
                     newKeyword = ""
                 }
@@ -164,18 +166,25 @@ struct RemoveBracketsSettingsPage: View {
                 keywordsCard
             }
             .padding()
-            .padding(.top, MacFloatingBarLayout.circleButtonContentTopPadding)
+            .padding(.top, 44)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .topLeading) {
-            MacFloatingCircleButton(
-                systemImage: "chevron.left",
-                help: localized("Back"),
-                accessibilityLabel: localized("Back"),
-                action: {
-                    dismiss()
-                }
-            )
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay {
+                Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+            }
+            .help(localized("Back"))
+            .accessibilityLabel(localized("Back"))
+            .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
             .padding(.top, 10)
             .padding(.leading, 10)
         }
@@ -198,7 +207,24 @@ struct RemoveBracketsSettingsPage: View {
 
     @ViewBuilder
     private var toggleSectionContent: some View {
+#if os(iOS)
+        Toggle(isOn: removeBracketsEnabledBinding) {
+            if pro.isPro {
+                Text(target.toggleLabel)
+            } else {
+                HStack {
+                    Text(target.toggleLabel)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    ProFeatureBadge()
+                }
+            }
+        }
+        .disabled(!pro.isPro)
+        .tint(.yellow)
+#else
         Toggle(target.toggleLabel, isOn: removeBracketsEnabledBinding)
+#endif
         Text(target.descriptionText)
             .font(.footnote)
             .foregroundStyle(.secondary)

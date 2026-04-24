@@ -180,7 +180,14 @@ struct SetupHelpView: View {
     }
 
     let mode: Mode
+    let hideTitle: Bool
     let onDone: () -> Void
+
+    init(mode: Mode, hideTitle: Bool = false, onDone: @escaping () -> Void) {
+        self.mode = mode
+        self.hideTitle = hideTitle
+        self.onDone = onDone
+    }
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @Environment(\.openURL) private var openURL
@@ -290,9 +297,11 @@ struct SetupHelpView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Text("Setup")
-                .font(.largeTitle.weight(.bold))
-                .foregroundStyle(.primary)
+            if !hideTitle {
+                Text("Setup")
+                    .font(.largeTitle.weight(.bold))
+                    .foregroundStyle(.primary)
+            }
 
             Text("FastScrobbler needs a few permissions and settings to work reliably.")
                 .font(.subheadline)
@@ -405,7 +414,7 @@ struct SetupHelpView: View {
         SettingRow(
             icon: "memories.badge.plus",
             title: NSLocalizedString("Shortcuts & Control Center", comment: ""),
-            subtitle: NSLocalizedString("Add Shortcut actions and Control Center buttons to scrobble or control playback without opening the app.", comment: ""),
+            subtitle: NSLocalizedString("Add Shortcut actions and Control Center buttons for Send Now Playing, Scrobble Song, or Manual Scrobble.", comment: ""),
             badgeText: NSLocalizedString("Tip", comment: ""),
             badgeLevel: .tip,
             actionTitle: nil,

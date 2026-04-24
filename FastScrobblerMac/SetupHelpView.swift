@@ -55,6 +55,7 @@ struct SetupHelpView: View {
         let title: String
         let subtitle: AttributedString
         let isChecked: Bool
+        let showsUncheckedStatus: Bool
         let actionTitle: String?
         let action: (() -> Void)?
         let actionTint: Color?
@@ -66,6 +67,7 @@ struct SetupHelpView: View {
             title: String,
             subtitle: String,
             isChecked: Bool = false,
+            showsUncheckedStatus: Bool = false,
             actionTitle: String? = nil,
             action: (() -> Void)? = nil,
             actionTint: Color? = nil,
@@ -76,6 +78,7 @@ struct SetupHelpView: View {
             self.title = title
             self.subtitle = AttributedString(subtitle)
             self.isChecked = isChecked
+            self.showsUncheckedStatus = showsUncheckedStatus
             self.actionTitle = actionTitle
             self.action = action
             self.actionTint = actionTint
@@ -88,6 +91,7 @@ struct SetupHelpView: View {
             title: String,
             subtitle: AttributedString,
             isChecked: Bool = false,
+            showsUncheckedStatus: Bool = false,
             actionTitle: String? = nil,
             action: (() -> Void)? = nil,
             actionTint: Color? = nil,
@@ -98,6 +102,7 @@ struct SetupHelpView: View {
             self.title = title
             self.subtitle = subtitle
             self.isChecked = isChecked
+            self.showsUncheckedStatus = showsUncheckedStatus
             self.actionTitle = actionTitle
             self.action = action
             self.actionTint = actionTint
@@ -106,47 +111,49 @@ struct SetupHelpView: View {
         }
 
         var body: some View {
-            ZStack(alignment: .topTrailing) {
-                HStack(alignment: .top, spacing: 16) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(.primary.opacity(0.10), lineWidth: 0.5)
-                        }
+            let showsStatusBadge = isChecked || showsUncheckedStatus
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(width: 44, height: 44)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.primary.opacity(0.10), lineWidth: 0.5)
+                    }
 
-                    VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 12) {
                         Text(title)
                             .font(.headline)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.trailing, isChecked ? 88 : 0)
 
-                        Text(subtitle)
-                            .font(.subheadline)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .foregroundStyle(.secondary)
-                            .tint(.accentColor)
+                        Spacer(minLength: 0)
 
-                        if let actionTitle, let action {
-                            actionButton(title: actionTitle, action: action)
-                                .disabled(actionDisabled)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.top, 4)
+                        if showsStatusBadge {
+                            statusBadge(isEnabled: isChecked)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 2)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .foregroundStyle(.secondary)
+                        .tint(.accentColor)
+
+                    if let actionTitle, let action {
+                        actionButton(title: actionTitle, action: action)
+                            .disabled(actionDisabled)
+                            .font(.subheadline.weight(.semibold))
+                            .padding(.top, 4)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                if isChecked {
-                    statusBadge
-                }
             }
+            .padding(.top, 2)
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -157,17 +164,17 @@ struct SetupHelpView: View {
             }
         }
 
-        private var statusBadge: some View {
+        private func statusBadge(isEnabled: Bool) -> some View {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill")
-                Text(NSLocalizedString("Enabled", comment: ""))
+                Image(systemName: isEnabled ? "checkmark.circle.fill" : "xmark.circle.fill")
+                Text(NSLocalizedString(isEnabled ? "Enabled" : "Not Enabled", comment: ""))
                     .lineLimit(1)
             }
             .font(.caption.weight(.semibold))
-            .foregroundStyle(.green)
+            .foregroundStyle(isEnabled ? .green : .red)
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
-            .background(.green.opacity(0.12), in: Capsule())
+            .background((isEnabled ? Color.green : Color.red).opacity(0.12), in: Capsule())
             .fixedSize(horizontal: true, vertical: false)
         }
 
@@ -197,6 +204,7 @@ struct SetupHelpView: View {
                         title: NSLocalizedString("Connect Last.fm", comment: ""),
                         subtitle: NSLocalizedString("Connect your account in Settings to start scrobbling.", comment: ""),
                         isChecked: isConnected,
+                        showsUncheckedStatus: true,
                         actionTitle: isConnected ? nil : (isSigningInToLastFM ? NSLocalizedString("Signing In…", comment: "") : NSLocalizedString("Sign In to Last.fm", comment: "")),
                         action: isConnected ? nil : signInToLastFM,
                         actionTint: .red,
@@ -232,6 +240,7 @@ struct SetupHelpView: View {
                         title: NSLocalizedString("Allow Music Control", comment: ""),
                         subtitle: NSLocalizedString("When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling.", comment: ""),
                         isChecked: musicControlAllowed,
+                        showsUncheckedStatus: true,
                         actionTitle: musicControlActionTitle,
                         action: musicControlAction
                     )
@@ -264,6 +273,7 @@ struct SetupHelpView: View {
                         title: NSLocalizedString("Media Library Permission", comment: ""),
                         subtitle: NSLocalizedString("If Media Library access is off, enable it in System Settings.", comment: ""),
                         isChecked: mediaAllowed,
+                        showsUncheckedStatus: true,
                         actionTitle: mediaActionTitle,
                         action: mediaAction
                     )
@@ -450,6 +460,6 @@ struct SetupHelpView: View {
     private func maybeStartScrobblingIfSetupAlreadyCompleted() async {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) || mode == .help else { return }
         guard auth.sessionKey != nil, observer.authorizationStatus == .authorized else { return }
-        await AppModel.shared.startIfNeeded()
+        AppModel.shared.startIfNeeded()
     }
 }

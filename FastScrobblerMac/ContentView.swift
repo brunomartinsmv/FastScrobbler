@@ -1,11 +1,7 @@
+#if canImport(MediaPlayer)
 import MediaPlayer
+#endif
 import SwiftUI
-#if canImport(SafariServices) && canImport(UIKit)
-import SafariServices
-#endif
-#if canImport(WebKit)
-import WebKit
-#endif
 
 struct ContentView: View {
     private enum Keys {
@@ -24,8 +20,7 @@ struct ContentView: View {
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
 
     @State private var currentDate: Date = .now
-    // Incrementing secondTick every second forces SwiftUI to re-evaluate computed views
-    // (statusCard, trackCard) that display live elapsed time without a dedicated @Published property.
+    // See iOS ContentView — secondTick drives per-second re-renders of time-sensitive views.
     @State private var secondTick: Int = 0
     @State private var errorText: String?
     @State private var isShowingSetup = false
@@ -33,141 +28,107 @@ struct ContentView: View {
     @State private var isShowingHelp = false
     @State private var isShowingSettings = false
     @State private var isShowingManualScrobble = false
-
-    @State private var inAppBrowserURL: URL?
-    @State private var prevBounce = 0
-    @State private var nextBounce = 0
-
-    private enum Tab { case home, settings }
-    @State private var selectedTab: Tab = .home
-
+    @State private var mediaLibraryStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
 
     var body: some View {
         Group {
-            // TabView keeps both tabs alive so the engine continues running in the background.
-            TabView(selection: $selectedTab) {
-                NavigationView {
-                    mainContent
-                }
-                .tabItem { Label("Home", systemImage: UIImage(systemName: "music.note.arrow.trianglehead.clockwise") != nil ? "music.note.arrow.trianglehead.clockwise" : "music.note") }
-                .tag(Tab.home)
-
-                settingsTabContent
-                    .tabItem { Label("Settings", systemImage: "gear") }
-                    .tag(Tab.settings)
+            // NavigationStack avoids the two-column split layout NavigationView produces on macOS.
+            NavigationStack {
+                mainContent
             }
-
+        }
+        // scenePhase doesn't fire reliably for popover-style menu bar apps, so we refresh
+        // permissions each time the popover is about to become visible instead.
+        .onReceive(NotificationCenter.default.publisher(for: .fastScrobblerPopoverWillShow)) { _ in
+            refreshPermissionStatusesIfNeeded()
         }
         .onAppear {
-            refreshMediaLibraryStatusIfNeeded()
+            refreshPermissionStatusesIfNeeded()
             presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
         }
         .onValueChange(of: scenePhase) { phase in
             guard phase == .active else { return }
-            refreshMediaLibraryStatusIfNeeded()
+            refreshPermissionStatusesIfNeeded()
             presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
             if hasSeenSetup {
-                AppModel.shared.startIfNeeded()
+                Task { @MainActor in
+                    AppModel.shared.startIfNeeded()
+                }
             }
         }
         .onValueChange(of: observer.authorizationStatus) { _ in
-            refreshMediaLibraryStatusIfNeeded()
+            refreshPermissionStatusesIfNeeded()
             presentSetupIfNeeded()
         }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
             guard hasSeenSetup else { return }
             presentWhatsNewIfNeeded()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openManualScrobble)) { _ in
-            isShowingManualScrobble = true
-        }
-        .fullScreenCover(isPresented: $isShowingSetup) {
-            SetupHelpView(mode: .onboarding) {
-                guard MPMediaLibrary.authorizationStatus() == .authorized else { return }
-                guard auth.sessionKey != nil else { return }
-                hasSeenSetup = true
-                isShowingSetup = false
-                presentWhatsNewIfNeeded()
-                AppModel.shared.startIfNeeded()
-            }
-        }
-        .fullScreenCover(isPresented: $isShowingWhatsNew) {
-            WhatsNewView {
-                dismissWhatsNew()
-            }
-        }
-        .fullScreenCover(isPresented: $isShowingHelp) {
-            SetupHelpView(mode: .help, hideTitle: true) {
-                isShowingHelp = false
-            }
-        }
-        // Custom Binding because .sheet(item:) would require URL: Identifiable.
-        .sheet(isPresented: Binding(
-            get: { inAppBrowserURL != nil },
-            set: { isPresented in
-                if !isPresented {
-                    inAppBrowserURL = nil
-                }
-            }
-        )) {
-            if let url = inAppBrowserURL {
-                InAppSafariView(url: url)
-                    .ignoresSafeArea()
-            }
+        .overlay {
+            macModalOverlay
         }
     }
 
     private var mainContent: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                controls
-                statusCard
-                trackCard
-                scrobbleLogCard
-                if let errorText {
-                    Text(errorText)
-                        .foregroundColor(.red)
-                        .font(.footnote)
+        ZStack(alignment: .topTrailing) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    macAttentionBanner
+                    controls
+                    statusCard
+                    trackCard
+                    scrobbleLogCard
+                    if let errorText {
+                        Text(errorText)
+                            .foregroundColor(.red)
+                            .font(.footnote)
+                    }
                 }
+                .padding()
+                .padding(.top, -8)
+                        .padding(.top, MacFloatingBarLayout.contentTopPadding) // room for the floating capsule bar
+                .animation(.easeInOut(duration: 0.3), value: observer.track)
+                .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
+                .animation(.easeInOut(duration: 0.3), value: engine.statusText)
             }
-            .padding()
-            .padding(.top, 8)
-            .animation(.easeInOut(duration: 0.3), value: observer.track)
-            .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
-            .animation(.easeInOut(duration: 0.3), value: engine.statusText)
-        }
-        .refreshable {
-            await AppModel.shared.scanListeningHistory()
-        }
-        .overlay(alignment: .top) {
-            GeometryReader { geo in
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground),
-                        Color(.systemBackground).opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                // SE has a ~20pt status bar; notch/Dynamic Island devices have ~50pt+.
-                // Use the safe area top inset to scale the gradient height accordingly.
-                .frame(height: geo.safeAreaInsets.top < 30 ? 50 : 70)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-            }
-            .ignoresSafeArea(edges: .top)
+
+            macPopoverTopButtons
+                .padding(.top, 10)
+                .padding(.trailing, 10)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            secondTick &+= 1 // &+= wraps on overflow instead of crashing after ~68 years of uptime
+            secondTick &+= 1
         }
         .navigationTitle("")
+        .toolbar {}
     }
 
-    private var settingsTabContent: some View {
-        SettingsView(isShowingHelp: $isShowingHelp)
-            .environment(\.isEmbeddedInTab, true)
+    private var macPopoverTopButtons: some View {
+        MacCapsuleBar {
+            HStack(spacing: 10) {
+                Button {
+                    isShowingHelp = true
+                } label: {
+                    Image(systemName: "questionmark.circle")
+                        .font(.system(size: 16, weight: .semibold))
+                        .padding(6)
+                }
+                .help("Help")
+                .accessibilityLabel("Help")
+
+                Button {
+                    isShowingSettings = true
+                } label: {
+                    Image(systemName: "gear")
+                        .font(.system(size: 16, weight: .semibold))
+                        .padding(6)
+                }
+                .help("Settings")
+                .accessibilityLabel("Settings")
+            }
+        }
     }
 
     private var statusCard: some View {
@@ -233,36 +194,6 @@ struct ContentView: View {
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
-                        HStack(spacing: 32) {
-                            Button {
-                                prevBounce += 1
-                                observer.skipToPreviousItem()
-                            } label: {
-                                Image(systemName: "backward.fill")
-                                    .symbolEffect(.bounce, value: prevBounce)
-                            }
-                            .font(.title3)
-                            Button { observer.togglePlayPause() } label: {
-                                Image(systemName: observer.playbackState == .playing ? "pause.fill" : "play.fill")
-                                    .contentTransition(.symbolEffect(.replace.downUp))
-                                    .scaleEffect(observer.playbackState == .playing ? 1.0 : 1.15)
-                                    .animation(.spring(response: 0.25, dampingFraction: 0.45), value: observer.playbackState)
-                                    .frame(width: 32, height: 32)
-                            }
-                            .font(.title)
-                            Button {
-                                nextBounce += 1
-                                observer.skipToNextItem()
-                            } label: {
-                                Image(systemName: "forward.fill")
-                                    .symbolEffect(.bounce, value: nextBounce)
-                            }
-                            .font(.title3)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.primary)
-                        .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: observer.playbackState)
                     }
                     .padding(.top, 12)
                 }
@@ -280,7 +211,7 @@ struct ContentView: View {
     }
 
     private var controls: some View {
-        let actionButtonHeight: CGFloat = 40
+        let actionButtonHeight: CGFloat = 32
         let actionButtonSpacing: CGFloat = 12
 
         return VStack(spacing: 12) {
@@ -297,6 +228,7 @@ struct ContentView: View {
             .pillButtonBorder()
             .tint(.red)
             .buttonGlow(.red)
+            .padding(.top, 8)
 
             HStack(spacing: actionButtonSpacing) {
                 Button {
@@ -353,7 +285,7 @@ struct ContentView: View {
             if auth.sessionKey != nil {
                 Button {
                     if let url = auth.freshProfileURL() {
-                        inAppBrowserURL = url
+                        openURL(url)
                     }
                 } label: {
                     Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
@@ -378,8 +310,88 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
-        .sheet(isPresented: $isShowingManualScrobble) {
-            ManualScrobbleView()
+    }
+
+    @ViewBuilder
+    private var macAttentionBanner: some View {
+        let isLoggedOut = (auth.sessionKey == nil)
+        let isMediaLibraryPermissionOff = (mediaLibraryStatus == .denied || mediaLibraryStatus == .restricted)
+        let isMusicControlPermissionOff = (observer.authorizationStatus == .denied || observer.authorizationStatus == .restricted)
+        if isLoggedOut || isMediaLibraryPermissionOff || isMusicControlPermissionOff {
+            VStack(alignment: .leading, spacing: 10) {
+                if isLoggedOut {
+                    Label(
+                        "You're signed out of Last.fm.",
+                        systemImage: "person.crop.circle.badge.exclamationmark"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+
+                if isMusicControlPermissionOff {
+                    Label(
+                        "Music control permission is off. Enable it in System Settings → Privacy & Security → Automation.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+
+                if isMediaLibraryPermissionOff {
+                    Label(
+                        "Media Library permission is off. Request it here or enable it in System Settings → Privacy & Security.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                }
+
+                HStack(spacing: 10) {
+                    if isLoggedOut {
+                        Button("Sign In") {
+                            isShowingSettings = true
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                    }
+
+                    if isMediaLibraryPermissionOff {
+                        Button("Request Media Library Access") {
+                            Task { @MainActor in
+                                let status: MPMediaLibraryAuthorizationStatus = await withCheckedContinuation { cont in
+                                    MPMediaLibrary.requestAuthorization { s in
+                                        cont.resume(returning: s)
+                                    }
+                                }
+                                mediaLibraryStatus = status
+                                guard status == .authorized else { return }
+                                AppModel.shared.startIfNeeded()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                    }
+
+                    if isMusicControlPermissionOff {
+                        Button(NSLocalizedString("Open System Settings", comment: "")) {
+                            if let automationSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                                openURL(automationSettingsURL)
+                            } else if let privacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                                openURL(privacySettingsURL)
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                    }
+
+                    Spacer(minLength: 0)
+                }
+            }
+            .foregroundStyle(.white)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.red.opacity(0.92), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+            }
         }
     }
 
@@ -455,9 +467,7 @@ struct ContentView: View {
     }
 
     private func presentSetupIfNeeded() {
-        // Re-check on every scene activation — permissions can change while the app is backgrounded.
-        let mediaAuthorized = (MPMediaLibrary.authorizationStatus() == .authorized)
-        let shouldShow = (!hasSeenSetup || !mediaAuthorized || auth.sessionKey == nil)
+        let shouldShow = (!hasSeenSetup || auth.sessionKey == nil || observer.authorizationStatus != .authorized)
         guard shouldShow else { return }
 
         isShowingHelp = false
@@ -466,29 +476,22 @@ struct ContentView: View {
         }
     }
 
-    private func refreshMediaLibraryStatusIfNeeded() {}
+    private func refreshPermissionStatusesIfNeeded() {
+        mediaLibraryStatus = MPMediaLibrary.authorizationStatus()
+        observer.refreshOnceIfAuthorized()
 
-    private func presentWhatsNewIfNeeded() {
-        guard hasSeenSetup else { return }
-        guard !isShowingSetup && !isShowingWhatsNew && !isShowingHelp else { return }
-        guard inAppBrowserURL == nil else { return }
-        if WhatsNewRelease.shouldPresent() {
-            isShowingWhatsNew = true
+        if hasSeenSetup, auth.sessionKey != nil, observer.authorizationStatus == .authorized {
+            Task { @MainActor in
+                AppModel.shared.startIfNeeded()
+            }
         }
     }
+
+    private func presentWhatsNewIfNeeded() {}
 
     private func dismissWhatsNew() {
         WhatsNewRelease.markSeen()
         isShowingWhatsNew = false
-    }
-}
-
-
-private struct IsEmbeddedInTabKey: EnvironmentKey { static let defaultValue = false }
-extension EnvironmentValues {
-    var isEmbeddedInTab: Bool {
-        get { self[IsEmbeddedInTabKey.self] }
-        set { self[IsEmbeddedInTabKey.self] = newValue }
     }
 }
 
@@ -520,7 +523,7 @@ private struct ScrobbleLogRowView: View {
                     .foregroundStyle(.primary)
             }
             HStack(spacing: 8) {
-                Text(relativeHoursMinutes(from: displayDate(for: entry), to: currentDate))
+                Text(relativeHoursMinutes(from: entry.scrobbledAt, to: currentDate))
                 if entry.lovedOnLastFM == true {
                     Text("Loved")
                         .padding(.horizontal, 8)
@@ -542,7 +545,7 @@ private struct ScrobbleLogRowView: View {
             .foregroundStyle(.primary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Suppress inherited list animations so new scrobble rows appear instantly rather than sliding in.
+        // Suppress inherited animations so new scrobble rows appear instantly rather than sliding in.
         .transaction { $0.animation = nil }
         .contentShape(Rectangle())
         .contextMenu {
@@ -581,7 +584,7 @@ private struct ScrobbleLogRowView: View {
                         .foregroundStyle(.primary)
                 }
                 HStack(spacing: 8) {
-                    Text(relativeHoursMinutes(from: displayDate(for: entry), to: currentDate))
+                    Text(relativeHoursMinutes(from: entry.scrobbledAt, to: currentDate))
                     if entry.lovedOnLastFM == true {
                         Text("Loved")
                             .padding(.horizontal, 8)
@@ -620,13 +623,6 @@ private struct ScrobbleLogRowView: View {
         }
     }
 
-    private func displayDate(for entry: ScrobbleLogStore.Entry) -> Date {
-        if entry.source == .playbackHistory {
-            return Date(timeIntervalSince1970: TimeInterval(entry.startTimestamp))
-        }
-        return entry.scrobbledAt
-    }
-
     private func relativeHoursMinutes(from date: Date, to now: Date) -> String {
         let delta = max(0, now.timeIntervalSince(date))
         let totalMinutes = Int(delta / 60)
@@ -646,76 +642,18 @@ private struct ScrobbleLogRowView: View {
     }
 }
 
-#if os(iOS)
-private struct InAppSafariView: UIViewControllerRepresentable {
-    let url: URL
-
-    func makeUIViewController(context: Context) -> SFSafariViewController {
-        let controller = SFSafariViewController(url: url)
-        controller.dismissButtonStyle = .close
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
-}
-#elseif os(macOS)
-private struct InAppSafariView: NSViewRepresentable {
-    let url: URL
-
-    func makeNSView(context: Context) -> WKWebView {
-        let webView = WKWebView()
-        webView.load(URLRequest(url: url))
-        return webView
-    }
-
-    func updateNSView(_ nsView: WKWebView, context: Context) {
-        guard nsView.url != url else { return }
-        nsView.load(URLRequest(url: url))
-    }
-}
-#endif
-
 extension View {
     @ViewBuilder
     func onValueChange<Value: Equatable>(
         of value: Value,
         perform action: @escaping (_ newValue: Value) -> Void
     ) -> some View {
-        onChange(of: value) { _, newValue in
-            action(newValue)
-        }
-    }
-}
-
-struct IOSCloseButtonLabel: View {
-    enum Style {
-        case plain
-        case floating
-    }
-
-    let style: Style
-
-    init(style: Style = .floating) {
-        self.style = style
-    }
-
-    var body: some View {
-        let icon = Image(systemName: "xmark")
-            .font(.system(size: 17, weight: .semibold))
-            .foregroundStyle(.primary)
-
-        switch style {
-        case .plain:
-            icon
-        case .floating:
-            icon
-                .frame(width: 32, height: 32)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay {
-                    Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
-                }
-                .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
-                .contentShape(Circle())
+        if #available(macOS 14.0, *) {
+            onChange(of: value) { _, newValue in
+                action(newValue)
+            }
+        } else {
+            onChange(of: value, perform: action)
         }
     }
 }
@@ -723,11 +661,139 @@ struct IOSCloseButtonLabel: View {
 extension View {
     @ViewBuilder
     func pillButtonBorder() -> some View {
-        self.buttonBorderShape(.capsule)
+        if #available(macOS 14.0, *) {
+            self.buttonBorderShape(.capsule)
+        } else {
+            self.buttonBorderShape(.roundedRectangle)
+        }
     }
 
     func buttonGlow(_ color: Color) -> some View {
-        self.shadow(color: color.opacity(0.25), radius: 8, x: 0, y: 4)
-            .shadow(color: color.opacity(0.40), radius: 7, x: 0, y: 4)
+        self.shadow(color: color.opacity(0.30), radius: 6, x: 0, y: 0)
+    }
+}
+
+enum MacFloatingBarLayout {
+    static let contentTopPadding: CGFloat = 52
+    static let circleButtonContentTopPadding: CGFloat = 28
+}
+
+struct MacCapsuleBar<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        content
+            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.ultraThinMaterial, in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+            }
+            .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+    }
+}
+
+struct MacFloatingCircleButton: View {
+    let systemImage: String
+    let help: String
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 36, height: 36)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+extension ContentView {
+    @ViewBuilder
+    var macModalOverlay: some View {
+        let isPresented = (isShowingSetup || isShowingHelp || isShowingSettings || isShowingManualScrobble)
+        if isPresented {
+            ZStack {
+                Color.black.opacity(0.18)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        // Don't let a backdrop tap dismiss onboarding — the user must complete setup.
+                        if !isShowingSetup {
+                            dismissMacModal()
+                        }
+                    }
+
+                macModalContent
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: .black.opacity(0.22), radius: 18, x: 0, y: 10)
+                    .padding(12)
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .transition(.opacity)
+            .animation(.easeOut(duration: 0.15), value: isPresented)
+        }
+    }
+
+    @ViewBuilder
+    var macModalContent: some View {
+        if isShowingSetup {
+            SetupHelpView(mode: .onboarding, onOpenSettings: {
+                isShowingSetup = false
+                isShowingSettings = true
+            }) {
+                hasSeenSetup = true
+                isShowingSetup = false
+                presentWhatsNewIfNeeded()
+                Task { @MainActor in
+                    AppModel.shared.startIfNeeded()
+                }
+            }
+        } else if isShowingHelp {
+            SetupHelpView(mode: .help, onOpenSettings: {
+                isShowingHelp = false
+                isShowingSettings = true
+            }) {
+                isShowingHelp = false
+            }
+        } else if isShowingSettings {
+            SettingsView(onBack: { isShowingSettings = false })
+        } else if isShowingManualScrobble {
+            ManualScrobbleView(onBack: { isShowingManualScrobble = false })
+        }
+    }
+
+    func dismissMacModal() {
+        if isShowingSettings {
+            isShowingSettings = false
+        } else if isShowingHelp {
+            isShowingHelp = false
+        } else if isShowingManualScrobble {
+            isShowingManualScrobble = false
+        } else if isShowingSetup {
+            // Keep onboarding visible until the setup requirements are actually satisfied.
+            return
+        }
     }
 }

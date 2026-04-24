@@ -78,7 +78,10 @@ struct WhatsNewView: View {
                     showsProBadge: false
                 )
             ]
-        ),
+        )
+    ]
+
+    private let previousSections: [VersionSection] = [
         VersionSection(
             id: "3.3",
             version: "3.3",
@@ -96,21 +99,18 @@ struct WhatsNewView: View {
             features: [
                 Feature(
                     systemImage: "parentheses",
-                    title: "\"Remove brackets for album titles\" feature",
+                    title: "\"Remove brackets in album titles\" feature",
                     showsProBadge: true
                 )
             ]
         ),
-    ]
-
-    private let previousSections: [VersionSection] = [
         VersionSection(
             id: "3.0",
             version: "3.0",
             features: [
                 Feature(
                     systemImage: "parentheses",
-                    title: "\"Remove brackets for song titles\" feature",
+                    title: "\"Remove brackets in song titles\" feature",
                     showsProBadge: true
                 ),
                 Feature(

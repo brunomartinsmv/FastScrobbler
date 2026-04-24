@@ -50,11 +50,6 @@ private struct LockScreenView: View {
                 Spacer()
             }
 
-            Text(state.status)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-
             if let artist = state.artist, let title = state.title {
                 Text("\(artist) - \(title)")
                     .font(.subheadline)

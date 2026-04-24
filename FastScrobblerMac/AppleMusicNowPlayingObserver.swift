@@ -1,6 +1,7 @@
 import Foundation
 import OSLog
 import AppKit
+import CoreServices
 
 @MainActor
 final class AppleMusicNowPlayingObserver: ObservableObject {
@@ -30,6 +31,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
     nonisolated private static let scriptingQueue = DispatchQueue(label: "FastScrobbler.MusicAppleScript", qos: .userInitiated)
 
     init() {
+        authorizationStatus = Self.determineMusicAutomationAuthorizationStatus(askUserIfNeeded: false)
         Task { @MainActor in
             await refreshFromMusic()
         }
@@ -43,17 +45,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
 
     /// Attempts to trigger macOS's Automation permission prompt for controlling the Music app.
     func requestMusicControlPermission() async {
-        Self.launchMusicIfNeeded()
-        try? await Task.sleep(nanoseconds: 150_000_000)
-        do {
-            _ = try await Self.runAppleScriptAsync(#"tell application "Music" to get player state as string"#)
-        } catch let error as AppleScriptError where error.number == -600 {
-            // Music can take a moment to launch on some systems.
-            try? await Task.sleep(nanoseconds: 250_000_000)
-            _ = try? await Self.runAppleScriptAsync(#"tell application "Music" to get player state as string"#)
-        } catch {
-            // Ignore: `refreshFromMusic()` will set the correct authorization state.
-        }
+        let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: true)
+        applyAutomationAuthorization(status)
         await refreshFromMusic()
     }
 
@@ -68,7 +61,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         guard authorizationStatus == .authorized else { throw ObserverError.musicAutomationDenied }
 
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 await self?.refreshFromMusic()
             }
@@ -84,45 +77,62 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         timer = nil
     }
 
+    func skipToNextItem() {
+        Task { try? await Self.runAppleScriptAsync(#"tell application "Music" to next track"#) }
+    }
+    func skipToPreviousItem() {
+        Task { try? await Self.runAppleScriptAsync(#"tell application "Music" to previous track"#) }
+    }
+    func togglePlayPause() {
+        Task { try? await Self.runAppleScriptAsync(#"tell application "Music" to playpause"#) }
+    }
+
     private func refreshFromMusic() async {
+        let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: false)
+        applyAutomationAuthorization(status)
+        guard status == .authorized else { return }
+
         do {
             let snapshot = try await Self.readMusicSnapshotAsync()
             authorizationStatus = .authorized
             playbackState = snapshot.playbackState
             playbackTimeSeconds = snapshot.playbackTimeSeconds
+            if let t = snapshot.track, t.durationSeconds == nil {
+                logger.debug("Snapshot missing duration for \(t.artist, privacy: .public) - \(t.title, privacy: .public); auto-scrobble will be blocked until duration is available")
+            }
             track = snapshot.track
             isNowPlayingLovedInAppleMusic = snapshot.isTrackFavorited
         } catch let error as AppleScriptError {
-            if error.number == -1743 {
+            if error.number == Int(errAEEventNotPermitted) {
                 // Not authorized to send Apple Events.
-                authorizationStatus = .denied
-                track = nil
-                playbackState = .stopped
-                playbackTimeSeconds = 0
-                isNowPlayingLovedInAppleMusic = nil
+                applyAutomationAuthorization(.denied)
                 return
             }
-            if error.number == -600 {
+            if error.number == Int(procNotFound) {
                 // Music isn't running (or still launching).
                 authorizationStatus = .authorized
-                track = nil
-                playbackState = .stopped
-                playbackTimeSeconds = 0
-                isNowPlayingLovedInAppleMusic = nil
+                resetPlaybackSnapshot()
                 return
             }
             logger.debug("AppleScript error: \(error.message, privacy: .public) (\(error.number, privacy: .public))")
-            track = nil
-            playbackState = .stopped
-            playbackTimeSeconds = 0
-            isNowPlayingLovedInAppleMusic = nil
+            resetPlaybackSnapshot()
         } catch {
             logger.debug("Music snapshot error: \(error.localizedDescription, privacy: .public)")
-            track = nil
-            playbackState = .stopped
-            playbackTimeSeconds = 0
-            isNowPlayingLovedInAppleMusic = nil
+            resetPlaybackSnapshot()
         }
+    }
+
+    private func applyAutomationAuthorization(_ status: MPMediaLibraryAuthorizationStatus) {
+        authorizationStatus = status
+        guard status != .authorized else { return }
+        resetPlaybackSnapshot()
+    }
+
+    private func resetPlaybackSnapshot() {
+        track = nil
+        playbackState = .stopped
+        playbackTimeSeconds = 0
+        isNowPlayingLovedInAppleMusic = nil
     }
 
     private struct MusicSnapshot: Sendable {
@@ -275,6 +285,47 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         }
     }
 
+    nonisolated private static func determineMusicAutomationAuthorizationStatusAsync(
+        askUserIfNeeded: Bool
+    ) async -> MPMediaLibraryAuthorizationStatus {
+        await withCheckedContinuation { cont in
+            scriptingQueue.async {
+                cont.resume(returning: determineMusicAutomationAuthorizationStatus(askUserIfNeeded: askUserIfNeeded))
+            }
+        }
+    }
+
+    nonisolated private static func determineMusicAutomationAuthorizationStatus(
+        askUserIfNeeded: Bool
+    ) -> MPMediaLibraryAuthorizationStatus {
+        let bundleID = "com.apple.Music"
+        var target = AEAddressDesc()
+        let createStatus = bundleID.withCString { buffer in
+            AECreateDesc(DescType(typeApplicationBundleID), buffer, bundleID.utf8.count, &target)
+        }
+
+        guard createStatus == noErr else { return .notDetermined }
+        defer { AEDisposeDesc(&target) }
+
+        let status = AEDeterminePermissionToAutomateTarget(
+            &target,
+            AEEventClass(typeWildCard),
+            AEEventID(typeWildCard),
+            askUserIfNeeded
+        )
+
+        switch status {
+        case noErr:
+            return .authorized
+        case OSStatus(errAEEventNotPermitted):
+            return .denied
+        case OSStatus(errAEEventWouldRequireUserConsent), OSStatus(procNotFound):
+            return .notDetermined
+        default:
+            return .notDetermined
+        }
+    }
+
     nonisolated private static func runAppleScriptAsync(_ source: String) async throws -> String {
         try await withCheckedThrowingContinuation { cont in
             scriptingQueue.async {
@@ -297,16 +348,6 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         }
 
         return output.stringValue ?? ""
-    }
-
-    nonisolated private static func launchMusicIfNeeded() {
-        let bundleID = "com.apple.Music"
-        guard NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty else { return }
-
-        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
-        let config = NSWorkspace.OpenConfiguration()
-        config.activates = false
-        NSWorkspace.shared.openApplication(at: appURL, configuration: config, completionHandler: nil)
     }
 
     nonisolated private static func splitSnapshotFields(_ output: String) -> [String] {

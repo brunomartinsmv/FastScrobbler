@@ -9,11 +9,13 @@ final class LiveActivityManager {
 
     static let enabledDefaultsKey = "FastScrobbler.LiveActivity.enabled"
     static let backgroundedAtDefaultsKey = "FastScrobbler.LiveActivity.backgroundedAt"
-    static let maxBackgroundSeconds: TimeInterval = 30 * 60
+    static let maxBackgroundSeconds: TimeInterval = 60 * 60
+    static let playbackStoppedDismissalDelay: TimeInterval = 5 * 60
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "LiveActivity")
     private var activity: Activity<ScrobblingActivityAttributes>?
     private var lastUpdateAt: Date?
+    private var playbackStoppedTimer: Timer?
 
     private init() {}
 
@@ -28,7 +30,7 @@ final class LiveActivityManager {
             return
         }
 
-        logger.debug("app backgrounded >= 30 minutes; ending all Live Activities")
+        logger.debug("app backgrounded >= 60 minutes; ending all Live Activities")
         await endAllActivities(except: nil)
         activity = nil
     }
@@ -55,6 +57,10 @@ final class LiveActivityManager {
         UserDefaults.standard.removeObject(forKey: Self.backgroundedAtDefaultsKey)
     }
 
+    var isActive: Bool {
+        activity?.activityState == .active
+    }
+
     private var isEnabled: Bool {
         if UserDefaults.standard.object(forKey: Self.enabledDefaultsKey) == nil { return false }
         return UserDefaults.standard.bool(forKey: Self.enabledDefaultsKey)
@@ -65,12 +71,7 @@ final class LiveActivityManager {
     }
 
     func startIfPossible() {
-        guard isEnabled else {
-            Task { @MainActor in
-                await self.stop()
-            }
-            return
-        }
+        guard isEnabled else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         guard activity == nil else { return }
 
@@ -114,6 +115,8 @@ final class LiveActivityManager {
     }
 
     func stop() async {
+        playbackStoppedTimer?.invalidate()
+        playbackStoppedTimer = nil
         await endAllActivities(except: nil)
         self.activity = nil
     }
@@ -140,6 +143,18 @@ final class LiveActivityManager {
 
         if let lastUpdateAt, now.timeIntervalSince(lastUpdateAt) < throttleSeconds { return }
         self.lastUpdateAt = now
+
+        if isActivelyScrobbling {
+            playbackStoppedTimer?.invalidate()
+            playbackStoppedTimer = nil
+        } else if playbackStoppedTimer == nil {
+            playbackStoppedTimer = Timer.scheduledTimer(
+                withTimeInterval: Self.playbackStoppedDismissalDelay,
+                repeats: false
+            ) { [weak self] _ in
+                Task { @MainActor in await self?.stop() }
+            }
+        }
 
         let state = ScrobblingActivityAttributes.ContentState(
             status: status,
@@ -183,7 +198,7 @@ final class LiveActivityManager {
             return false
         }
 
-        logger.debug("app backgrounded >= 30 minutes; ending all Live Activities")
+        logger.debug("app backgrounded >= 60 minutes; ending all Live Activities")
         await endAllActivities(except: nil)
         activity = nil
         return true

@@ -1,14 +1,13 @@
-	#if os(macOS)
-	import AppKit
-	import SwiftUI
+import AppKit
+import SwiftUI
 
-	extension Notification.Name {
-	    static let fastScrobblerPopoverWillShow = Notification.Name("FastScrobbler.popover.willShow")
-	}
+extension Notification.Name {
+    static let fastScrobblerPopoverWillShow = Notification.Name("FastScrobbler.popover.willShow")
+}
 
-	@MainActor
-	final class MenuBarController: NSObject, NSPopoverDelegate {
-	    static let shared = MenuBarController()
+@MainActor
+final class MenuBarController: NSObject, NSPopoverDelegate {
+    static let shared = MenuBarController()
 
     private let statusItem: NSStatusItem
     private let popover: NSPopover
@@ -21,9 +20,9 @@
         "music.quarternote.3",
     ]
 
-	    private override init() {
-	        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-	        popover = NSPopover()
+    private override init() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        popover = NSPopover()
 
         quitMenu = NSMenu()
         super.init()
@@ -37,36 +36,36 @@
         quitItem.target = self
         quitMenu.addItem(quitItem)
 
-	        if let button = statusItem.button {
-	            let thickness = NSStatusBar.system.thickness
-	            let pointSize = thickness * 0.60
-	            let symbolConfig = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
+        if let button = statusItem.button {
+            let thickness = NSStatusBar.system.thickness
+            let pointSize = thickness * 0.60
+            let symbolConfig = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
 
-	            let image = Self.makeStatusBarImage(
-	                symbolNames: Self.statusBarSymbolNames,
-	                symbolConfiguration: symbolConfig,
-	                pointSize: pointSize,
-	                targetSize: NSSize(width: thickness, height: thickness)
-	            )
+            let image = Self.makeStatusBarImage(
+                symbolNames: Self.statusBarSymbolNames,
+                symbolConfiguration: symbolConfig,
+                pointSize: pointSize,
+                targetSize: NSSize(width: thickness, height: thickness)
+            )
 
             if let image {
-	                image.isTemplate = true
-	                button.image = image
-	                button.title = ""
-	                button.imagePosition = .imageOnly
+                image.isTemplate = true
+                button.image = image
+                button.title = ""
+                button.imagePosition = .imageOnly
             } else {
                 button.image = nil
                 button.title = "♪"
                 button.font = NSFont.systemFont(ofSize: max(13, thickness * 0.62), weight: .regular)
                 button.imagePosition = .noImage
             }
-	            button.imageScaling = .scaleNone
-	            button.toolTip = "FastScrobbler"
-	            button.target = self
-	            button.action = #selector(statusItemClicked(_:))
-	            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-	        }
-	    }
+            button.imageScaling = .scaleNone
+            button.toolTip = "FastScrobbler"
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+        }
+    }
 
     private static func makeStatusBarImage(
         symbolNames: [String],
@@ -151,18 +150,18 @@
         }
     }
 
-	    private func showPopover() {
-	        guard let button = statusItem.button else { return }
-	        NSApp.activate(ignoringOtherApps: true)
-	        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+    private func showPopover() {
+        guard let button = statusItem.button else { return }
+        NSApp.activate(ignoringOtherApps: true)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         // Make the popover window key so SwiftUI renders buttons with full colour
         popover.contentViewController?.view.window?.makeKey()
         installDismissMonitors()
-	        // Post after presenting so any refresh work can't delay the popover from appearing.
-	        DispatchQueue.main.async {
-	            NotificationCenter.default.post(name: .fastScrobblerPopoverWillShow, object: nil)
-	        }
-	    }
+        // Post after presenting so any refresh work can't delay the popover from appearing.
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .fastScrobblerPopoverWillShow, object: nil)
+        }
+    }
 
     func popoverDidClose(_ notification: Notification) {
         removeDismissMonitors()
@@ -234,4 +233,3 @@
         NSApp.terminate(nil)
     }
 }
-#endif

@@ -9,8 +9,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = scene as? UIWindowScene else { return }
 
         let model = AppModel.shared
+        model.startIfNeeded()
         Task { @MainActor in
-            await model.startIfNeeded()
             await ProPurchaseManager.shared.startIfNeeded()
         }
 
@@ -32,22 +32,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        Task { @MainActor in
-            AppModel.shared.prepareForBackground()
-        }
+        AppModel.shared.prepareForBackground()
         BackgroundTaskManager.shared.scheduleAppRefresh()
+        BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
-        Task { @MainActor in
-            await AppModel.shared.startIfNeeded()
-        }
+        AppModel.shared.handleWillEnterForeground()
+        AppModel.shared.startIfNeeded()
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
 #if os(iOS)
         guard let windowScene = scene as? UIWindowScene else { return }
         Task { @MainActor in
+            await AppModel.shared.handleSceneDidBecomeActive()
             AppReviewManager.shared.recordAppDidBecomeActive(in: windowScene)
         }
 #endif

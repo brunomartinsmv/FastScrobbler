@@ -6,12 +6,13 @@
 "A quick checklist to get scrobbling working reliably." = "Une liste rapide pour faire fonctionner le scrobbling correctement.";
 "Account" = "Compte";
 "Allow Music Control" = "Autoriser le contrôle de Musique";
-"Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you’re encountering issues looping songs." = "Empêche d’envoyer le même morceau à Last.fm plus d’une fois dans un court laps de temps. Désactivez-le si vous rencontrez des problèmes lors de la mise en boucle de chansons.";
+"Avoids sending the same playback session to Last.fm more than once within a short time window." = "Empêche d’envoyer la même session de lecture à Last.fm plus d’une fois dans un court laps de temps.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Fonction bêta : affiche l’état du scrobbling sur l’écran verrouillé et la Dynamic Island.";
 "Connected" = "Connecté";
 "Done" = "Terminé";
 "Duration: %@s | Playback: %@s" = "Durée : %1$@ s | Lecture : %2$@ s";
 "Enabled" = "Activé";
+"Not Enabled" = "Non activé";
 "Engine: " = "Moteur : ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "Général";
@@ -31,8 +32,8 @@
 "Recent Scrobbles" = "Scrobbles récents";
 /* Remove brackets screen */
 "Remove brackets" = "Retirer les crochets";
-"Remove brackets for song titles" = "Retirer les crochets des titres de morceaux";
-"Remove brackets for album titles" = "Retirer les crochets des titres d’album";
+"Remove brackets in song titles" = "Retirer les crochets des titres de morceaux";
+"Remove brackets in album titles" = "Retirer les crochets des titres d’album";
 "When enabled, brackets containing any of the keywords in the list below will be removed when scrobbling." = "Une fois activée, cette option retire lors du scrobbling les segments entre crochets contenant l’un des mots-clés de la liste ci-dessous.";
 "When enabled, brackets containing any of the keywords in the list below will be removed from song titles when scrobbling." = "Une fois activée, cette option retire lors du scrobbling les segments entre crochets des titres de morceaux contenant l’un des mots-clés de la liste ci-dessous.";
 "When enabled, brackets containing any of the keywords in the list below will be removed from album titles when scrobbling." = "Une fois activée, cette option retire lors du scrobbling les segments entre crochets des titres d’album contenant l’un des mots-clés de la liste ci-dessous.";
@@ -63,6 +64,7 @@
 "Sign Out of Last.fm?" = "Se déconnecter de Last.fm ?";
 "State: %@" = "État : %@";
 "Thank you!" = "Merci !";
+"Thank you! ^_^" = "Merci ! ^_^";
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "Cela réinitialise les réglages à leurs valeurs initiales (votre compte Last.fm reste connecté).";
 "Upgrade to unlock more scrobble controls." = "Passez à la version supérieure pour débloquer plus de contrôles de scrobble.";
 "Replace song artist with album artist when scrobbling" = "Remplacer l’artiste du morceau par l’artiste de l’album lors du scrobble";
@@ -179,7 +181,7 @@
 "Unknown" = "Inconnu";
 "Upgrade" = "Passer à la version supérieure";
 "Upgrade for %@" = "Mettre à niveau pour %@";
-"Remove brackets from song and album titles by matching keywords, or optionally remove all brackets." = "Retire des titres de morceaux et d’album les segments entre crochets selon des mots-clés, ou supprime tous les crochets.";
+"Remove brackets in song and album titles by matching keywords, or remove all brackets entirely." = "Retire des titres de morceaux et d’album les segments entre crochets selon des mots-clés, ou supprime entièrement tous les crochets.";
 "Replace song artist with album artist when scrobbling, and remove \"- EP\" / \"- Single\" from album names." = "Remplace l’artiste du morceau par l’artiste de l’album lors du scrobble et retire « - EP » / « - Single » des noms d’album.";
 "View Profile" = "Voir le profil";
 "View Profile in Last.fm" = "Voir le profil sur Last.fm";
@@ -219,7 +221,7 @@
 /* Text Replacement */
 "Text Replacement" = "Remplacement de texte";
 "Text replacement" = "Remplacement de texte";
-"Find and replace keywords to automatically clean up track, album, or artist names before scrobbling." = "Recherchez et remplacez des mots-clés pour nettoyer automatiquement les noms de piste, d'album ou d'artiste avant le scrobbling.";
+"Find and replace keywords to automatically clean up artist, song, and album titles when scrobbling. Also removes \"- EP\" and \"- Single\" from album titles." = "Recherchez et remplacez des mots-clés pour nettoyer automatiquement les noms d'artiste, de chanson et d'album lors du scrobbling. Supprime également « - EP » et « - Single » des titres d'album.";
 "Add Rule" = "Ajouter une règle";
 "Rules" = "Règles";
 "Each rule replaces all exact occurrences of the \"Find\" text in the selected fields before scrobbling. All keywords are case-sensitive." = "Chaque règle remplace toutes les occurrences exactes du texte « Chercher » dans les champs sélectionnés avant le scrobbling. Tous les mots-clés sont sensibles à la casse.";
@@ -227,5 +229,9 @@
 "Blank" = "Vide";
 "Replace with" = "Remplacer par";
 "Song" = "Morceau";
-"This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History." = "Cette option est temporairement indisponible en raison de problèmes affectant la fiabilité du scrobbling depuis l'historique d'écoute.";
+"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "Cette option est actuellement indisponible en raison de problèmes affectant la fiabilité du scrobbling depuis l'historique d'écoute.";
 "This will restore all settings to their defaults." = "Cela restaurera tous les réglages à leurs valeurs par défaut.";
+"Scrobble looped tracks" = "Scrobbler les morceaux en boucle";
+"Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "Scrobble à nouveau le même morceau lorsqu'il boucle ou redémarre. Activez cette option si vous rejouez des morceaux et souhaitez que chaque écoute soit comptabilisée.";
+"View Pro features" = "Voir les fonctionnalités Pro";
+"Upgrade to Pro" = "Passer à Pro";

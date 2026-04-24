@@ -39,7 +39,7 @@ https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
 - **Manual Scrobble**: submit a scrobble for any track by entering artist, song, album, and an optional custom timestamp (up to two weeks in the past). Includes a log of the last 30 manual scrobbles.
 - **Pause/Resume scrobbling**: stops all sending while paused.
 - **Offline / failure tolerant**: queues scrobbles locally and retries with exponential-ish backoff.
-- **Listening History import (iOS)**: uses the Apple Music app's Listening History functionality as a scrobbling backlog.
+- **Listening History import (iOS)**: uses the Apple Music app's Listening History functionality as a recovery backlog for plays missed while the app was suspended.
 - **Apple Music favourites → Last.fm love (optional)**: when enabled, favouriting a song in Apple Music can trigger `track.love` after scrobbling.
 - **Scrobble metadata controls**:
   - Use **Album Artist** as scrobble artist (when available, except compilation albums).
@@ -49,7 +49,8 @@ https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
 - **Shortcuts (iOS)**:
   - **Send Now Playing** (updates Last.fm "currently playing")
   - **Scrobble Song** (immediate scrobble)
-- **Control Center buttons (iOS 18+)**: Control Widgets that run the same actions without opening the app.
+  - **Manual Scrobble** (opens the Manual Scrobble screen)
+- **Control Center buttons (iOS 18+)**: Control Widgets for **Send Now Playing**, **Scrobble Song**, and **Manual Scrobble**.
 - **macOS menu bar UI**: no dock icon/windows; click the menu bar icon to open the popover UI.
 - **Start at login (macOS)**: optional toggle in Settings.
 
@@ -70,11 +71,11 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - Xcode (recent) and an Apple Developer signing setup
 - Recommended: a physical iPhone with the Apple Music app installed
 - iOS targets:
-  - App: iOS 16.6+
+  - App: iOS 16+
   - Live Activity extension: iOS 16.1+
   - Control Widgets extensions: iOS 18.0+
 - macOS target:
-  - Menu bar app: macOS 13.5+
+  - Menu bar app: macOS 14+
 
 ## Permissions / OS prompts
 
@@ -116,16 +117,16 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 
 ## iOS constraints / gotchas
 
-- Background scrobbling is **best-effort**. iOS can suspend apps aggressively; FastScrobbler uses `BGAppRefreshTask` / `BGProcessingTask`, but always-on behavior is not guaranteed.
+- Background scrobbling is **best-effort**. FastScrobbler keeps live scrobbling running for a short period immediately after the app is backgrounded, then falls back to `BGAppRefreshTask` / `BGProcessingTask`. iOS can still suspend the app earlier than requested, so always-on behavior is not guaranteed.
 - Scrobbling requires a track duration. If Apple Music doesn’t provide a duration, FastScrobbler can still send **Now Playing**, but may not auto-scrobble.
-- Listening History import uses the Apple Music app's Listening History functionality, which only records songs added to the user's library. 
+- Listening History import is a backup path for missed plays and only works for songs added to your library.
 - Live Activities, Shortcuts, and Control Center widgets may update with a delay (iOS can throttle background/intent execution).
 
 ## Troubleshooting
 
 - **No track detected (iOS)**: make sure Apple Music is playing and Media Library permission is granted.
-- **No scrobbles while locked/backgrounded (iOS)**: keep the app open occasionally; ensure Background App Refresh is enabled.
-- **Issue scrobbling looped songs**: ensure that "Prevent duplicate scrobbles" is turned off in the app's settings 
+- **No scrobbles while locked/backgrounded (iOS)**: the app can continue live scrobbling for a few minutes after you background it, but longer background time is still best-effort. Ensure Background App Refresh is enabled.
+- Looped or restarted tracks are counted automatically; each playback must still reach the scrobble threshold on its own.
 - **macOS shows "permission" errors**: enable Automation permission for Music in System Settings.
 - **Auth callback issues**: `LastFMSecrets.callbackScheme` must match `CFBundleURLTypes` in `FastScrobbler/Info.plist`.
 

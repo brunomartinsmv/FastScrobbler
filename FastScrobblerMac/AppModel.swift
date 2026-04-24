@@ -1,8 +1,4 @@
 import Foundation
-import StoreKit
-#if canImport(UIKit)
-import UIKit
-#endif
 
 @MainActor
 final class AppModel {
@@ -56,10 +52,6 @@ final class AppModel {
     private func performStart() async {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
-        if #available(iOS 16.2, *) {
-            LiveActivityManager.shared.startIfPossible()
-        }
-
         do {
             try await observer.start()
         } catch {
@@ -105,61 +97,12 @@ final class AppModel {
         await engine.tickAsync()
     }
 
-    func handleSceneDidBecomeActive() async {
-        guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
-
-        if #available(iOS 16.2, *) {
-            await LiveActivityManager.shared.handleAppBecameActive()
-        }
-    }
-
-    func handleWillEnterForeground() {
-        BackgroundTaskManager.shared.endLiveScrobbleGracePeriod()
-        UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
-        if #available(iOS 16.2, *) {
-            LiveActivityManager.shared.clearEnteredBackground()
-        }
-    }
-
     func prepareForBackground() {
         let backgroundedAt = Date()
         UserDefaults.standard.set(backgroundedAt, forKey: Keys.lastEnteredBackgroundAt)
         LiveActivityManager.shared.recordEnteredBackground(at: backgroundedAt)
-
-        let shouldKeepLiveScrobbling =
-            UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) &&
-            auth.sessionKey != nil &&
-            !engine.isUserPaused &&
-            engine.isRunning &&
-            observer.isRunning &&
-            observer.track != nil &&
-            observer.playbackState == .playing
-
-        if shouldKeepLiveScrobbling {
-            let started = BackgroundTaskManager.shared.startLiveScrobbleGracePeriod { [weak self] in
-                await self?.finishBackgroundGracePeriodIfNeeded()
-            }
-            if !started {
-                engine.pauseForBackground()
-            }
-        } else {
-            engine.pauseForBackground()
-        }
-
-        Task { @MainActor in
-            if #available(iOS 16.2, *) {
-                await LiveActivityManager.shared.scheduleDismissalAfterAppClosed(backgroundedAt: backgroundedAt)
-            }
-        }
-    }
-
-    func finishBackgroundGracePeriodIfNeeded() async {
-        guard UserDefaults.standard.object(forKey: Keys.lastEnteredBackgroundAt) != nil else { return }
-
-        await engine.tickAsync()
+        observer.stop()
         engine.pauseForBackground()
-        BackgroundTaskManager.shared.scheduleAppRefresh()
-        BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
     }
 
     func backgroundTick() async {
@@ -178,7 +121,6 @@ final class AppModel {
                     source: scrobbleLogSource(for: item.origin),
                     lovedOnLastFM: item.lovedOnLastFM
                 )
-                AppReviewManager.shared.recordSuccessfulScrobble()
             }
         }
         await engine.tickAsync()
@@ -225,7 +167,6 @@ final class AppModel {
         await flushBacklogIfNeeded(sessionKey: sessionKey)
     }
 
-    @discardableResult
     private func flushBacklogIfNeeded(sessionKey: String, force: Bool = false) async -> ScrobbleBacklog.FlushResult {
         let pending = await backlog.pendingCount()
         guard pending > 0 else {
@@ -256,7 +197,6 @@ final class AppModel {
                 source: scrobbleLogSource(for: item.origin),
                 lovedOnLastFM: item.lovedOnLastFM
             )
-            AppReviewManager.shared.recordSuccessfulScrobble()
         }
         return result
     }
@@ -278,75 +218,4 @@ final class AppModel {
             return .backlog
         }
     }
-}
-
-@MainActor
-final class AppReviewManager {
-    static let shared = AppReviewManager()
-
-    private enum Keys {
-        static let firstLaunchAt = "FastScrobbler.Review.firstLaunchAt"
-        static let lastCountedSessionAt = "FastScrobbler.Review.lastCountedSessionAt"
-        static let engagedSessionCount = "FastScrobbler.Review.engagedSessionCount"
-        static let successfulScrobbleCount = "FastScrobbler.Review.successfulScrobbleCount"
-        static let lastPromptedVersion = "FastScrobbler.Review.lastPromptedVersion"
-        static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
-    }
-
-    private let defaults = UserDefaults.standard
-    private let minimumDaysSinceFirstLaunch: TimeInterval = 7 * 24 * 60 * 60
-    private let minimumSessionSpacing: TimeInterval = 4 * 60 * 60
-    private let minimumEngagedSessions = 4
-    private let minimumSuccessfulScrobbles = 10
-
-    static let writeReviewURL = URL(string: "https://apps.apple.com/app/id6759501541?action=write-review")!
-
-    private init() {
-        if defaults.object(forKey: Keys.firstLaunchAt) == nil {
-            defaults.set(Date(), forKey: Keys.firstLaunchAt)
-        }
-    }
-
-    #if canImport(UIKit)
-    func recordAppDidBecomeActive(in windowScene: UIWindowScene) {
-        if defaults.object(forKey: Keys.firstLaunchAt) == nil {
-            defaults.set(Date(), forKey: Keys.firstLaunchAt)
-        }
-
-        guard defaults.bool(forKey: Keys.hasSeenSetup) else { return }
-
-        let now = Date()
-        if let lastCountedSessionAt = defaults.object(forKey: Keys.lastCountedSessionAt) as? Date {
-            if now.timeIntervalSince(lastCountedSessionAt) >= minimumSessionSpacing {
-                defaults.set(now, forKey: Keys.lastCountedSessionAt)
-                defaults.set(defaults.integer(forKey: Keys.engagedSessionCount) + 1, forKey: Keys.engagedSessionCount)
-            }
-        } else {
-            defaults.set(now, forKey: Keys.lastCountedSessionAt)
-            defaults.set(1, forKey: Keys.engagedSessionCount)
-        }
-
-        requestReviewIfEligible(in: windowScene, now: now)
-    }
-    #endif
-
-    func recordSuccessfulScrobble() {
-        defaults.set(defaults.integer(forKey: Keys.successfulScrobbleCount) + 1, forKey: Keys.successfulScrobbleCount)
-    }
-
-    #if canImport(UIKit)
-    private func requestReviewIfEligible(in windowScene: UIWindowScene, now: Date) {
-        guard let firstLaunchAt = defaults.object(forKey: Keys.firstLaunchAt) as? Date else { return }
-        guard now.timeIntervalSince(firstLaunchAt) >= minimumDaysSinceFirstLaunch else { return }
-        guard defaults.integer(forKey: Keys.engagedSessionCount) >= minimumEngagedSessions else { return }
-        guard defaults.integer(forKey: Keys.successfulScrobbleCount) >= minimumSuccessfulScrobbles else { return }
-
-        let currentVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        guard let currentVersion, !currentVersion.isEmpty else { return }
-        guard defaults.string(forKey: Keys.lastPromptedVersion) != currentVersion else { return }
-
-        defaults.set(currentVersion, forKey: Keys.lastPromptedVersion)
-        SKStoreReviewController.requestReview(in: windowScene)
-    }
-    #endif
 }

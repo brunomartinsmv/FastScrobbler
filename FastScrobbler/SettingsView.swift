@@ -1,23 +1,18 @@
+import SwiftUI
 #if os(iOS)
 import ActivityKit
 #endif
-#if os(macOS)
-import ServiceManagement
-#endif
-import SwiftUI
 
 struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/kevinlim512/FastScrobbler")!
     private static let redditURL = URL(string: "https://www.reddit.com/r/FastScrobbler/")!
     private static let redditSubmitURL = URL(string: "https://www.reddit.com/r/FastScrobbler/submit")!
     private static let writeReviewURL = URL(string: "https://apps.apple.com/app/id6759501541?action=write-review")!
+    // Last.fm brand red, used for the links section background
     private static let linksSectionRed = Color(red: 0.72, green: 0.14, blue: 0.14)
-#if os(macOS)
-    private static let macSettingsButtonMinHeight: CGFloat = 28
-#else
+    // Insets position the Pro badge overlay to sit just inside the disclosure indicator / toggle
     private static let iosLockedProNavigationBadgeTrailingInset: CGFloat = 24
     private static let iosLockedProToggleBadgeTrailingInset: CGFloat = 63
-#endif
 
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
@@ -38,11 +33,9 @@ struct SettingsView: View {
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
     @EnvironmentObject private var pro: ProPurchaseManager
-#if os(macOS)
-    @EnvironmentObject private var appLanguage: AppLanguageStore
-#endif
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isEmbeddedInTab) private var isEmbeddedInTab
 
     private enum ActiveAlert: Identifiable {
         case logoutConfirmation
@@ -65,28 +58,20 @@ struct SettingsView: View {
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
         case textReplacement
+        case proUpgrade
     }
 
     @State private var activeAlert: ActiveAlert?
     @State private var isSigningInToLastFM = false
     @State private var lastFMLoginErrorText: String?
-#if os(iOS)
     @State private var isScanningListeningHistory = false
     @State private var isShowingWhatsNew = false
-#endif
-#if os(macOS)
-    @State private var startAtLoginEnabled = StartAtLoginManager.isEnabled
-    @State private var startAtLoginErrorText: String?
-    @State private var isConfirmingReset = false
-    @State private var isConfirmingSignOut = false
-#endif
-#if os(macOS)
-    let onBack: (() -> Void)?
 
-    init(onBack: (() -> Void)? = nil) {
-        self.onBack = onBack
+    var isShowingHelp: Binding<Bool>?
+
+    init(isShowingHelp: Binding<Bool>? = nil) {
+        self.isShowingHelp = isShowingHelp
     }
-#endif
 
     var body: some View {
         NavigationStack {
@@ -99,36 +84,39 @@ struct SettingsView: View {
                         RemoveBracketsSettingsPage(target: .albumTitles)
                     case .textReplacement:
                         TextReplacementSettingsPage()
+                    case .proUpgrade:
+                        ProUpgradeView()
                     }
                 }
-#if os(iOS)
                 .navigationTitle("Settings")
-                .navigationBarTitleDisplayMode(.inline)
+#if os(iOS)
+                .navigationBarTitleDisplayMode(.large)
+#endif
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            dismiss()
-                        } label: {
-                            IOSCloseButtonLabel(style: .plain)
+                    if !isEmbeddedInTab {
+#if os(iOS)
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                dismiss()
+                            } label: {
+                                IOSCloseButtonLabel(style: .plain)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Close")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Close")
+#endif
                     }
                 }
-#endif
         }
         .task {
             await auth.refreshUserInfoIfNeeded()
-#if os(macOS)
-            startAtLoginEnabled = StartAtLoginManager.isEnabled
-#endif
         }
         .alert(item: $activeAlert) { alert in
             switch alert {
             case .logoutConfirmation:
                 Alert(
                     title: Text("Sign Out of Last.fm?"),
-                    message: Text("You’ll need to sign in again to scrobble."),
+                    message: Text("You'll need to sign in again to scrobble."),
                     primaryButton: .destructive(Text("Sign Out"), action: performLogout),
                     secondaryButton: .cancel()
                 )
@@ -165,50 +153,53 @@ struct SettingsView: View {
                 isShowingWhatsNew = false
             }
         }
+#else
+        .sheet(isPresented: $isShowingWhatsNew) {
+            WhatsNewView {
+                isShowingWhatsNew = false
+            }
+        }
 #endif
     }
 
     @ViewBuilder
     private var settingsRootContent: some View {
-#if os(macOS)
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text(localized("Settings"))
-                    .font(.title.weight(.bold))
-
-                macGeneralCard
-                macScrobbleControlsCard
-                macAccountCard
-                macSupportCard
-            }
-            .padding()
-            .padding(.top, MacFloatingBarLayout.contentTopPadding)
-        }
-        .background(Color(nsColor: .windowBackgroundColor))
-        .overlay(alignment: .topLeading) {
-            if onBack != nil {
-                MacFloatingCircleButton(
-                    systemImage: "chevron.left",
-                    help: "Back",
-                    accessibilityLabel: "Back",
-                    action: {
-                        if let onBack {
-                            onBack()
-                        } else {
-                            dismiss()
-                        }
-                    }
-                )
-                .padding(.top, 10)
-                .padding(.leading, 10)
-            }
-        }
-#else
         Form {
+            Section(pro.isPro ? "Thank you! ^_^" : "Unlock Pro features") {
+                NavigationLink(value: SettingsRoute.proUpgrade) {
+                    Text(pro.isPro ? "View Pro features" : "Upgrade to Pro")
+                        .fontWeight(pro.isPro ? .regular : .bold)
+                        .foregroundStyle(.primary)
+                        .padding(.vertical, pro.isPro ? 0 : 10)
+                }
+                .listRowBackground(pro.isPro ? nil : Color.yellow)
+            }
+
+            if let isShowingHelp {
+                Section {
+                    Button {
+                        isShowingHelp.wrappedValue = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "questionmark.circle")
+                            Text("Help")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.footnote.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                }
+#if os(iOS)
+                .listSectionSpacing(.compact)
+#endif
+            }
+
             Section("Scrobble Controls") {
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Prevent duplicate scrobbles", isOn: $preventDuplicateScrobblesEnabled)
-                    Text("Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs.")
+                    Text("Avoids sending the same playback session to Last.fm more than once within a short time window.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -225,6 +216,7 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(!pro.isPro)
+                .tint(.yellow)
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
@@ -237,12 +229,12 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(!pro.isPro)
+                .tint(.yellow)
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
             }
 
-#if os(iOS)
             Section("Listening History") {
                 let allDevicesEnabled = scrobbleListeningHistoryEnabled && pro.isPro
 
@@ -282,13 +274,14 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
+                    // Hardcoded to true and disabled while the multi-device scrobble feature is broken
                     Toggle(isOn: .constant(true)) {
                         Text("Scrobble Listening History from all devices")
                             .foregroundStyle(.secondary)
                     }
                     .disabled(true)
 
-                    Text(NSLocalizedString("This toggle is temporarily unavailable due to issues affecting the reliability of scrobbling from Listening History.", comment: ""))
+                    Text(NSLocalizedString("This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History.", comment: ""))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -306,6 +299,7 @@ struct SettingsView: View {
                         }
                     }
 
+                #if os(iOS)
                 if #available(iOS 16.1, *) {
                     if !ActivityAuthorizationInfo().areActivitiesEnabled {
                         Text("Live Activities are disabled in iOS Settings for FastScrobbler.")
@@ -313,12 +307,12 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                #endif
 
                 Text("Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-#endif
 
             Section("Account") {
                 HStack {
@@ -405,215 +399,7 @@ struct SettingsView: View {
                 }
             }
         }
-#endif
     }
-
-#if os(macOS)
-    private var macGeneralCard: some View {
-        let requiresApproval = (StartAtLoginManager.status == .requiresApproval)
-        return VStack(alignment: .leading, spacing: 12) {
-            Text(localized("General"))
-                .font(.title3.weight(.semibold))
-
-            HStack(alignment: .center, spacing: -20) {
-                Text(localized("Language"))
-                Picker(localized("Language"), selection: $appLanguage.selection) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-                .frame(width: 180)
-            }
-            .fixedSize()
-
-            Toggle(localized("Start at login"), isOn: $startAtLoginEnabled)
-                .onValueChange(of: startAtLoginEnabled) { isEnabled in
-                    Task { @MainActor in
-                        do {
-                            try StartAtLoginManager.setEnabled(isEnabled)
-                        } catch {
-                            startAtLoginErrorText = error.localizedDescription
-                        }
-                        startAtLoginEnabled = StartAtLoginManager.isEnabled
-                    }
-                }
-
-            Text(
-                requiresApproval
-                    ? NSLocalizedString("Requires approval in System Settings → Login Items.", comment: "")
-                    : NSLocalizedString("Launches FastScrobbler when you sign in.", comment: "")
-            )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .alert(localized("Couldn't update Start at login"), isPresented: Binding(
-            get: { startAtLoginErrorText != nil },
-            set: { isPresented in
-                if !isPresented {
-                    startAtLoginErrorText = nil
-                }
-            }
-        )) {
-            Button(localized("OK"), role: .cancel) {}
-        } message: {
-            Text(startAtLoginErrorText ?? "")
-        }
-    }
-
-    private var macScrobbleControlsCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(localized("Scrobble Controls"))
-                .font(.title3.weight(.semibold))
-
-            Toggle(localized("Prevent duplicate scrobbles"), isOn: $preventDuplicateScrobblesEnabled)
-            Text(localized("Avoids sending the same track to Last.fm more than once within a short time window. Disable this if you're encountering issues looping songs."))
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            scrobbleThresholdSlider()
-            removeBracketsNavigationLink(target: .songTitles)
-            removeBracketsNavigationLink(target: .albumTitles)
-            textReplacementNavigationLink
-            Toggle(isOn: proLockedBoolBinding($loveOnFavoriteEnabled, unlockedDefault: false)) {
-                HStack {
-                    Text(localized("Love Apple Music favourites on Last.fm"))
-                        .foregroundStyle(pro.isPro ? .primary : .secondary)
-                    Spacer()
-                    ProFeatureBadge()
-                }
-            }
-            .disabled(!pro.isPro)
-            Toggle(isOn: proLockedBoolBinding($useAlbumArtistForScrobbling, unlockedDefault: false)) {
-                HStack {
-                    Text(localized("Replace song artist with album artist when scrobbling"))
-                        .foregroundStyle(pro.isPro ? .primary : .secondary)
-                    Spacer()
-                    ProFeatureBadge()
-                }
-            }
-            .disabled(!pro.isPro)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-    }
-
-    private var macAccountCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(localized("Account"))
-                    .font(.title3.weight(.semibold))
-                Spacer()
-                Text(auth.sessionKey != nil ? NSLocalizedString("Connected", comment: "") : NSLocalizedString("Not connected", comment: ""))
-                    .foregroundStyle(auth.sessionKey != nil ? .green : .secondary)
-            }
-
-            if auth.sessionKey != nil {
-                HStack {
-                    Text(localized("Username"))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Text(auth.username ?? NSLocalizedString("Loading…", comment: ""))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.trailing)
-                        .textSelection(.enabled)
-                }
-                .font(.subheadline)
-            }
-
-            HStack(spacing: 12) {
-                if !isConfirmingSignOut {
-                    Button {
-                        if let url = auth.freshProfileURL() {
-                            openURL(url)
-                        }
-                    } label: {
-                        Label(localized("View Profile"), systemImage: "person.circle")
-                            .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-                    }
-                    .buttonStyle(.bordered)
-                    .pillButtonBorder()
-                    .disabled(auth.sessionKey == nil || auth.profileURL == nil)
-                }
-
-                if auth.sessionKey == nil {
-                    Button {
-                        Task { await connectTapped() }
-                    } label: {
-                        Label(isSigningInToLastFM ? NSLocalizedString("Signing In…", comment: "") : NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
-                            .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-                    }
-                    .buttonStyle(.bordered)
-                    .pillButtonBorder()
-                    .tint(.blue)
-                    .disabled(isSigningInToLastFM)
-                } else {
-                    if isConfirmingSignOut {
-                        HStack(spacing: 8) {
-                            Text("Sign out?")
-                                .foregroundStyle(.secondary)
-                                .font(.headline)
-                            Spacer()
-                            Button("Cancel") {
-                                isConfirmingSignOut = false
-                            }
-                            .buttonStyle(.bordered)
-                            .pillButtonBorder()
-                            Button("Sign Out") {
-                                isConfirmingSignOut = false
-                                performLogout()
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .pillButtonBorder()
-                            .tint(.red)
-                        }
-                        .frame(minHeight: Self.macSettingsButtonMinHeight)
-                    } else {
-                        Button {
-                            isConfirmingSignOut = true
-                        } label: {
-                            Label(localized("Sign Out"), systemImage: "power")
-                                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-                        }
-                        .buttonStyle(.bordered)
-                        .pillButtonBorder()
-                        .tint(.red)
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-    }
-
-    private var macSupportCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(spacing: 12) {
-                macRedditButton
-                macAskQuestionButton
-                macRateButton
-                macGitHubButton
-                macResetButton
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-    }
-#endif
 
     private func performLogout() {
         auth.disconnect()
@@ -622,13 +408,11 @@ struct SettingsView: View {
     }
 
     private func resetToInitialSettings() {
-#if os(iOS)
         UserDefaults.standard.removeObject(forKey: LiveActivityManager.enabledDefaultsKey)
         liveActivityEnabled = false
         Task { @MainActor in
             await LiveActivityManager.shared.stop()
         }
-#endif
 
         let defaults = AppGroup.userDefaults
         defaults.removeObject(forKey: ProSettings.Keys.loveOnFavoriteEnabled)
@@ -643,6 +427,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.scrobbleListeningHistoryFromAllDevicesEnabled)
+        defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
 
         loveOnFavoriteEnabled = false
         scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
@@ -654,21 +439,8 @@ struct SettingsView: View {
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
         scrobbleListeningHistoryFromAllDevicesEnabled = false
-
-#if os(macOS)
-        appLanguage.selection = .system
-        Task { @MainActor in
-            do {
-                try StartAtLoginManager.setEnabled(false)
-            } catch {
-                startAtLoginErrorText = error.localizedDescription
-            }
-            startAtLoginEnabled = StartAtLoginManager.isEnabled
-        }
-#endif
     }
 
-#if os(iOS)
     @MainActor
     private func scanListeningHistoryTapped() async {
         guard auth.sessionKey != nil else { return }
@@ -676,12 +448,12 @@ struct SettingsView: View {
         isScanningListeningHistory = true
         defer { isScanningListeningHistory = false }
 
-        let imported = await AppModel.shared.scanListeningHistory()
-        if imported > 0 {
+        let result = await AppModel.shared.scanListeningHistory()
+        if result.dialogCount > 0 {
             activeAlert = .listeningHistoryScanResult(
                 message: String.localizedStringWithFormat(
                     NSLocalizedString("Imported %lld play(s).", comment: ""),
-                    Int64(imported)
+                    Int64(result.dialogCount)
                 )
             )
         } else {
@@ -693,7 +465,6 @@ struct SettingsView: View {
             )
         }
     }
-#endif
 
     @MainActor
     private func connectTapped() async {
@@ -730,17 +501,12 @@ struct SettingsView: View {
                 lockedProInlineBadge
             }
             .foregroundStyle(pro.isPro ? .primary : .secondary)
-            #if os(macOS)
-            Slider(value: sliderValue, in: 0...Double(ProSettings.scrobbleThresholdOptions.count - 1), step: 1)
-                .disabled(!pro.isPro)
-                .frame(maxWidth: .infinity)
-            #else
             Slider(value: sliderValue, in: 0...Double(ProSettings.scrobbleThresholdOptions.count - 1), step: 1) {
                 Text(localized("Scrobble threshold"))
             }
             .disabled(!pro.isPro)
+            .tint(.yellow)
             .frame(maxWidth: .infinity)
-            #endif
             HStack {
                 Text(localized("10%"))
                 Spacer()
@@ -763,61 +529,20 @@ struct SettingsView: View {
         case .albumTitles:
             route = .removeBracketsFromAlbumTitles
         }
-#if os(macOS)
-        return NavigationLink(value: route) {
-            HStack(spacing: 12) {
-                Text(target.settingsLabel)
-                    .foregroundStyle(pro.isPro ? .primary : .secondary)
-                Spacer()
-                ProFeatureBadge()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.primary.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!pro.isPro)
-#else
         return NavigationLink(value: route) {
             HStack {
                 Text(target.settingsLabel)
-                    .foregroundStyle(pro.isPro ? .primary : .secondary)
                 Spacer()
                 proFeatureBadgePlaceholder
             }
         }
-        .disabled(!pro.isPro)
         .overlay(alignment: .trailing) {
             lockedProBadgeOverlay(trailingInset: Self.iosLockedProNavigationBadgeTrailingInset)
         }
-#endif
     }
 
     @ViewBuilder
     private var textReplacementNavigationLink: some View {
-#if os(macOS)
-        NavigationLink(value: SettingsRoute.textReplacement) {
-            HStack(spacing: 12) {
-                Text(localized("Text replacement"))
-                    .foregroundStyle(pro.isPro ? .primary : .secondary)
-                Spacer()
-                ProFeatureBadge()
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(Color.primary.opacity(0.05))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!pro.isPro)
-#else
         NavigationLink(value: SettingsRoute.textReplacement) {
             HStack {
                 Text(localized("Text replacement"))
@@ -830,7 +555,6 @@ struct SettingsView: View {
         .overlay(alignment: .trailing) {
             lockedProBadgeOverlay(trailingInset: Self.iosLockedProNavigationBadgeTrailingInset)
         }
-#endif
     }
 
     @ViewBuilder
@@ -840,9 +564,10 @@ struct SettingsView: View {
         }
     }
 
-#if os(iOS)
     @ViewBuilder
     private var proFeatureBadgePlaceholder: some View {
+        // Invisible badge reserves the same trailing space so row content stays
+        // left-aligned regardless of Pro status, avoiding layout shifts.
         if !pro.isPro {
             ProFeatureBadge()
                 .hidden()
@@ -858,9 +583,7 @@ struct SettingsView: View {
                 .padding(.trailing, trailingInset)
         }
     }
-#endif
 
-#if os(iOS)
     private func iosLinksBrandButton(title: LocalizedStringKey, imageName: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             settingsBrandLabel(title: title, imageName: imageName, color: .white)
@@ -877,7 +600,6 @@ struct SettingsView: View {
         .listRowBackground(Self.linksSectionRed)
         .listRowSeparatorTint(.white.opacity(0.35))
     }
-#endif
 
     private func settingsBrandLabel(title: LocalizedStringKey, imageName: String, color: Color, iconSize: CGFloat = 24) -> some View {
         Label {
@@ -893,6 +615,8 @@ struct SettingsView: View {
         .foregroundStyle(color)
     }
 
+    // Returns a binding that reads/writes the real storage only when Pro is active;
+    // non-Pro users always see unlockedDefault and writes are silently dropped.
     private func proLockedBoolBinding(_ storage: Binding<Bool>, unlockedDefault: Bool) -> Binding<Bool> {
         Binding(
             get: { pro.isPro ? storage.wrappedValue : unlockedDefault },
@@ -902,122 +626,10 @@ struct SettingsView: View {
             }
         )
     }
-
-#if os(macOS)
-    private var macRedditButton: some View {
-        Button {
-            openURL(Self.redditURL)
-        } label: {
-            settingsBrandLabel(title: "r/FastScrobbler", imageName: "reddit_logo", color: .white, iconSize: 16)
-                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-        }
-        .buttonStyle(.borderedProminent)
-        .pillButtonBorder()
-        .tint(Self.linksSectionRed)
-    }
-
-    private var macAskQuestionButton: some View {
-        Button {
-            openURL(Self.redditSubmitURL)
-        } label: {
-            Label("Ask a Question or Report a Bug", systemImage: "questionmark.bubble")
-                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-        }
-        .buttonStyle(.borderedProminent)
-        .pillButtonBorder()
-        .tint(Self.linksSectionRed)
-    }
-
-    private var macRateButton: some View {
-        Button {
-            openURL(Self.writeReviewURL)
-        } label: {
-            Label("Rate FastScrobbler", systemImage: "star.bubble")
-                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-        }
-        .buttonStyle(.borderedProminent)
-        .pillButtonBorder()
-        .tint(Self.linksSectionRed)
-    }
-
-    private var macGitHubButton: some View {
-        Button {
-            openURL(Self.repositoryURL)
-        } label: {
-            settingsBrandLabel(title: "GitHub", imageName: "github_logo", color: .white, iconSize: 16)
-                .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-        }
-        .buttonStyle(.borderedProminent)
-        .pillButtonBorder()
-        .tint(Self.linksSectionRed)
-    }
-
-    private var macResetButton: some View {
-        Group {
-            if isConfirmingReset {
-                HStack(spacing: 8) {
-                    Text("Reset settings?")
-                        .foregroundStyle(.secondary)
-                        .font(.headline)
-                    Spacer()
-                    Button("Cancel") {
-                        isConfirmingReset = false
-                    }
-                    .buttonStyle(.bordered)
-                    .pillButtonBorder()
-                    Button("Reset") {
-                        isConfirmingReset = false
-                        resetToInitialSettings()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .pillButtonBorder()
-                    .tint(.red)
-                }
-                .frame(minHeight: Self.macSettingsButtonMinHeight)
-            } else {
-                Button {
-                    isConfirmingReset = true
-                } label: {
-                    Label("Reset Settings", systemImage: "arrow.counterclockwise")
-                        .frame(maxWidth: .infinity, minHeight: Self.macSettingsButtonMinHeight)
-                }
-                .buttonStyle(.bordered)
-                .pillButtonBorder()
-                .tint(.red)
-            }
-        }
-    }
-
-    private enum StartAtLoginManager {
-        static var status: SMAppService.Status {
-            SMAppService.mainApp.status
-        }
-
-        static var isEnabled: Bool {
-            switch status {
-            case .enabled, .requiresApproval:
-                return true
-            default:
-                return false
-            }
-        }
-
-        static func setEnabled(_ enabled: Bool) throws {
-            if enabled {
-                try SMAppService.mainApp.register()
-            } else {
-                try SMAppService.mainApp.unregister()
-            }
-        }
-    }
-#endif
 }
 
 struct ProFeatureBadge: View {
     var body: some View {
-#if os(macOS)
-        EmptyView()
-#else
         Text("Pro")
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.black)
@@ -1026,58 +638,5 @@ struct ProFeatureBadge: View {
             .background(Color.yellow)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .accessibilityLabel("Pro")
-#endif
-    }
-}
-
-private struct LogoutConfirmationView: View {
-    let confirm: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Sign Out of Last.fm?")
-                    .font(.title2.weight(.semibold))
-
-                Text("You’ll need to sign in again to scrobble.")
-                    .foregroundColor(.secondary)
-
-                Spacer()
-            }
-            .padding()
-            .navigationTitle("Confirm")
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Sign Out", role: .destructive) {
-                        confirm()
-                        dismiss()
-                    }
-                }
-#else
-                ToolbarItem {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem {
-                    Button("Sign Out", role: .destructive) {
-                        confirm()
-                        dismiss()
-                    }
-                }
-#endif
-            }
-#if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-#endif
-        }
     }
 }

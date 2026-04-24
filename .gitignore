@@ -1,11 +1,10 @@
 FastScrobbler/LastFMSecrets.swift
 FastScrobbler/LastFM/KeychainStore.swift
-Images/AppIcon.psd
-Images/AppIcon2.psd
-Images/AppIcon3.psd
-Images/music_note.png
+Images/
 build/
 FastScrobblerMac/DerivedData/
 FastScrobbler.storekit/
 .DS_Store
 FastScrobbler.xcodeproj
+FastScrobbler/Pro.swift
+AppIcon.icon

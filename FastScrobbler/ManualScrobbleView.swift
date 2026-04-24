@@ -24,6 +24,13 @@ struct ManualScrobbleView: View {
         NSLocalizedString(key, comment: "")
     }
 
+    private func truncated(_ text: String) -> String {
+        if text.count > 500 {
+            return String(text.prefix(500))
+        }
+        return text
+    }
+
     private var canSubmit: Bool {
         !artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -131,10 +138,10 @@ struct ManualScrobbleView: View {
             .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { date in
                 now = date
             }
-            .onChange(of: artist) { _, v in if v.count > 500 { artist = String(v.prefix(500)) } }
-            .onChange(of: title) { _, v in if v.count > 500 { title = String(v.prefix(500)) } }
-            .onChange(of: album) { _, v in if v.count > 500 { album = String(v.prefix(500)) } }
-            .onChange(of: albumArtist) { _, v in if v.count > 500 { albumArtist = String(v.prefix(500)) } }
+            .onValueChange(of: artist) { artist = truncated($0) }
+            .onValueChange(of: title) { title = truncated($0) }
+            .onValueChange(of: album) { album = truncated($0) }
+            .onValueChange(of: albumArtist) { albumArtist = truncated($0) }
             .navigationTitle("Manual Scrobble")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -246,10 +253,10 @@ struct ManualScrobbleView: View {
                 }
                 .padding()
         }
-        .onChange(of: artist) { _, v in if v.count > 500 { artist = String(v.prefix(500)) } }
-        .onChange(of: title) { _, v in if v.count > 500 { title = String(v.prefix(500)) } }
-        .onChange(of: album) { _, v in if v.count > 500 { album = String(v.prefix(500)) } }
-        .onChange(of: albumArtist) { _, v in if v.count > 500 { albumArtist = String(v.prefix(500)) } }
+        .onValueChange(of: artist) { artist = truncated($0) }
+        .onValueChange(of: title) { title = truncated($0) }
+        .onValueChange(of: album) { album = truncated($0) }
+        .onValueChange(of: albumArtist) { albumArtist = truncated($0) }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .topLeading) {
             MacFloatingCircleButton(
@@ -276,7 +283,7 @@ struct ManualScrobbleView: View {
                     .foregroundColor(.secondary)
             }
             HStack(spacing: 8) {
-                Text(relativeHoursMinutes(from: entry.scrobbledAt, to: now))
+                Text(relativeHoursMinutes(from: displayDate(for: entry), to: now))
                 if entry.lovedOnLastFM == true {
                     Text("Loved")
                         .padding(.horizontal, 8)
@@ -308,6 +315,13 @@ struct ManualScrobbleView: View {
         case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
         case .manual: return NSLocalizedString("Manual", comment: "")
         }
+    }
+
+    private func displayDate(for entry: ScrobbleLogStore.Entry) -> Date {
+        if entry.source == .playbackHistory {
+            return Date(timeIntervalSince1970: TimeInterval(entry.startTimestamp))
+        }
+        return entry.scrobbledAt
     }
 
     private func relativeHoursMinutes(from date: Date, to now: Date) -> String {

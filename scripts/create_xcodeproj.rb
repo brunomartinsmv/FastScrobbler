@@ -6,10 +6,10 @@ require "xcodeproj"
 
 PROJECT_NAME = "FastScrobbler"
 PROJECT_PATH = "#{PROJECT_NAME}.xcodeproj"
-IOS_DEPLOYMENT_TARGET = "17.0"
+IOS_DEPLOYMENT_TARGET = "17.6"
 LIVE_ACTIVITY_DEPLOYMENT_TARGET = "16.1"
 CONTROL_WIDGET_DEPLOYMENT_TARGET = "18.0"
-MACOS_DEPLOYMENT_TARGET = "13.5"
+MACOS_DEPLOYMENT_TARGET = "14.6"
 
 SWIFT_VERSION = "5.0"
 MARKETING_VERSION = "1.0"
@@ -19,11 +19,17 @@ MAIN_APP_BUNDLE_ID = "com.kevin.FastScrobbler"
 LIVE_ACTIVITY_BUNDLE_ID = "com.kevin.FastScrobbler.liveactivity"
 NOW_PLAYING_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.nowplayingcontrol"
 SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.scrobblecontrol"
-MAC_APP_BUNDLE_ID = "com.kevin.FastScrobbler.mac"
+MANUAL_SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.manualscrobblecontrol"
+MAC_APP_BUNDLE_ID = "com.kevin.FastScrobbler"
 
 IGNORED_DIRS = %w[DerivedData build].freeze
 IGNORED_FILES = [".DS_Store"].freeze
 IGNORED_SUFFIXES = ["_Template.swift", "_template.swift"].freeze
+KNOWN_REGIONS = %w[en Base es fr ja zh-Hans].freeze
+
+def localized_resources(root_path)
+  Dir.glob("#{root_path}/*.lproj").sort
+end
 
 SHARED_CORE_SOURCES = %w[
   FastScrobbler/AppModel.swift
@@ -46,23 +52,43 @@ IOS_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
   FastScrobbler/Intents/ScrobbleShortcutsIntents.swift
   FastScrobbler/LiveActivity/LiveActivityManager.swift
   FastScrobbler/LiveActivity/ScrobblingActivityAttributes.swift
+  FastScrobbler/ManualScrobbleView.swift
   FastScrobbler/NowPlaying/AppleMusicFavorites.swift
   FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift
   FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
+  FastScrobbler/RemoveBracketsSettingsPage.swift
   FastScrobbler/SceneDelegate.swift
   FastScrobbler/SetupHelpView.swift
+  FastScrobbler/TextReplacementSettingsPage.swift
+  FastScrobbler/WhatsNewView.swift
 ]).freeze
 
-MAC_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
-  FastScrobbler/MenuBarController.swift
+MAC_APP_SOURCES = %w[
+  FastScrobbler/LastFM/KeychainStore.swift
+  FastScrobbler/LastFM/LastFMAuthManager.swift
+  FastScrobbler/LastFM/LastFMClient.swift
+  FastScrobbler/LastFMSecrets.swift
+  FastScrobbler/ManualScrobbleView.swift
+  FastScrobbler/Models/Track.swift
+  FastScrobbler/Pro.swift
+  FastScrobbler/RemoveBracketsSettingsPage.swift
+  FastScrobbler/Scrobble/ScrobbleBacklog.swift
+  FastScrobbler/Scrobble/ScrobbleEngine.swift
+  FastScrobbler/Scrobble/ScrobbleLogStore.swift
+  FastScrobbler/TextReplacementSettingsPage.swift
+  FastScrobbler/WhatsNewView.swift
+  FastScrobblerMac/AppModel.swift
   FastScrobblerMac/AppleMusicNowPlayingObserver.swift
   FastScrobblerMac/BackgroundTaskManager.swift
+  FastScrobblerMac/ContentView.swift
   FastScrobblerMac/FastScrobblerMacApp.swift
   FastScrobblerMac/LiveActivityManager.swift
+  FastScrobblerMac/MenuBarController.swift
   FastScrobblerMac/MediaPlayerShims.swift
   FastScrobblerMac/PlaybackHistoryImporter.swift
+  FastScrobblerMac/SettingsView.swift
   FastScrobblerMac/SetupHelpView.swift
-]).freeze
+].freeze
 
 LIVE_ACTIVITY_SOURCES = %w[
   FastScrobbler/LiveActivity/ScrobblingActivityAttributes.swift
@@ -88,13 +114,25 @@ SCROBBLE_CONTROL_SOURCES = (CONTROL_SHARED_SOURCES + %w[
   FastScrobblerScrobbleControl/ScrobbleSongControlWidget.swift
 ]).freeze
 
+MANUAL_SCROBBLE_CONTROL_SOURCES = (CONTROL_SHARED_SOURCES + %w[
+  FastScrobblerManualScrobbleControl/ManualScrobbleControlWidget.swift
+]).freeze
+
 IOS_APP_RESOURCES = %w[
+  AppIcon.icon
   FastScrobbler/Resources/Assets.xcassets
   FastScrobbler/Resources/LaunchScreen.storyboard
-].freeze
+] + localized_resources("FastScrobbler")
+IOS_APP_RESOURCES.freeze
 
 MAC_APP_RESOURCES = %w[
+  AppIcon.icon
   FastScrobbler/Resources/Assets.xcassets
+] + localized_resources("FastScrobblerMac")
+MAC_APP_RESOURCES.freeze
+
+ROOT_FILE_PATHS = %w[
+  AppIcon.icon
 ].freeze
 
 ROOT_GROUP_PATHS = %w[
@@ -103,6 +141,7 @@ ROOT_GROUP_PATHS = %w[
   FastScrobblerLiveActivity
   FastScrobblerNowPlayingControl
   FastScrobblerScrobbleControl
+  FastScrobblerManualScrobbleControl
   FastScrobbler.storekit
 ].freeze
 
@@ -118,6 +157,8 @@ TARGET_DEFINITIONS = [
     sources: IOS_APP_SOURCES,
     resources: IOS_APP_RESOURCES,
     app_icon: "AppIcon",
+    accent_color: "AccentColor",
+    include_all_app_icon_assets: "YES",
     supported_platforms: "iphoneos iphonesimulator",
     targeted_device_family: "1",
     skip_install: "NO",
@@ -136,6 +177,8 @@ TARGET_DEFINITIONS = [
   },
   {
     name: "FastScrobblerMac",
+    product_name: "FastScrobbler",
+    product_module_name: "FastScrobbler",
     type: :application,
     platform: :osx,
     deployment_target: MACOS_DEPLOYMENT_TARGET,
@@ -144,7 +187,9 @@ TARGET_DEFINITIONS = [
     entitlements: "FastScrobblerMac/FastScrobblerMac.entitlements",
     sources: MAC_APP_SOURCES,
     resources: MAC_APP_RESOURCES,
-    app_icon: "AppIconMac",
+    app_icon: "AppIcon",
+    accent_color: "AccentColor",
+    include_all_app_icon_assets: "YES",
     supported_platforms: "macosx",
     skip_install: "NO",
     application_extension_api_only: "NO",
@@ -187,7 +232,7 @@ TARGET_DEFINITIONS = [
     info_plist: "FastScrobblerNowPlayingControl/Info.plist",
     entitlements: "FastScrobblerNowPlayingControl/FastScrobblerNowPlayingControl.entitlements",
     sources: NOW_PLAYING_CONTROL_SOURCES,
-    resources: [],
+    resources: localized_resources("FastScrobblerNowPlayingControl"),
     supported_platforms: "iphoneos iphonesimulator",
     targeted_device_family: "1",
     skip_install: "YES",
@@ -208,6 +253,27 @@ TARGET_DEFINITIONS = [
     info_plist: "FastScrobblerScrobbleControl/Info.plist",
     entitlements: "FastScrobblerScrobbleControl/FastScrobblerScrobbleControl.entitlements",
     sources: SCROBBLE_CONTROL_SOURCES,
+    resources: localized_resources("FastScrobblerScrobbleControl"),
+    supported_platforms: "iphoneos iphonesimulator",
+    targeted_device_family: "1",
+    skip_install: "YES",
+    application_extension_api_only: "YES",
+    frameworks: %w[
+      AppIntents
+      MediaPlayer
+      Security
+      WidgetKit
+    ],
+  },
+  {
+    name: "FastScrobblerManualScrobbleControl",
+    type: :app_extension,
+    platform: :ios,
+    deployment_target: CONTROL_WIDGET_DEPLOYMENT_TARGET,
+    bundle_id: MANUAL_SCROBBLE_CONTROL_BUNDLE_ID,
+    info_plist: "FastScrobblerManualScrobbleControl/Info.plist",
+    entitlements: "FastScrobblerManualScrobbleControl/FastScrobblerManualScrobbleControl.entitlements",
+    sources: MANUAL_SCROBBLE_CONTROL_SOURCES,
     resources: [],
     supported_platforms: "iphoneos iphonesimulator",
     targeted_device_family: "1",
@@ -262,7 +328,8 @@ def apply_common_build_settings(target, definition)
   target.build_configurations.each do |config|
     settings = config.build_settings
     settings["PRODUCT_BUNDLE_IDENTIFIER"] = definition[:bundle_id]
-    settings["PRODUCT_NAME"] = definition[:name]
+    settings["PRODUCT_NAME"] = definition.fetch(:product_name, definition[:name])
+    settings["PRODUCT_MODULE_NAME"] = definition[:product_module_name] if definition[:product_module_name]
     settings["INFOPLIST_FILE"] = definition[:info_plist]
     settings["GENERATE_INFOPLIST_FILE"] = "NO"
     settings["SWIFT_VERSION"] = SWIFT_VERSION
@@ -275,6 +342,8 @@ def apply_common_build_settings(target, definition)
     settings["APPLICATION_EXTENSION_API_ONLY"] = definition[:application_extension_api_only]
     settings["SKIP_INSTALL"] = definition[:skip_install]
     settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = definition[:app_icon] if definition[:app_icon]
+    settings["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME"] = definition[:accent_color] if definition[:accent_color]
+    settings["ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS"] = definition[:include_all_app_icon_assets] if definition[:include_all_app_icon_assets]
   end
 end
 
@@ -287,8 +356,13 @@ end
 FileUtils.rm_rf(PROJECT_PATH)
 
 project = Xcodeproj::Project.new(PROJECT_PATH)
+project.root_object.known_regions = KNOWN_REGIONS
 
 refs_by_path = {}
+ROOT_FILE_PATHS.each do |root_path|
+  refs_by_path[root_path] = project.main_group.new_file(root_path)
+end
+
 ROOT_GROUP_PATHS.each do |root_path|
   group = project.main_group.new_group(File.basename(root_path), root_path)
   add_tree(group, root_path, refs_by_path)
@@ -315,9 +389,10 @@ embedded_extensions = [
   targets.fetch("FastScrobblerLiveActivity"),
   targets.fetch("FastScrobblerNowPlayingControl"),
   targets.fetch("FastScrobblerScrobbleControl"),
+  targets.fetch("FastScrobblerManualScrobbleControl"),
 ]
 
-embed_phase = ios_app.new_copy_files_build_phase("Embed App Extensions")
+embed_phase = ios_app.new_copy_files_build_phase("Embed Foundation Extensions")
 embed_phase.symbol_dst_subfolder_spec = :plug_ins
 
 embedded_extensions.each do |extension_target|

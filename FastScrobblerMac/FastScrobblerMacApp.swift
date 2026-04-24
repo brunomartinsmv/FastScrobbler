@@ -38,7 +38,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         MenuBarController.shared.start(rootView: rootView)
 
         Task { @MainActor in
-            await model.startIfNeeded()
+            model.startIfNeeded()
             await ProPurchaseManager.shared.startIfNeeded()
         }
 

@@ -25,7 +25,7 @@ final class ScrobbleLogStore: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "ScrobbleLogStore")
-    private let maxEntries = 50
+    private let maxEntries = 200
 
     private init() {
         load()
@@ -47,7 +47,9 @@ final class ScrobbleLogStore: ObservableObject {
             lovedOnLastFM: lovedOnLastFM
         )
 
-        if entries.contains(where: { $0.startTimestamp == startTimestamp && $0.track.dedupeKey == track.dedupeKey }) {
+        if source != .playbackHistory,
+           entries.contains(where: { $0.startTimestamp == startTimestamp && $0.track.dedupeKey == track.dedupeKey })
+        {
             return
         }
 
@@ -64,7 +66,7 @@ final class ScrobbleLogStore: ObservableObject {
     }
 
     func isMostRecentScrobble(dedupeKey: String) -> Bool {
-        entries.first?.track.dedupeKey == dedupeKey
+        entries.max(by: { $0.startTimestamp < $1.startTimestamp })?.track.dedupeKey == dedupeKey
     }
 
     func containsSimilar(track: Track, around startTimestamp: Int, toleranceSeconds: Int) -> Bool {
@@ -74,19 +76,63 @@ final class ScrobbleLogStore: ObservableObject {
         })
     }
 
+    func mostSimilar(track: Track, around startTimestamp: Int, toleranceSeconds: Int) -> Entry? {
+        let tol = max(0, toleranceSeconds)
+        return entries
+            .filter { $0.track.dedupeKey == track.dedupeKey && abs($0.startTimestamp - startTimestamp) <= tol }
+            .min(by: { abs($0.startTimestamp - startTimestamp) < abs($1.startTimestamp - startTimestamp) })
+    }
+
     func containsPlaybackHistoryMatch(track: Track, playedAt: Date, endTimestampToleranceSeconds: Int) -> Bool {
         let playedAtTimestamp = Int(playedAt.timeIntervalSince1970.rounded(.down))
         let tol = max(0, endTimestampToleranceSeconds)
 
         return entries.contains(where: { entry in
             guard entry.track.dedupeKey == track.dedupeKey else { return false }
-            guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
-                return abs(entry.startTimestamp - playedAtTimestamp) <= tol
-            }
+            let directMatch = abs(entry.startTimestamp - playedAtTimestamp) <= tol
 
-            let expectedEndTimestamp = entry.startTimestamp + durationSeconds
-            return abs(expectedEndTimestamp - playedAtTimestamp) <= tol
+            switch entry.source {
+            case .playbackHistory, .recentlyPlayed, .manual:
+                return directMatch
+            case .live:
+                guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
+                    return directMatch
+                }
+
+                let expectedEndTimestamp = entry.startTimestamp + durationSeconds
+                return abs(expectedEndTimestamp - playedAtTimestamp) <= tol
+            case .backlog:
+                guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
+                    return directMatch
+                }
+
+                let expectedEndTimestamp = entry.startTimestamp + durationSeconds
+                return directMatch || abs(expectedEndTimestamp - playedAtTimestamp) <= tol
+            }
         })
+    }
+
+    func playbackHistoryImportMatchCount(
+        track: Track,
+        startTimestamp: Int,
+        playedAt: Date,
+        exactTimestampToleranceSeconds: Int,
+        endTimestampToleranceSeconds: Int
+    ) -> Int {
+        let playedAtTimestamp = Int(playedAt.timeIntervalSince1970.rounded(.down))
+        let exactTol = max(0, exactTimestampToleranceSeconds)
+        let endTol = max(0, endTimestampToleranceSeconds)
+
+        return entries.filter { entry in
+            matchesPlaybackHistoryImport(
+                entry: entry,
+                track: track,
+                startTimestamp: startTimestamp,
+                playedAtTimestamp: playedAtTimestamp,
+                exactTimestampToleranceSeconds: exactTol,
+                endTimestampToleranceSeconds: endTol
+            )
+        }.count
     }
 
     private func load() {
@@ -108,10 +154,10 @@ final class ScrobbleLogStore: ObservableObject {
 
             var map: [String: Entry] = [:]
             for e in sharedEntries {
-                map["\(e.startTimestamp)|\(e.track.dedupeKey)"] = e
+                map[e.id.uuidString] = e
             }
             for e in legacyEntries {
-                let key = "\(e.startTimestamp)|\(e.track.dedupeKey)"
+                let key = e.id.uuidString
                 if let existing = map[key] {
                     if e.scrobbledAt > existing.scrobbledAt {
                         map[key] = e
@@ -122,7 +168,7 @@ final class ScrobbleLogStore: ObservableObject {
             }
 
             var merged = Array(map.values)
-            merged.sort(by: { $0.scrobbledAt > $1.scrobbledAt })
+            merged.sort(by: { $0.startTimestamp > $1.startTimestamp })
             if merged.count > maxEntries {
                 merged.removeLast(merged.count - maxEntries)
             }
@@ -154,6 +200,41 @@ final class ScrobbleLogStore: ObservableObject {
             return Int(candidate.rounded(.down))
         }
         return nil
+    }
+
+    private func matchesPlaybackHistoryImport(
+        entry: Entry,
+        track: Track,
+        startTimestamp: Int,
+        playedAtTimestamp: Int,
+        exactTimestampToleranceSeconds: Int,
+        endTimestampToleranceSeconds: Int
+    ) -> Bool {
+        guard entry.track.dedupeKey == track.dedupeKey else { return false }
+
+        let exactMatch = abs(entry.startTimestamp - startTimestamp) <= exactTimestampToleranceSeconds
+        let directPlayedAtMatch = abs(entry.startTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
+
+        switch entry.source {
+        case .playbackHistory, .recentlyPlayed, .manual:
+            return exactMatch || directPlayedAtMatch
+        case .live:
+            guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
+                return exactMatch || directPlayedAtMatch
+            }
+
+            let expectedEndTimestamp = entry.startTimestamp + durationSeconds
+            return exactMatch || abs(expectedEndTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
+        case .backlog:
+            guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
+                return exactMatch || directPlayedAtMatch
+            }
+
+            let expectedEndTimestamp = entry.startTimestamp + durationSeconds
+            return exactMatch ||
+                directPlayedAtMatch ||
+                abs(expectedEndTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
+        }
     }
 
     private func fileURL() -> URL {

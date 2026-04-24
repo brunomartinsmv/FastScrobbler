@@ -1,7 +1,9 @@
 import Foundation
 
+// Shared app group used by the main app, extensions, and widgets to access common UserDefaults and the shared container.
 enum AppGroup {
     static let id = "group.com.kevin.FastScrobbler"
+    // Falls back to .standard so the app still functions outside an app group (e.g. unit tests).
     static let userDefaults = UserDefaults(suiteName: id) ?? .standard
 
     static func sharedContainerURL() -> URL? {
@@ -19,6 +21,7 @@ enum AppSettings {
     }
 
     static func scrobbleListeningHistoryEnabled() -> Bool {
+        // nil means the key was never written; default to enabled.
         if AppGroup.userDefaults.object(forKey: Keys.scrobbleListeningHistoryEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleListeningHistoryEnabled)
     }
@@ -128,6 +131,7 @@ enum ProSettings {
     }
 
     static func preventDuplicateScrobblesEnabled() -> Bool {
+        // Default to true — safer to skip a duplicate scrobble than to send one.
         if AppGroup.userDefaults.object(forKey: Keys.preventDuplicateScrobblesEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.preventDuplicateScrobblesEnabled)
     }
@@ -186,10 +190,12 @@ enum ProSettings {
         AppGroup.userDefaults.set(data, forKey: Keys.removeBracketsFromAlbumTitleKeywords)
     }
 
+    // Stable IDs for built-in rules so they can be matched across saves without relying on position.
     static let builtInRuleIDs: Set<UUID> = [
         UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
         UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
     ]
+    // Shipped disabled by default; users must explicitly opt in.
     private static let builtInRules: [TextReplacementRule] = [
         TextReplacementRule(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, find: "- Single", replace: "", scope: .album, isEnabled: false),
         TextReplacementRule(id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!, find: "- EP", replace: "", scope: .album, isEnabled: false),
@@ -198,6 +204,7 @@ enum ProSettings {
     static func textReplacementRules() -> [TextReplacementRule] {
         let saved = AppGroup.userDefaults.data(forKey: Keys.textReplacementRules)
             .flatMap { try? JSONDecoder().decode([TextReplacementRule].self, from: $0) } ?? []
+        // Merge persisted enabled-state into built-in rules so they always appear first (pinned).
         var pinned = builtInRules
         for (i, rule) in pinned.enumerated() {
             if let savedRule = saved.first(where: { $0.id == rule.id }) {
@@ -278,6 +285,8 @@ extension Track {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
+    // Returns a stable string key that uniquely identifies a track across app launches.
+    // Priority: local persistentID > store ID > metadata fingerprint (least stable, used as fallback).
     static func stableLibraryIdentity(
         persistentID: UInt64?,
         playbackStoreID: String?,
@@ -300,11 +309,19 @@ extension Track {
         return "meta:\(normalizedMetadataComponent(artist))|\(normalizedMetadataComponent(title))|\(albumValue)"
     }
 
-    static func usableAlbumArtistForArtistSubstitution(_ albumArtist: String?, isCompilation: Bool?) -> String? {
+    // Returns the album artist only if it's suitable to substitute for the track artist.
+    // Rejects "Various Artists" and, by default, compilation tracks to avoid scrobbling under a generic name.
+    static func usableAlbumArtistForArtistSubstitution(
+        _ albumArtist: String?,
+        isCompilation: Bool?,
+        respectsCompilationFlag: Bool = true
+    ) -> String? {
         guard let trimmed = albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
         }
-        guard isCompilation != true else { return nil }
+        if respectsCompilationFlag {
+            guard isCompilation != true else { return nil }
+        }
         guard trimmed.compare("Various Artists", options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame else {
             return nil
         }
@@ -380,11 +397,14 @@ extension Track {
     }
 
     func applyingAlbumArtistAsArtistIfAvailable() -> Track {
-        guard let a = Self.usableAlbumArtistForArtistSubstitution(albumArtist, isCompilation: isCompilation) else {
+        guard let a = Self.usableAlbumArtistForArtistSubstitution(
+            albumArtist, isCompilation: isCompilation, respectsCompilationFlag: false
+        ) else {
             return self
         }
         var copy = self
         copy.artist = a
+        copy.albumArtist = nil  // artist field now carries the album artist; avoid sending it twice
         return copy
     }
 
@@ -435,6 +455,9 @@ extension Track {
         return copy
     }
 
+    // Matches one level of (…) or […] — nested brackets require multiple passes.
+    private static let parentheticalSegmentRegex = try? NSRegularExpression(pattern: #"\([^()]*\)|\[[^\[\]]*\]"#)
+
     private static func cleanedMetadataByRemovingParentheticalSegments(
         from value: String,
         removeAll: Bool,
@@ -442,11 +465,11 @@ extension Track {
     ) -> String {
         guard removeAll || !keywords.isEmpty else { return value }
 
-        let pattern = #"\([^()]*\)|\[[^\[\]]*\]"#
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return value }
+        guard let regex = parentheticalSegmentRegex else { return value }
 
         var workingValue = value
         var removedAnySegment = false
+        // Cap passes to guard against pathological inputs with many nested brackets.
         var passesRemaining = 5
 
         while passesRemaining > 0 {
@@ -494,6 +517,7 @@ extension Track {
             options: .regularExpression
         ).trimmingCharacters(in: .whitespacesAndNewlines)
 
+        // Fall back to the original value if stripping everything would leave an empty string.
         return normalizedWhitespace.isEmpty ? value : normalizedWhitespace
     }
 

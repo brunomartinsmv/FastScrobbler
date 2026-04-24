@@ -3,6 +3,10 @@ import Foundation
 import MediaPlayer
 import OSLog
 
+extension Notification.Name {
+    static let openManualScrobble = Notification.Name("FastScrobbler.openManualScrobble")
+}
+
 enum ShortcutsIntentError: Error, LocalizedError {
     case notConnected
     case mediaLibraryDenied
@@ -104,6 +108,21 @@ private enum ShortcutsPlaybackReader {
     }
 }
 
+struct OpenManualScrobbleIntent: AppIntent {
+    static let title: LocalizedStringResource = "Manual Scrobble"
+    static let description = IntentDescription("Opens the Manual Scrobble screen in FastScrobbler.")
+    static let openAppWhenRun: Bool = true
+
+    init() {}
+
+    func perform() async throws -> some IntentResult {
+        await MainActor.run {
+            NotificationCenter.default.post(name: .openManualScrobble, object: nil)
+        }
+        return .result()
+    }
+}
+
 struct SendNowPlayingIntent: AppIntent {
     static let title: LocalizedStringResource = "Send Now Playing"
     static let description = IntentDescription("Sends the currently playing track to Last.fm as \"Now Playing\".")
@@ -155,10 +174,9 @@ struct ScrobbleSongIntent: AppIntent {
         }
 
         let now = Date()
-        let (track, playbackTimeSeconds) = try ShortcutsPlaybackReader.nowPlayingTrackAndPlaybackTime()
+        let (track, _) = try ShortcutsPlaybackReader.nowPlayingTrackAndPlaybackTime()
         let scrobbleTrack = track.applyingProScrobblePreferences()
-        let startedAt = now.addingTimeInterval(-max(0, playbackTimeSeconds))
-        let ts = Int(startedAt.timeIntervalSince1970.rounded(.down))
+        let ts = max(1, Int(now.timeIntervalSince1970.rounded(.down)))
 
         let client = try LastFMClient()
         do {
@@ -207,6 +225,16 @@ struct FastScrobblerShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Send Now Playing",
             systemImageName: "music.note"
+        )
+
+        AppShortcut(
+            intent: OpenManualScrobbleIntent(),
+            phrases: [
+                "Manual scrobble in \(.applicationName)",
+                "Open manual scrobble in \(.applicationName)",
+            ],
+            shortTitle: "Manual Scrobble",
+            systemImageName: "plus.circle"
         )
     }
 }

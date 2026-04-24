@@ -76,16 +76,25 @@ struct TextReplacementSettingsPage: View {
                 rulesCard
             }
             .padding()
-            .padding(.top, MacFloatingBarLayout.circleButtonContentTopPadding)
+            .padding(.top, 44)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .topLeading) {
-            MacFloatingCircleButton(
-                systemImage: "chevron.left",
-                help: localized("Back"),
-                accessibilityLabel: localized("Back"),
-                action: { dismiss() }
-            )
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay {
+                Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+            }
+            .help(localized("Back"))
+            .accessibilityLabel(localized("Back"))
+            .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
             .padding(.top, 10)
             .padding(.leading, 10)
         }
@@ -152,7 +161,7 @@ struct TextReplacementSettingsPage: View {
         HStack(alignment: .center, spacing: 8) {
             Toggle("", isOn: draft.isEnabled)
                 .labelsHidden()
-                .onChange(of: draft.wrappedValue.isEnabled) { _, _ in persist() }
+                .onValueChange(of: draft.wrappedValue.isEnabled) { _ in persist() }
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
@@ -176,7 +185,7 @@ struct TextReplacementSettingsPage: View {
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
                 .disabled(isBuiltIn)
-                .onChange(of: draft.wrappedValue.scope) { _, _ in persist() }
+                .onValueChange(of: draft.wrappedValue.scope) { _ in persist() }
             }
             .frame(maxWidth: .infinity)
 
@@ -199,8 +208,8 @@ struct TextReplacementSettingsPage: View {
         .padding(10)
         .background(Color.primary.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .onChange(of: draft.wrappedValue.find) { _, _ in persist() }
-        .onChange(of: draft.wrappedValue.replace) { _, _ in persist() }
+        .onValueChange(of: draft.wrappedValue.find) { _ in persist() }
+        .onValueChange(of: draft.wrappedValue.replace) { _ in persist() }
 #else
         let isBuiltIn = draft.wrappedValue.isBuiltIn
         HStack(alignment: .center, spacing: 12) {
@@ -225,7 +234,7 @@ struct TextReplacementSettingsPage: View {
                     .labelsHidden()
                     .scaleEffect(0.85)
                     .frame(width: 51)
-                    .onChange(of: draft.wrappedValue.isEnabled) { _, _ in persist() }
+                    .onValueChange(of: draft.wrappedValue.isEnabled) { _ in persist() }
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
 
@@ -239,8 +248,8 @@ struct TextReplacementSettingsPage: View {
                     TextField(isBuiltIn ? "Blank" : "Replace with", text: draft.replace)
                         .disabled(isBuiltIn)
                 }
-                .onChange(of: draft.wrappedValue.find) { _, _ in persist() }
-                .onChange(of: draft.wrappedValue.replace) { _, _ in persist() }
+                .onValueChange(of: draft.wrappedValue.find) { _ in persist() }
+                .onValueChange(of: draft.wrappedValue.replace) { _ in persist() }
 
                 Picker("Apply to", selection: draft.scope) {
                     ForEach(TextReplacementScope.allCases, id: \.self) { scope in
@@ -249,7 +258,7 @@ struct TextReplacementSettingsPage: View {
                 }
                 .pickerStyle(.segmented)
                 .disabled(isBuiltIn)
-                .onChange(of: draft.wrappedValue.scope) { _, _ in persist() }
+                .onValueChange(of: draft.wrappedValue.scope) { _ in persist() }
             }
         }
         .padding(.vertical, 4)
