@@ -6,5 +6,5 @@ FastScrobblerMac/DerivedData/
 FastScrobbler.storekit/
 .DS_Store
 FastScrobbler.xcodeproj
-FastScrobbler/Pro.swift
 AppIcon.icon
+Pro.swift
