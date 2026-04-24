@@ -2,19 +2,19 @@
 
 **Effective date:** February 26, 2026
 
-FastScrobbler is an iOS and macOS app that helps you submit ("scrobble") your Apple Music / Music app listening activity to your Last.fm account. This policy explains what information the app accesses, stores, and shares.
+FastScrobbler is an iOS and macOS app for scrobbling Apple Music / Music app plays to Last.fm.
 
 ## Summary
 
-- FastScrobbler does **not** operate any developer-run backend service.
-- The app sends track metadata to **Last.fm** only when you explicitly connect your Last.fm account and use the app’s scrobbling features (including Shortcuts / Control Center widgets).
+- FastScrobbler does **not** run a developer-owned backend service.
+- The app sends track metadata to **Last.fm** only after you connect your Last.fm account and use scrobbling features, including Shortcuts and Control Center widgets.
 - FastScrobbler does **not** use third-party analytics SDKs and does **not** track you across apps and websites.
 
 ## Information the app accesses
 
 ### Apple Music / Media Library (on-device)
 
-With your permission, FastScrobbler can access Apple Music (Media Library) information to identify what is playing and (optionally) import recent playback history for scrobbling. This may include:
+With your permission, FastScrobbler reads Apple Music / Media Library data to identify the current track and, if enabled, import recent plays for scrobbling. This can include:
 
 - Track metadata (artist, title, album)
 - Album artist (when available)
@@ -26,24 +26,24 @@ FastScrobbler uses this information to determine what to submit to Last.fm. Loca
 
 ### Music app automation (macOS)
 
-On macOS, FastScrobbler reads now-playing metadata from the Music app using Apple Events (Automation). This may include:
+On macOS, FastScrobbler uses Apple Events (Automation) to read now-playing metadata from the Music app. This can include:
 
 - Track metadata (artist, title, album)
 - Track duration and playback position
 
-If you deny Automation permission, the macOS app cannot read what’s playing and cannot scrobble.
+If Automation permission is denied, the macOS app cannot read what is playing or scrobble it.
 
 ### Apple Music favorites (optional, on-device)
 
-FastScrobbler can infer whether the current track is favorited in Apple Music (for example via the "Favorite Songs" playlist). If you enable the "Love Apple Music favourites on Last.fm" setting, FastScrobbler may use this on-device favorite status to decide whether to also send a `track.love` request to Last.fm after scrobbling.
+FastScrobbler can infer whether the current track is favorited in Apple Music, for example through the "Favorite Songs" playlist. If "Love Apple Music favourites on Last.fm" is enabled, the app may use that on-device favorite status to send a `track.love` request to Last.fm after scrobbling.
 
 ### Last.fm account connection
 
-When you connect to Last.fm, FastScrobbler uses Apple’s authentication flow to obtain a Last.fm session key that authorizes scrobbling on your behalf.
+When you connect Last.fm, FastScrobbler uses Apple’s authentication flow to obtain a Last.fm session key for your account.
 
 ## Information the app stores (on your device)
 
-FastScrobbler stores certain data locally to make the app work reliably:
+FastScrobbler stores the following data locally:
 
 - **Last.fm session key**: stored in Apple Keychain services (iOS/macOS).
 - **Last.fm username**: stored locally (UserDefaults) after it is fetched from Last.fm.
@@ -54,26 +54,24 @@ FastScrobbler stores certain data locally to make the app work reliably:
 
 FastScrobbler does not intentionally store your full music library; it stores only what is needed for queued scrobbles and recent history.
 
-Some data may be stored in an app group container so the iOS app and its extensions (Live Activity / Control Center widgets) can share the same on-device state.
+Some data may be stored in an app group container so the iOS app and its extensions, such as Live Activities and Control Center widgets, can share the same on-device state.
 
 ## Information the app shares
 
 ### Last.fm
 
-When you use FastScrobbler, the app sends requests to Last.fm’s API. Depending on the feature used, the app may send:
+When you use FastScrobbler, the app sends requests directly from your device to Last.fm’s API. Depending on the feature, those requests may include:
 
 - Artist and track title
 - Album (if available)
 - Track duration (if available)
 - A timestamp representing when playback started / occurred (for scrobbles)
 
-These requests are made directly from your device to Last.fm. Last.fm will also receive standard network information such as your IP address as part of providing its service.
-
-Your use of Last.fm is also governed by Last.fm’s own terms and privacy policy.
+Last.fm also receives standard network information, such as your IP address, as part of providing its service. Your use of Last.fm is governed by Last.fm’s own terms and privacy policy.
 
 ### Apple
 
-FastScrobbler uses Apple system frameworks (for example: AuthenticationServices, Background Tasks, Widgets, Live Activities). Apple may receive standard device/service information as part of operating iOS/macOS. FastScrobbler does not send your music listening data to any developer-run server.
+FastScrobbler uses Apple system frameworks, including AuthenticationServices, Background Tasks, Widgets, and Live Activities. Apple may receive standard device and service information as part of operating iOS/macOS. FastScrobbler does not send your music listening data to any developer-run server.
 
 ### No sale of data
 
@@ -91,11 +89,11 @@ FastScrobbler does not sell your personal information.
 - Queued scrobbles remain on-device until they are successfully submitted or until you remove the app.
 - To remove all locally stored app data, delete FastScrobbler from your device.
 
-Scrobbles that have already been submitted to Last.fm are stored by Last.fm according to their policies; you can manage or delete them via Last.fm.
+Scrobbles already submitted to Last.fm are stored by Last.fm under its own policies. You can manage or delete them through Last.fm.
 
 ## Security
 
-FastScrobbler uses HTTPS for communication with Last.fm and uses Apple Keychain services for storing the Last.fm session key.
+FastScrobbler uses HTTPS when communicating with Last.fm. The Last.fm session key is stored in Apple Keychain services.
 
 ## Children’s privacy
 
@@ -107,4 +105,4 @@ If this policy changes, the "Effective date" above will be updated.
 
 ## Contact
 
-For questions about this policy, contact the developer via the project’s support channel (for example, the GitHub repository issues page where this app is distributed).
+For questions about this policy, contact the developer through the project’s support channel, such as the GitHub repository issues page where the app is distributed.
