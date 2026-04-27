@@ -64,6 +64,7 @@ final class AppModel {
             )
             return
         }
+        guard !Task.isCancelled else { return }
 
         await purgePlaybackHistoryBacklogIfNeeded()
 

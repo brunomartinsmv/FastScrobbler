@@ -46,7 +46,11 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
     /// Attempts to trigger macOS's Automation permission prompt for controlling the Music app.
     func requestMusicControlPermission() async {
         let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: true)
-        applyAutomationAuthorization(status)
+        if status == .notDetermined {
+            await requestMusicControlPermissionWithAppleScriptFallback()
+        } else {
+            applyAutomationAuthorization(status)
+        }
         await refreshFromMusic()
     }
 
@@ -133,6 +137,23 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         playbackState = .stopped
         playbackTimeSeconds = 0
         isNowPlayingLovedInAppleMusic = nil
+    }
+
+    private func requestMusicControlPermissionWithAppleScriptFallback() async {
+        do {
+            _ = try await Self.runAppleScriptAsync(#"tell application id "com.apple.Music" to get running"#)
+            applyAutomationAuthorization(.authorized)
+        } catch let error as AppleScriptError {
+            if error.number == Int(errAEEventNotPermitted) {
+                applyAutomationAuthorization(.denied)
+            } else {
+                logger.debug("Music automation permission fallback failed: \(error.message, privacy: .public) (\(error.number, privacy: .public))")
+                applyAutomationAuthorization(.notDetermined)
+            }
+        } catch {
+            logger.debug("Music automation permission fallback failed: \(error.localizedDescription, privacy: .public)")
+            applyAutomationAuthorization(.notDetermined)
+        }
     }
 
     private struct MusicSnapshot: Sendable {

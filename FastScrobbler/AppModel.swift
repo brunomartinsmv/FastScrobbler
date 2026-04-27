@@ -26,6 +26,11 @@ final class AppModel {
         static let lastEnteredBackgroundAt = "FastScrobbler.AppModel.lastEnteredBackgroundAt"
     }
 
+    private enum ListeningHistoryScanLimits {
+        static let maxImports = 1000
+        static let maxFlushBatches = 80
+    }
+
     let auth: LastFMAuthManager
     let observer: AppleMusicNowPlayingObserver
     let engine: ScrobbleEngine
@@ -72,6 +77,7 @@ final class AppModel {
             )
             return
         }
+        guard !Task.isCancelled else { return }
 
         await purgePlaybackHistoryBacklogIfNeeded()
 
@@ -192,26 +198,45 @@ final class AppModel {
             return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0)
         }
 
-        let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
-            backlog: backlog,
-            scrobbleLog: scrobbleLog,
-            maxItems: maxItems
-        )
+        var totalImported = 0
+        if maxItems > 0 {
+            while totalImported < ListeningHistoryScanLimits.maxImports {
+                if Task.isCancelled { break }
 
-        guard let sessionKey = auth.sessionKey else {
-            return ListeningHistoryScanResult(importedCount: imported, flushedPlaybackHistoryCount: 0)
-        }
+                let batchLimit = min(maxItems, ListeningHistoryScanLimits.maxImports - totalImported)
+                let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
+                    backlog: backlog,
+                    scrobbleLog: scrobbleLog,
+                    maxItems: batchLimit
+                )
 
-        let flushResult = await flushBacklogIfNeeded(sessionKey: sessionKey, force: true)
-        let flushedPlaybackHistoryCount = flushResult.sentItems.reduce(into: 0) { count, item in
-            if item.origin == .playbackHistory {
-                count += 1
+                guard imported > 0 else { break }
+                totalImported += imported
             }
         }
 
+        guard let sessionKey = auth.sessionKey else {
+            return ListeningHistoryScanResult(importedCount: totalImported, flushedPlaybackHistoryCount: 0)
+        }
+
+        var totalFlushedPlaybackHistoryCount = 0
+        for _ in 0..<ListeningHistoryScanLimits.maxFlushBatches {
+            if Task.isCancelled { break }
+
+            let flushResult = await flushBacklogIfNeeded(sessionKey: sessionKey, force: true)
+            let flushedPlaybackHistoryCount = flushResult.sentItems.reduce(into: 0) { count, item in
+                if item.origin == .playbackHistory {
+                    count += 1
+                }
+            }
+
+            guard flushedPlaybackHistoryCount > 0 else { break }
+            totalFlushedPlaybackHistoryCount += flushedPlaybackHistoryCount
+        }
+
         return ListeningHistoryScanResult(
-            importedCount: imported,
-            flushedPlaybackHistoryCount: flushedPlaybackHistoryCount
+            importedCount: totalImported,
+            flushedPlaybackHistoryCount: totalFlushedPlaybackHistoryCount
         )
     }
 

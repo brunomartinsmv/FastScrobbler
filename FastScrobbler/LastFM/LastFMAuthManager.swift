@@ -12,12 +12,14 @@ final class LastFMAuthManager: NSObject, ObservableObject {
         case missingCallbackScheme
         case invalidCallbackURL
         case missingTokenInCallback
+        case failedToStartWebAuthentication
 
         var errorDescription: String? {
             switch self {
             case .missingCallbackScheme: return NSLocalizedString("Missing callback URL scheme.", comment: "")
             case .invalidCallbackURL: return NSLocalizedString("Invalid sign-in callback URL.", comment: "")
             case .missingTokenInCallback: return NSLocalizedString("Last.fm callback did not include an auth token.", comment: "")
+            case .failedToStartWebAuthentication: return NSLocalizedString("Could not start Last.fm sign-in.", comment: "")
             }
         }
     }
@@ -49,6 +51,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
 
         let callbackURL: URL = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: LastFMSecrets.callbackScheme) { callbackURL, error in
+                self.webAuth = nil
                 if let error = error as? ASWebAuthenticationSessionError,
                    error.code == .canceledLogin
                 {
@@ -66,7 +69,11 @@ final class LastFMAuthManager: NSObject, ObservableObject {
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = true
             self.webAuth = session
-            _ = session.start()
+            guard session.start() else {
+                self.webAuth = nil
+                cont.resume(throwing: AuthError.failedToStartWebAuthentication)
+                return
+            }
         }
 
         let callbackComps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)

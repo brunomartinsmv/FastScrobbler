@@ -80,21 +80,12 @@ struct TextReplacementSettingsPage: View {
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .overlay(alignment: .topLeading) {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 13, weight: .semibold))
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
-            .background(.ultraThinMaterial, in: Circle())
-            .overlay {
-                Circle().strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
-            }
-            .help(localized("Back"))
-            .accessibilityLabel(localized("Back"))
-            .shadow(color: .black.opacity(0.12), radius: 6, x: 0, y: 3)
+            MacFloatingCircleButton(
+                systemImage: "chevron.left",
+                help: localized("Back"),
+                accessibilityLabel: localized("Back"),
+                action: { dismiss() }
+            )
             .padding(.top, 10)
             .padding(.leading, 10)
         }

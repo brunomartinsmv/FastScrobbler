@@ -66,6 +66,7 @@ struct SettingsView: View {
     @State private var lastFMLoginErrorText: String?
     @State private var isScanningListeningHistory = false
     @State private var isShowingWhatsNew = false
+    @State private var navigationPath = NavigationPath()
 
     var isShowingHelp: Binding<Bool>?
 
@@ -74,7 +75,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             settingsRootContent
                 .navigationDestination(for: SettingsRoute.self) { route in
                     switch route {
@@ -166,13 +167,7 @@ struct SettingsView: View {
     private var settingsRootContent: some View {
         Form {
             Section(pro.isPro ? "Thank you! ^_^" : "Unlock Pro features") {
-                NavigationLink(value: SettingsRoute.proUpgrade) {
-                    Text(pro.isPro ? "View Pro features" : "Upgrade to Pro")
-                        .fontWeight(pro.isPro ? .regular : .bold)
-                        .foregroundStyle(.primary)
-                        .padding(.vertical, pro.isPro ? 0 : 10)
-                }
-                .listRowBackground(pro.isPro ? nil : Color.yellow)
+                proUpgradeNavigationRow
             }
 
             if let isShowingHelp {
@@ -518,6 +513,31 @@ struct SettingsView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private var proUpgradeNavigationRow: some View {
+        if pro.isPro {
+            NavigationLink(value: SettingsRoute.proUpgrade) {
+                Text("View Pro features")
+            }
+        } else {
+            Button {
+                navigationPath.append(SettingsRoute.proUpgrade)
+            } label: {
+                HStack {
+                    Text("Upgrade to Pro")
+                        .fontWeight(.bold)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                }
+                .foregroundStyle(Color.black)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+            .listRowBackground(Color.yellow)
         }
     }
 

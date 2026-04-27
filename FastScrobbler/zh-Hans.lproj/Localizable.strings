@@ -13,6 +13,7 @@
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobbler 需要一些权限和设置才能稳定运行。";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "通用";
+"Home" = "首页";
 "Imports plays from your Music app Listening History (%@)." = "从音乐 App 播放历史记录（%@）导入播放记录。";
 "Last.fm" = "Last.fm";
 "Listening History" = "播放历史";

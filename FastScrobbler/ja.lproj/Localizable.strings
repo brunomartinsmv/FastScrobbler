@@ -13,6 +13,7 @@
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobblerが安定して動作するには、いくつかの許可と設定が必要です。";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "一般";
+"Home" = "ホーム";
 "Imports plays from your Music app Listening History (%@)." = "ミュージックアプリの再生履歴（%@）から再生を取り込みます。";
 "Last.fm" = "Last.fm";
 "Listening History" = "再生履歴";

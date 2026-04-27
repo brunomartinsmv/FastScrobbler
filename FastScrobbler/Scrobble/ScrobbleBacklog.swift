@@ -268,17 +268,27 @@ actor ScrobbleBacklog {
                     }
                     sentCount += 1
                 } catch {
-                    item.attemptCount += 1
-                    item.lastAttemptAt = now
-                    if idx < items.count, items[idx].id == item.id {
-                        items[idx] = item
-                    } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
-                        items[currentIndex] = item
+                    if let clientError = error as? LastFMClient.ClientError,
+                       !clientError.shouldRetryScrobble {
+                        logger.warning("discarding non-retryable backlog item: \(error.localizedDescription, privacy: .public)")
+                        if idx < items.count, items[idx].id == item.id {
+                            items.remove(at: idx)
+                        } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
+                            items.remove(at: currentIndex)
+                        }
                     } else {
-                        // Item was already removed (or the backlog was mutated unexpectedly while awaiting).
+                        item.attemptCount += 1
+                        item.lastAttemptAt = now
+                        if idx < items.count, items[idx].id == item.id {
+                            items[idx] = item
+                        } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
+                            items[currentIndex] = item
+                        } else {
+                            // Item was already removed (or the backlog was mutated unexpectedly while awaiting).
+                        }
+                        idx += 1
                     }
                     logger.warning("backlog scrobble failed: \(error.localizedDescription, privacy: .public)")
-                    idx += 1
                 }
             }
         } catch {

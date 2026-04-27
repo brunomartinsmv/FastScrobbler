@@ -195,7 +195,9 @@ struct ScrobbleSongIntent: AppIntent {
             )
         } catch {
             logger.warning("manual scrobble failed: \(error.localizedDescription, privacy: .public)")
-            await ScrobbleBacklog.shared.enqueue(track: scrobbleTrack, startTimestamp: ts)
+            if (error as? LastFMClient.ClientError)?.shouldRetryScrobble ?? true {
+                await ScrobbleBacklog.shared.enqueue(track: scrobbleTrack, startTimestamp: ts)
+            }
             throw error
         }
     }

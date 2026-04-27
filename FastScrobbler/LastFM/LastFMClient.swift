@@ -10,6 +10,7 @@ struct LastFMClient {
         case invalidRequestURL
         case invalidResponse
         case apiError(code: Int, message: String)
+        case scrobbleIgnored(code: Int?, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -20,6 +21,19 @@ struct LastFMClient {
             case .invalidRequestURL: return NSLocalizedString("Invalid Last.fm request URL.", comment: "")
             case .invalidResponse: return NSLocalizedString("Invalid response from Last.fm.", comment: "")
             case .apiError(_, let message): return message
+            case .scrobbleIgnored(_, let message): return message
+            }
+        }
+
+        var shouldRetryScrobble: Bool {
+            switch self {
+            case .scrobbleIgnored(let code, _):
+                // Last.fm ignore code 5 is the daily scrobble limit; keep it retryable.
+                return code == 5
+            case .apiError(let code, _):
+                return code == 8 || code == 11 || code == 16 || code == 29
+            default:
+                return true
             }
         }
     }
@@ -112,12 +126,13 @@ struct LastFMClient {
             "timestamp": String(startTimestamp),
         ]
         applyOptionalTrackMetadata(from: track, to: &params)
-        _ = try await signedCall(
+        let json = try await signedCall(
             method: "track.scrobble",
             sessionKey: sessionKey,
             params: params,
             httpMethod: "POST"
         )
+        try validateScrobbleAccepted(json)
     }
 
     func love(track: Track, sessionKey: String) async throws {
@@ -150,6 +165,57 @@ struct LastFMClient {
             return nil
         }
         return trimmed
+    }
+
+    private func validateScrobbleAccepted(_ json: [String: Any]) throws {
+        guard let scrobbles = json["scrobbles"] as? [String: Any] else {
+            throw ClientError.invalidResponse
+        }
+
+        let attrs = scrobbles["@attr"] as? [String: Any]
+        let accepted = intValue(attrs?["accepted"])
+        let ignored = intValue(attrs?["ignored"])
+
+        if let accepted, accepted > 0 { return }
+        if let ignored, ignored == 0 { return }
+
+        let ignoredMessage = firstIgnoredMessage(in: scrobbles)
+        let code = intValue(ignoredMessage?["code"])
+        let message = stringValue(ignoredMessage?["#text"]) ??
+            stringValue(ignoredMessage?["text"]) ??
+            NSLocalizedString("Last.fm ignored this scrobble.", comment: "")
+
+        throw ClientError.scrobbleIgnored(code: code, message: message)
+    }
+
+    private func firstIgnoredMessage(in scrobbles: [String: Any]) -> [String: Any]? {
+        if let scrobble = scrobbles["scrobble"] as? [String: Any] {
+            return scrobble["ignoredMessage"] as? [String: Any]
+        }
+
+        if let scrobbles = scrobbles["scrobble"] as? [[String: Any]] {
+            for scrobble in scrobbles {
+                guard let ignoredMessage = scrobble["ignoredMessage"] as? [String: Any] else { continue }
+                let code = intValue(ignoredMessage["code"])
+                let message = stringValue(ignoredMessage["#text"]) ?? stringValue(ignoredMessage["text"])
+                if code != 0 || !(message ?? "").isEmpty { return ignoredMessage }
+            }
+        }
+
+        return nil
+    }
+
+    private func intValue(_ value: Any?) -> Int? {
+        if let int = value as? Int { return int }
+        if let string = value as? String { return Int(string) }
+        if let number = value as? NSNumber { return number.intValue }
+        return nil
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        guard let string = value as? String else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     private func signedCall(
