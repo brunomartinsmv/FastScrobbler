@@ -43,6 +43,12 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         }
     }
 
+    func refreshAuthorizationStatus() async -> MPMediaLibraryAuthorizationStatus {
+        let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: false)
+        applyAutomationAuthorization(status)
+        return status
+    }
+
     /// Attempts to trigger macOS's Automation permission prompt for controlling the Music app.
     func requestMusicControlPermission() async {
         let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: true)
@@ -340,8 +346,10 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             return .authorized
         case OSStatus(errAEEventNotPermitted):
             return .denied
-        case OSStatus(errAEEventWouldRequireUserConsent), OSStatus(procNotFound):
+        case OSStatus(errAEEventWouldRequireUserConsent):
             return .notDetermined
+        case OSStatus(procNotFound):
+            return .authorized
         default:
             return .notDetermined
         }

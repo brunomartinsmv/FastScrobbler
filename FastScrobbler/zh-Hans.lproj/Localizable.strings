@@ -89,6 +89,7 @@
 "Help" = "帮助";
 "Idle" = "空闲";
 "Imported %lld play(s)." = "已导入 %lld 次播放。";
+"Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "找到 %lld 次新的资料库播放。\n已提交 %lld 条 scrobble。\n已跳过 %lld 次已导入的播放。";
 "Invalid Last.fm base URL." = "无效的 Last.fm 基础 URL。";
 "Invalid Last.fm request URL." = "无效的 Last.fm 请求 URL。";
 "Invalid response from Last.fm." = "来自 Last.fm 的响应无效。";

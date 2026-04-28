@@ -15,12 +15,8 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: Bool,
         scrobbleLoopedTracks: Bool
     ) -> [Int] {
-        let allowRepeatScrobbles = !preventDuplicates || scrobbleLoopedTracks
         let delta: Int = {
             guard let previousPlayCount else {
-                if allowRepeatScrobbles {
-                    return max(playCount, 1)
-                }
                 return 1
             }
             let d = playCount - previousPlayCount
@@ -29,9 +25,6 @@ func runListeningHistoryRecoveryTests() {
         }()
 
         let playsToImport: Int = {
-            if !allowRepeatScrobbles {
-                return min(max(delta, 1), 5)
-            }
             return max(delta, 1)
         }()
 
@@ -40,13 +33,13 @@ func runListeningHistoryRecoveryTests() {
                 ? max(playCount, 1)
                 : playsToImport
 
-        guard synthesizedPlayCount > 1 else { return [playedAt] }
-
         if let durationSeconds, durationSeconds > 0 {
             return (0..<synthesizedPlayCount).map { index in
                 playedAt - durationSeconds * (synthesizedPlayCount - index)
             }
         }
+
+        guard synthesizedPlayCount > 1 else { return [playedAt] }
 
         return (0..<synthesizedPlayCount).map { index in
             playedAt - (synthesizedPlayCount - index - 1)
@@ -62,9 +55,8 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: false,
         scrobbleLoopedTracks: false
     )
-    expectEqual("first sighting imports full playCount when duplicate prevention is OFF", recoveredStarts.count, 20)
-    expectEqual("recovered repeats synthesize distinct timestamps", Set(recoveredStarts).count, 20)
-    expect("latest synthesized repeat ends at Apple's playedAt", recoveredStarts.last == 1_222, detail: "got \(recoveredStarts.suffix(3))")
+    expectEqual("first sighting imports only the current lastPlayedDate play", recoveredStarts.count, 1)
+    expect("first sighting uses playback start when duration is known", recoveredStarts == [1_222], detail: "got \(recoveredStarts)")
 
     let conservativeStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 15,
@@ -75,8 +67,8 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: true,
         scrobbleLoopedTracks: false
     )
-    expectEqual("duplicate prevention ON keeps conservative 5-play cap", conservativeStarts.count, 5)
-    expect("conservative recovery also staggers timestamps", conservativeStarts == [4_105, 4_165, 4_225, 4_285, 4_345], detail: "got \(conservativeStarts)")
+    expectEqual("known play-count increases can recover all new plays", conservativeStarts.count, 15)
+    expect("known play-count increases stagger timestamps", conservativeStarts == [3_505, 3_565, 3_625, 3_685, 3_745, 3_805, 3_865, 3_925, 3_985, 4_045, 4_105, 4_165, 4_225, 4_285, 4_345], detail: "got \(conservativeStarts)")
 
     let loopToggleStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 20,
@@ -87,7 +79,7 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: true,
         scrobbleLoopedTracks: true
     )
-    expectEqual("looped-track setting also enables full-count history recovery", loopToggleStarts.count, 20)
+    expectEqual("looped-track setting does not turn lifetime playCount into first-sighting imports", loopToggleStarts.count, 1)
 
     let samePlayedAtGrowthStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 4,
@@ -99,6 +91,35 @@ func runListeningHistoryRecoveryTests() {
         scrobbleLoopedTracks: false
     )
     expect("same playedAt growth regenerates the full synthesized timeline", samePlayedAtGrowthStarts == [400, 600, 800, 1000], detail: "got \(samePlayedAtGrowthStarts)")
+
+    let unknownDurationStarts = recoveredPlaybackHistoryStartTimestamps(
+        playCount: 1,
+        previousPlayCount: nil,
+        playedAt: 3_000,
+        durationSeconds: nil,
+        previousSeenPlayedAt: nil,
+        preventDuplicates: false,
+        scrobbleLoopedTracks: false
+    )
+    expect("unknown-duration first sighting falls back to Apple's timestamp", unknownDurationStarts == [3_000], detail: "got \(unknownDurationStarts)")
+
+    func shouldAdvancePlaybackHistoryCursor(candidateCount: Int, importedBeforeTrack: Int, maxItems: Int) -> Bool {
+        var importedCount = importedBeforeTrack
+        var processedAllCandidateTimestamps = true
+        for _ in 0..<candidateCount {
+            guard importedCount < maxItems else {
+                processedAllCandidateTimestamps = false
+                break
+            }
+            importedCount += 1
+        }
+        return processedAllCandidateTimestamps
+    }
+
+    expect("cursor advances when the full recovered timeline is processed",
+           shouldAdvancePlaybackHistoryCursor(candidateCount: 3, importedBeforeTrack: 0, maxItems: 3))
+    expect("cursor does not advance when the batch ends mid-timeline",
+           !shouldAdvancePlaybackHistoryCursor(candidateCount: 4, importedBeforeTrack: 0, maxItems: 3))
 
     func shouldProcessPlaybackHistoryCandidate(
         playedAt: Int,

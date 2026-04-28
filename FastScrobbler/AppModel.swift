@@ -9,13 +9,7 @@ final class AppModel {
     struct ListeningHistoryScanResult {
         let importedCount: Int
         let flushedPlaybackHistoryCount: Int
-
-        var dialogCount: Int {
-            if flushedPlaybackHistoryCount > 0 {
-                return flushedPlaybackHistoryCount
-            }
-            return importedCount
-        }
+        let skippedDuplicateCount: Int
     }
 
     static let shared = AppModel()
@@ -79,6 +73,7 @@ final class AppModel {
         }
         guard !Task.isCancelled else { return }
 
+        await backlog.cleanupNow()
         await purgePlaybackHistoryBacklogIfNeeded()
 
         if auth.sessionKey == nil {
@@ -195,20 +190,23 @@ final class AppModel {
     func scanListeningHistory(maxItems: Int = 200) async -> ListeningHistoryScanResult {
         guard AppSettings.scrobbleListeningHistoryEnabled() else {
             await purgePlaybackHistoryBacklogIfNeeded()
-            return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0)
+            return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0, skippedDuplicateCount: 0)
         }
 
         var totalImported = 0
+        var totalSkippedDuplicates = 0
         if maxItems > 0 {
             while totalImported < ListeningHistoryScanLimits.maxImports {
                 if Task.isCancelled { break }
 
                 let batchLimit = min(maxItems, ListeningHistoryScanLimits.maxImports - totalImported)
-                let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
+                let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
                     backlog: backlog,
                     scrobbleLog: scrobbleLog,
                     maxItems: batchLimit
                 )
+                let imported = importResult.importedCount
+                totalSkippedDuplicates += importResult.skippedDuplicateCount
 
                 guard imported > 0 else { break }
                 totalImported += imported
@@ -216,7 +214,11 @@ final class AppModel {
         }
 
         guard let sessionKey = auth.sessionKey else {
-            return ListeningHistoryScanResult(importedCount: totalImported, flushedPlaybackHistoryCount: 0)
+            return ListeningHistoryScanResult(
+                importedCount: totalImported,
+                flushedPlaybackHistoryCount: 0,
+                skippedDuplicateCount: totalSkippedDuplicates
+            )
         }
 
         var totalFlushedPlaybackHistoryCount = 0
@@ -236,7 +238,8 @@ final class AppModel {
 
         return ListeningHistoryScanResult(
             importedCount: totalImported,
-            flushedPlaybackHistoryCount: totalFlushedPlaybackHistoryCount
+            flushedPlaybackHistoryCount: totalFlushedPlaybackHistoryCount,
+            skippedDuplicateCount: totalSkippedDuplicates
         )
     }
 

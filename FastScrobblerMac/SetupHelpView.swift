@@ -28,10 +28,10 @@ struct SetupHelpView: View {
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var observer: AppleMusicNowPlayingObserver
     @EnvironmentObject private var engine: ScrobbleEngine
+    @EnvironmentObject private var permissions: PermissionStatusStore
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
-    @State private var mediaLibraryStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
     @State private var startAtLoginEnabled = Self.isStartAtLoginEnabled
     @State private var isSigningInToLastFM = false
     @State private var lastFMErrorText: String?
@@ -41,7 +41,7 @@ struct SetupHelpView: View {
     }
 
     private var canFinishSetup: Bool {
-        auth.sessionKey != nil && observer.authorizationStatus == .authorized
+        auth.sessionKey != nil && permissions.automationStatus == .authorized
     }
 
     init(mode: Mode, onOpenSettings: (() -> Void)? = nil, onDone: @escaping () -> Void) {
@@ -212,13 +212,11 @@ struct SetupHelpView: View {
                         actionDisabled: isSigningInToLastFM
                     )
 
-                    let musicControlAllowed = (observer.authorizationStatus == .authorized)
+                    let musicControlAllowed = (permissions.automationStatus == .authorized)
                     let musicControlActionTitle: String? = {
                         guard !musicControlAllowed else { return nil }
-                        switch observer.authorizationStatus {
-                        case .notDetermined:
-                            return NSLocalizedString("Request Access", comment: "")
-                        case .denied, .restricted:
+                        switch permissions.automationStatus {
+                        case .notDetermined, .denied, .restricted:
                             return NSLocalizedString("Open System Settings", comment: "")
                         case .authorized:
                             return nil
@@ -226,10 +224,8 @@ struct SetupHelpView: View {
                     }()
                     let musicControlAction: (() -> Void)? = {
                         guard !musicControlAllowed else { return nil }
-                        switch observer.authorizationStatus {
-                        case .notDetermined:
-                            return requestMusicControlPermission
-                        case .denied, .restricted:
+                        switch permissions.automationStatus {
+                        case .notDetermined, .denied, .restricted:
                             return { openPrivacySettings(kind: .automation) }
                         case .authorized:
                             return nil
@@ -245,10 +241,10 @@ struct SetupHelpView: View {
                         action: musicControlAction
                     )
 
-                    let mediaAllowed = (mediaLibraryStatus == .authorized)
+                    let mediaAllowed = (permissions.mediaLibraryStatus == .authorized)
                     let mediaActionTitle: String? = {
                         guard !mediaAllowed else { return nil }
-                        switch mediaLibraryStatus {
+                        switch permissions.mediaLibraryStatus {
                         case .notDetermined:
                             return NSLocalizedString("Request Access", comment: "")
                         case .denied, .restricted:
@@ -259,7 +255,7 @@ struct SetupHelpView: View {
                     }()
                     let mediaAction: (() -> Void)? = {
                         guard !mediaAllowed else { return nil }
-                        switch mediaLibraryStatus {
+                        switch permissions.mediaLibraryStatus {
                         case .notDetermined:
                             return requestMediaLibraryPermission
                         case .denied, .restricted:
@@ -404,9 +400,11 @@ struct SetupHelpView: View {
     }
 
     private func refreshStatuses() {
-        mediaLibraryStatus = MPMediaLibrary.authorizationStatus()
         startAtLoginEnabled = Self.isStartAtLoginEnabled
-        observer.refreshOnceIfAuthorized()
+        Task { @MainActor in
+            await permissions.refreshNow(observer: observer)
+            observer.refreshOnceIfAuthorized()
+        }
     }
 
     private static var isStartAtLoginEnabled: Bool {
@@ -425,6 +423,7 @@ struct SetupHelpView: View {
                     cont.resume(returning: ())
                 }
             }
+            await permissions.refreshNow(observer: observer)
             refreshStatuses()
             await maybeStartScrobblingIfSetupAlreadyCompleted()
         }
@@ -433,6 +432,7 @@ struct SetupHelpView: View {
     private func requestMusicControlPermission() {
         Task { @MainActor in
             await observer.requestMusicControlPermission()
+            await permissions.refreshNow(observer: observer)
             refreshStatuses()
             await maybeStartScrobblingIfSetupAlreadyCompleted()
         }
@@ -459,7 +459,7 @@ struct SetupHelpView: View {
 
     private func maybeStartScrobblingIfSetupAlreadyCompleted() async {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) || mode == .help else { return }
-        guard auth.sessionKey != nil, observer.authorizationStatus == .authorized else { return }
+        guard auth.sessionKey != nil, permissions.automationStatus == .authorized else { return }
         AppModel.shared.startIfNeeded()
     }
 }

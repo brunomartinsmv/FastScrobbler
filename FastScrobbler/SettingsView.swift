@@ -269,8 +269,7 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Hardcoded to true and disabled while the multi-device scrobble feature is broken
-                    Toggle(isOn: .constant(true)) {
+                    Toggle(isOn: $scrobbleListeningHistoryFromAllDevicesEnabled) {
                         Text("Scrobble Listening History from all devices")
                             .foregroundStyle(.secondary)
                     }
@@ -444,11 +443,13 @@ struct SettingsView: View {
         defer { isScanningListeningHistory = false }
 
         let result = await AppModel.shared.scanListeningHistory()
-        if result.dialogCount > 0 {
+        if result.importedCount > 0 || result.flushedPlaybackHistoryCount > 0 || result.skippedDuplicateCount > 0 {
             activeAlert = .listeningHistoryScanResult(
                 message: String.localizedStringWithFormat(
-                    NSLocalizedString("Imported %lld play(s).", comment: ""),
-                    Int64(result.dialogCount)
+                    NSLocalizedString("Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
+                    Int64(result.importedCount),
+                    Int64(result.flushedPlaybackHistoryCount),
+                    Int64(result.skippedDuplicateCount)
                 )
             )
         } else {

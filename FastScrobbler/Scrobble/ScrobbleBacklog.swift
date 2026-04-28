@@ -35,7 +35,24 @@ actor ScrobbleBacklog {
         var sentItems: [SentItem]
     }
 
+    struct CleanupResult: Sendable, Equatable {
+        var removedTooOldCount: Int
+        var removedTooManyFailedAttemptsCount: Int
+        var removedTooManyItemsCount: Int
+        var remainingCount: Int
+
+        var removedCount: Int {
+            removedTooOldCount + removedTooManyFailedAttemptsCount + removedTooManyItemsCount
+        }
+    }
+
     static let shared = ScrobbleBacklog()
+
+    private enum CleanupLimits {
+        static let maxPendingItems = 5_000
+        static let maxItemAge: TimeInterval = 30 * 24 * 60 * 60
+        static let maxAttemptCount = 10
+    }
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "ScrobbleBacklog")
     private var isLoaded = false
@@ -47,6 +64,44 @@ actor ScrobbleBacklog {
     func pendingCount() async -> Int {
         await loadIfNeeded()
         return items.count
+    }
+
+    func storageSizeBytes() async -> Int64 {
+        let urls = [sharedFileURL(), legacyFileURL()].compactMap { $0 }
+        var seenPaths = Set<String>()
+        var total: Int64 = 0
+
+        for url in urls {
+            guard seenPaths.insert(url.path).inserted else { continue }
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let size = attributes[.size] as? NSNumber else {
+                continue
+            }
+            total += size.int64Value
+        }
+
+        return total
+    }
+
+    @discardableResult
+    func cleanupNow() async -> CleanupResult {
+        await loadIfNeeded()
+        let result = pruneItems(now: Date())
+        if result.removedCount > 0 {
+            logCleanup(result)
+            await save(pruneBeforeWrite: false)
+        }
+        return result
+    }
+
+    func clearAll() async {
+        await loadIfNeeded()
+        guard !items.isEmpty else {
+            await save(pruneBeforeWrite: false)
+            return
+        }
+        items = []
+        await save(pruneBeforeWrite: false)
     }
 
     func enqueue(track: Track, startTimestamp: Int) async {
@@ -325,11 +380,23 @@ actor ScrobbleBacklog {
         } catch {
             items = []
         }
+
+        let result = pruneItems(now: Date())
+        if result.removedCount > 0 {
+            logCleanup(result)
+            await save(pruneBeforeWrite: false)
+        }
     }
 
-    private func save() async {
+    private func save(pruneBeforeWrite: Bool = true) async {
         let url = fileURL()
         do {
+            if pruneBeforeWrite {
+                let result = pruneItems(now: Date())
+                if result.removedCount > 0 {
+                    logCleanup(result)
+                }
+            }
             let data = try JSONEncoder().encode(items)
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
@@ -340,6 +407,52 @@ actor ScrobbleBacklog {
         } catch {
             logger.warning("failed to persist backlog: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private func pruneItems(now: Date) -> CleanupResult {
+        let originalCount = items.count
+        let cutoffTimestamp = Int(now.addingTimeInterval(-CleanupLimits.maxItemAge).timeIntervalSince1970.rounded(.down))
+
+        items.removeAll { item in
+            item.attemptCount >= CleanupLimits.maxAttemptCount
+        }
+        let removedTooManyFailedAttemptsCount = originalCount - items.count
+
+        let countAfterFailedAttemptPrune = items.count
+        items.removeAll { item in
+            item.startTimestamp > 0 && item.startTimestamp < cutoffTimestamp
+        }
+        let removedTooOldCount = countAfterFailedAttemptPrune - items.count
+
+        var removedTooManyItemsCount = 0
+        if items.count > CleanupLimits.maxPendingItems {
+            items.sort {
+                if $0.startTimestamp == $1.startTimestamp {
+                    return $0.queuedAt > $1.queuedAt
+                }
+                return $0.startTimestamp > $1.startTimestamp
+            }
+            removedTooManyItemsCount = items.count - CleanupLimits.maxPendingItems
+            items.removeLast(removedTooManyItemsCount)
+        }
+
+        return CleanupResult(
+            removedTooOldCount: removedTooOldCount,
+            removedTooManyFailedAttemptsCount: removedTooManyFailedAttemptsCount,
+            removedTooManyItemsCount: removedTooManyItemsCount,
+            remainingCount: items.count
+        )
+    }
+
+    private func logCleanup(_ result: CleanupResult) {
+        logger.info(
+            """
+            cleaned scrobble backlog: old=\(result.removedTooOldCount, privacy: .public), \
+            failed=\(result.removedTooManyFailedAttemptsCount, privacy: .public), \
+            excess=\(result.removedTooManyItemsCount, privacy: .public), \
+            remaining=\(result.remainingCount, privacy: .public)
+            """
+        )
     }
 
     private func playbackDurationSeconds(for storedTrack: Track, fallbackTrack: Track) -> Int? {

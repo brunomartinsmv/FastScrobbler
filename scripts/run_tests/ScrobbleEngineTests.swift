@@ -24,9 +24,36 @@ func runScrobbleEngineTests() {
         case stopped
     }
 
+    enum SimScrobbleAttemptOutcome: Equatable {
+        case belowThreshold
+        case inactivePlayback
+        case duplicate
+        case retryableFailure(queued: Bool)
+        case nonRetryableFailure
+        case submitted
+    }
+
     func shouldAutoScrobble(playbackState: SimPlaybackState, played: Double, duration: Double, thresholdIndex: Int, allowRepeatScrobbles: Bool = false) -> Bool {
         guard playbackState == .playing else { return false }
         return shouldScrobble(played: played, duration: duration, thresholdIndex: thresholdIndex, allowRepeatScrobbles: allowRepeatScrobbles)
+    }
+
+    func autoScrobbleAttemptOutcome(
+        playbackState: SimPlaybackState,
+        played: Double,
+        duration: Double,
+        thresholdIndex: Int,
+        isDuplicate: Bool = false,
+        simulatedErrorIsRetryable: Bool? = nil,
+        alreadyQueued: Bool = false
+    ) -> SimScrobbleAttemptOutcome {
+        guard playbackState == .playing else { return .inactivePlayback }
+        guard shouldScrobble(played: played, duration: duration, thresholdIndex: thresholdIndex) else { return .belowThreshold }
+        if isDuplicate { return .duplicate }
+        if let retryable = simulatedErrorIsRetryable {
+            return retryable ? .retryableFailure(queued: !alreadyQueued) : .nonRetryableFailure
+        }
+        return .submitted
     }
 
     func rawPlaybackTimeCrossedThreshold(_ rawPlaybackTime: Double, duration: Double, threshold: Double, elapsedSinceStart: Double) -> Bool {
@@ -107,9 +134,14 @@ func runScrobbleEngineTests() {
         return current + min(playbackDelta, wallDelta)
     }
 
-    func renderInactiveStatus(artist: String, title: String, playbackState: SimPlaybackState, hasSentNowPlaying: Bool = false, hasScrobbled: Bool = false, hasLoved: Bool = false) -> String {
+    func renderInactiveStatus(artist: String, title: String, playbackState: SimPlaybackState, played: Double = 0, duration: Double = 0, thresholdIndex: Int = 2, hasSentNowPlaying: Bool = false, hasScrobbled: Bool = false, hasLoved: Bool = false, failureMessage: String? = nil) -> String {
         var bits = ["\(artist) - \(title)"]
         bits.append(playbackState == .paused ? "paused" : "Idle")
+        if let failureMessage {
+            bits.append(failureMessage)
+        } else if !hasScrobbled, shouldScrobble(played: played, duration: duration, thresholdIndex: thresholdIndex) {
+            bits.append("Ready to scrobble when playback resumes.")
+        }
         if hasSentNowPlaying { bits.append("now playing sent") }
         if hasScrobbled { bits.append("scrobbled") }
         if hasLoved { bits.append("loved") }
@@ -196,6 +228,9 @@ func runScrobbleEngineTests() {
 
     expect("paused track above threshold does not auto-scrobble", !shouldAutoScrobble(playbackState: .paused, played: 30, duration: 60, thresholdIndex: 2))
     expect("stopped track above threshold does not auto-scrobble", !shouldAutoScrobble(playbackState: .stopped, played: 30, duration: 60, thresholdIndex: 2))
+    expectEqual("paused track above threshold reports inactive attempt outcome",
+                autoScrobbleAttemptOutcome(playbackState: .paused, played: 30, duration: 60, thresholdIndex: 2),
+                .inactivePlayback)
 
     let pausedAccumulated = accumulatePlaySeconds(current: 25, previousPlaybackTime: 25, playbackTime: 25, wallDelta: 5)
     expect("paused tick preserves accumulated play time", pausedAccumulated == 25, detail: "got \(pausedAccumulated)")
@@ -203,11 +238,52 @@ func runScrobbleEngineTests() {
     let resumedAccumulated = accumulatePlaySeconds(current: pausedAccumulated, previousPlaybackTime: 25, playbackTime: 30, wallDelta: 5)
     expect("resume tick adds newly played seconds", resumedAccumulated == 30, detail: "got \(resumedAccumulated)")
     expect("resumed playback can scrobble once threshold is met", shouldAutoScrobble(playbackState: .playing, played: resumedAccumulated, duration: 60, thresholdIndex: 2))
+    expectEqual("resumed playback after threshold is immediately submitted",
+                autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2),
+                .submitted)
     expect("repeat-enabled short track can auto-scrobble once threshold is met", shouldAutoScrobble(playbackState: .playing, played: 12, duration: 12, thresholdIndex: 2, allowRepeatScrobbles: true))
 
     let pausedStatus = renderInactiveStatus(artist: "Depeche Mode", title: "Waiting for the Night", playbackState: .paused, hasSentNowPlaying: true)
     expect("paused status renders paused marker", pausedStatus.contains("paused"), detail: "got '\(pausedStatus)'")
     expect("paused status omits countdown text", !pausedStatus.contains("to scrobble"), detail: "got '\(pausedStatus)'")
+
+    let thresholdReadyStatus = renderInactiveStatus(
+        artist: "Depeche Mode",
+        title: "Waiting for the Night",
+        playbackState: .paused,
+        played: 30,
+        duration: 60,
+        thresholdIndex: 2,
+        hasSentNowPlaying: true
+    )
+    expect("paused threshold-qualified status says it is ready on resume",
+           thresholdReadyStatus.contains("Ready to scrobble when playback resumes."),
+           detail: "got '\(thresholdReadyStatus)'")
+
+    section("Engine · Auto-scrobble attempt outcomes")
+
+    expectEqual("retryable failure queues once",
+                autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2, simulatedErrorIsRetryable: true),
+                .retryableFailure(queued: true))
+    expectEqual("retryable duplicate failure does not enqueue again",
+                autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2, simulatedErrorIsRetryable: true, alreadyQueued: true),
+                .retryableFailure(queued: false))
+    expectEqual("non-retryable failure remains visible",
+                autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2, simulatedErrorIsRetryable: false),
+                .nonRetryableFailure)
+    expectEqual("duplicate match reports duplicate outcome",
+                autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2, isDuplicate: true),
+                .duplicate)
+
+    let nonRetryableStatus = renderInactiveStatus(
+        artist: "Depeche Mode",
+        title: "Waiting for the Night",
+        playbackState: .paused,
+        failureMessage: "Last.fm ignored this scrobble."
+    )
+    expect("non-retryable failure status includes Last.fm message",
+           nonRetryableStatus.contains("Last.fm ignored this scrobble."),
+           detail: "got '\(nonRetryableStatus)'")
 
     section("Engine · Looped track restart detection")
 

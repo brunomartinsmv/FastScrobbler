@@ -89,6 +89,7 @@
 "Help" = "Ayuda";
 "Idle" = "Inactivo";
 "Imported %lld play(s)." = "Se importaron %lld reproducciones.";
+"Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "Se encontraron %lld reproducciones nuevas de la biblioteca.\nSe enviaron %lld scrobbles.\nSe omitieron %lld reproducciones ya importadas.";
 "Invalid Last.fm base URL." = "URL base de Last.fm no válida.";
 "Invalid Last.fm request URL." = "URL de solicitud de Last.fm no válida.";
 "Invalid response from Last.fm." = "Respuesta no válida de Last.fm.";

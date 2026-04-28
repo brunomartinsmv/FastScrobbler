@@ -1,19 +1,33 @@
 import Foundation
 
 @MainActor
-final class AppModel {
-    struct ListeningHistoryScanResult {
-        let importedCount: Int
-        let flushedPlaybackHistoryCount: Int
+final class PermissionStatusStore: ObservableObject {
+    @Published private(set) var mediaLibraryStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
+    @Published private(set) var automationStatus: MPMediaLibraryAuthorizationStatus = .notDetermined
 
-        var dialogCount: Int {
-            if flushedPlaybackHistoryCount > 0 {
-                return flushedPlaybackHistoryCount
+    private var monitoringTask: Task<Void, Never>?
+
+    func startMonitoring(observer: AppleMusicNowPlayingObserver) {
+        monitoringTask?.cancel()
+        monitoringTask = Task { @MainActor in
+            await refreshNow(observer: observer)
+
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard !Task.isCancelled else { break }
+                await refreshNow(observer: observer)
             }
-            return importedCount
         }
     }
 
+    func refreshNow(observer: AppleMusicNowPlayingObserver) async {
+        mediaLibraryStatus = MPMediaLibrary.authorizationStatus()
+        automationStatus = await observer.refreshAuthorizationStatus()
+    }
+}
+
+@MainActor
+final class AppModel {
     static let shared = AppModel()
 
     private enum Keys {
@@ -27,6 +41,7 @@ final class AppModel {
     let engine: ScrobbleEngine
     let backlog: ScrobbleBacklog
     let scrobbleLog: ScrobbleLogStore
+    let permissions: PermissionStatusStore
 
     private var startTask: Task<Void, Never>?
 
@@ -35,6 +50,8 @@ final class AppModel {
         let observer = AppleMusicNowPlayingObserver()
         self.auth = auth
         self.observer = observer
+        let permissions = PermissionStatusStore()
+        self.permissions = permissions
         let backlog = ScrobbleBacklog.shared
         self.backlog = backlog
         let scrobbleLog = ScrobbleLogStore.shared
@@ -81,13 +98,8 @@ final class AppModel {
 
         if let sessionKey = auth.sessionKey {
             await auth.refreshUserInfoIfNeeded()
-            let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
-                backlog: backlog,
-                scrobbleLog: scrobbleLog,
-                maxItems: 200
-            )
             UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
-            await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0)
+            await flushBacklogIfNeeded(sessionKey: sessionKey)
             BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
         }
 
@@ -111,7 +123,6 @@ final class AppModel {
 
         observer.refreshOnceIfAuthorized()
         await purgePlaybackHistoryBacklogIfNeeded()
-        _ = await PlaybackHistoryImporter.shared.importIntoBacklog(backlog: backlog, scrobbleLog: scrobbleLog)
         if let sessionKey = auth.sessionKey {
             let result = await backlog.flush(sessionKey: sessionKey)
             for item in result.sentItems {
@@ -127,37 +138,6 @@ final class AppModel {
         await engine.tickAsync()
     }
 
-    /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
-    @discardableResult
-    func scanListeningHistory(maxItems: Int = 200) async -> ListeningHistoryScanResult {
-        guard AppSettings.scrobbleListeningHistoryEnabled() else {
-            await purgePlaybackHistoryBacklogIfNeeded()
-            return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0)
-        }
-
-        let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
-            backlog: backlog,
-            scrobbleLog: scrobbleLog,
-            maxItems: maxItems
-        )
-
-        guard let sessionKey = auth.sessionKey else {
-            return ListeningHistoryScanResult(importedCount: imported, flushedPlaybackHistoryCount: 0)
-        }
-
-        let flushResult = await flushBacklogIfNeeded(sessionKey: sessionKey, force: true)
-        let flushedPlaybackHistoryCount = flushResult.sentItems.reduce(into: 0) { count, item in
-            if item.origin == .playbackHistory {
-                count += 1
-            }
-        }
-
-        return ListeningHistoryScanResult(
-            importedCount: imported,
-            flushedPlaybackHistoryCount: flushedPlaybackHistoryCount
-        )
-    }
-
     func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
         guard !isEnabled else { return }
         await backlog.removeAll(origin: .playbackHistory)
@@ -168,6 +148,7 @@ final class AppModel {
         await flushBacklogIfNeeded(sessionKey: sessionKey)
     }
 
+    @discardableResult
     private func flushBacklogIfNeeded(sessionKey: String, force: Bool = false) async -> ScrobbleBacklog.FlushResult {
         let pending = await backlog.pendingCount()
         guard pending > 0 else {

@@ -108,4 +108,40 @@ func runAPITests() {
     var negativeDurationParams: [String: String] = [:]
     applyOptionalTrackMetadata(from: APITrack(album: nil, albumArtist: nil, durationSeconds: -1), to: &negativeDurationParams)
     expect("negative duration is omitted", negativeDurationParams["duration"] == nil)
+
+    // ─── HTTP status retry classification ────────────────────────────────────────
+    // Mirrors LastFMClient.ClientError.shouldRetryScrobble for transport-level HTTP failures.
+
+    section("API · HTTP status retry classification")
+
+    func shouldRetryHTTPStatus(_ statusCode: Int) -> Bool {
+        statusCode == 408 || statusCode == 425 || statusCode == 429 || (500...599).contains(statusCode)
+    }
+
+    expect("HTTP 429 is retryable", shouldRetryHTTPStatus(429))
+    expect("HTTP 503 is retryable", shouldRetryHTTPStatus(503))
+    expect("HTTP 408 is retryable", shouldRetryHTTPStatus(408))
+    expect("HTTP 400 is not retryable", !shouldRetryHTTPStatus(400))
+    expect("HTTP 403 is not retryable", !shouldRetryHTTPStatus(403))
+    expect("HTTP 404 is not retryable", !shouldRetryHTTPStatus(404))
+
+    func responseMessage(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let json = obj as? [String: Any],
+           let message = json["message"] as? String {
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        guard let string = String(data: data, encoding: .utf8) else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : String(trimmed.prefix(200))
+    }
+
+    let jsonErrorData = #"{"error":29,"message":"Rate Limit Exceeded"}"#.data(using: .utf8)!
+    expectEqual("HTTP error JSON message is extracted", responseMessage(from: jsonErrorData), "Rate Limit Exceeded")
+    expectEqual("HTTP error text body is trimmed", responseMessage(from: Data("  unavailable  ".utf8)), "unavailable")
+    expectEqual("empty HTTP error body has no message", responseMessage(from: Data()), nil)
 }

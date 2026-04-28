@@ -183,4 +183,70 @@ func runManualScrobbleTests() {
     expect("failure: backlog has entry",                simBacklog.count == 1, detail: "got \(simBacklog.count)")
     expect("failure: backlog entry has manual origin",  simBacklog.first?.origin == .manual)
     expect("failure: scrobble log unchanged (no add)",  simLog.count == 1, detail: "got \(simLog.count)")
+
+    // ─── Manual Scrobble — retry dedupe and ambiguous delivery ──────────────────
+    // Mirrors ScrobbleEngine.shouldEnqueueManualRetry(track:timestamp:after:).
+
+    section("Manual Scrobble · Retry dedupe and ambiguous delivery")
+
+    enum SimManualRetryError {
+        case transientHTTP(Int)
+        case invalidResponse
+        case timedOut
+        case notConnected
+        case ignored(Int?)
+    }
+
+    func shouldRetryManualScrobble(_ error: SimManualRetryError) -> Bool {
+        switch error {
+        case .transientHTTP(let code):
+            return code == 408 || code == 425 || code == 429 || (500...599).contains(code)
+        case .invalidResponse:
+            return true
+        case .timedOut, .notConnected:
+            return true
+        case .ignored(let code):
+            return code == 5
+        }
+    }
+
+    func manualRetryDeliveryIsAmbiguous(_ error: SimManualRetryError) -> Bool {
+        switch error {
+        case .invalidResponse, .timedOut:
+            return true
+        case .transientHTTP, .notConnected, .ignored:
+            return false
+        }
+    }
+
+    func shouldEnqueueManualRetry(
+        key: String,
+        timestamp: Int,
+        error: SimManualRetryError,
+        backlog: [SimBacklogEntry2],
+        log: [(key: String, ts: Int)]
+    ) -> Bool {
+        guard shouldRetryManualScrobble(error) else { return false }
+        guard !manualRetryDeliveryIsAmbiguous(error) else { return false }
+        let tolerance = 10
+        let alreadyQueued = backlog.contains { $0.key == key && abs($0.ts - timestamp) <= tolerance }
+        guard !alreadyQueued else { return false }
+        return !log.contains { $0.key == key && abs($0.ts - timestamp) <= tolerance }
+    }
+
+    let retryKey = "meta:artist|song|"
+    expect("retryable HTTP failure enqueues when no duplicate exists",
+           shouldEnqueueManualRetry(key: retryKey, timestamp: 10_000, error: .transientHTTP(503), backlog: [], log: []))
+    expect("existing backlog match suppresses retry enqueue",
+           !shouldEnqueueManualRetry(key: retryKey, timestamp: 10_005, error: .transientHTTP(503), backlog: [SimBacklogEntry2(key: retryKey, ts: 10_000, origin: .manual)], log: []))
+    expect("existing scrobble log match suppresses retry enqueue",
+           !shouldEnqueueManualRetry(key: retryKey, timestamp: 10_005, error: .transientHTTP(503), backlog: [], log: [(key: retryKey, ts: 10_000)]))
+    expect("timeout is treated as ambiguous delivery and not queued",
+           !shouldEnqueueManualRetry(key: retryKey, timestamp: 10_000, error: .timedOut, backlog: [], log: []))
+    expect("invalid response is treated as ambiguous delivery and not queued",
+           !shouldEnqueueManualRetry(key: retryKey, timestamp: 10_000, error: .invalidResponse, backlog: [], log: []))
+    expect("offline failure can queue for later",
+           shouldEnqueueManualRetry(key: retryKey, timestamp: 10_000, error: .notConnected, backlog: [], log: []))
+    expect("non-retryable ignored scrobble is not queued",
+           !shouldEnqueueManualRetry(key: retryKey, timestamp: 10_000, error: .ignored(1), backlog: [], log: []))
 }

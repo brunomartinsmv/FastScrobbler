@@ -174,3 +174,101 @@ func runBacklogTimestampPreservationTests() {
     expectEqual("backlog retry preserves the original captured timestamp", preservedTimestamp, 1_234_567_890)
     expectEqual("backlog retry only increments attempts, not timestamp", preservedEntry.attemptCount, 1)
 }
+
+func runBacklogCleanupTests() {
+    section("Backlog · Storage cleanup")
+
+    struct CleanupBacklogEntry {
+        let id: Int
+        let startTimestamp: Int
+        let queuedAt: Int
+        let attemptCount: Int
+    }
+
+    struct CleanupResult {
+        let entries: [CleanupBacklogEntry]
+        let removedTooOldCount: Int
+        let removedTooManyFailedAttemptsCount: Int
+        let removedTooManyItemsCount: Int
+    }
+
+    func cleanup(
+        _ entries: [CleanupBacklogEntry],
+        nowTimestamp: Int,
+        maxAgeSeconds: Int = 30 * 24 * 60 * 60,
+        maxPendingItems: Int = 5_000,
+        maxAttemptCount: Int = 10
+    ) -> CleanupResult {
+        var working = entries
+        let originalCount = working.count
+        let cutoffTimestamp = nowTimestamp - maxAgeSeconds
+
+        working.removeAll { $0.attemptCount >= maxAttemptCount }
+        let removedTooManyFailedAttemptsCount = originalCount - working.count
+
+        let countAfterFailedAttemptPrune = working.count
+        working.removeAll { $0.startTimestamp > 0 && $0.startTimestamp < cutoffTimestamp }
+        let removedTooOldCount = countAfterFailedAttemptPrune - working.count
+
+        var removedTooManyItemsCount = 0
+        if working.count > maxPendingItems {
+            working.sort {
+                if $0.startTimestamp == $1.startTimestamp {
+                    return $0.queuedAt > $1.queuedAt
+                }
+                return $0.startTimestamp > $1.startTimestamp
+            }
+            removedTooManyItemsCount = working.count - maxPendingItems
+            working.removeLast(removedTooManyItemsCount)
+        }
+
+        return CleanupResult(
+            entries: working,
+            removedTooOldCount: removedTooOldCount,
+            removedTooManyFailedAttemptsCount: removedTooManyFailedAttemptsCount,
+            removedTooManyItemsCount: removedTooManyItemsCount
+        )
+    }
+
+    let now = 2_000_000_000
+    let oldTimestamp = now - (31 * 24 * 60 * 60)
+    let recentTimestamp = now - 60
+
+    let ageResult = cleanup([
+        CleanupBacklogEntry(id: 1, startTimestamp: oldTimestamp, queuedAt: oldTimestamp, attemptCount: 0),
+        CleanupBacklogEntry(id: 2, startTimestamp: recentTimestamp, queuedAt: recentTimestamp, attemptCount: 0),
+    ], nowTimestamp: now)
+    expectEqual("cleanup removes entries older than 30 days", ageResult.removedTooOldCount, 1)
+    expectEqual("cleanup keeps recent entries", ageResult.entries.map(\.id), [2])
+
+    let failedResult = cleanup([
+        CleanupBacklogEntry(id: 1, startTimestamp: recentTimestamp, queuedAt: recentTimestamp, attemptCount: 9),
+        CleanupBacklogEntry(id: 2, startTimestamp: recentTimestamp + 1, queuedAt: recentTimestamp + 1, attemptCount: 10),
+    ], nowTimestamp: now)
+    expectEqual("cleanup removes entries with 10 failed attempts", failedResult.removedTooManyFailedAttemptsCount, 1)
+    expectEqual("cleanup keeps entries below failed-attempt cap", failedResult.entries.map(\.id), [1])
+
+    let oversizedEntries = (0..<5_010).map { index in
+        CleanupBacklogEntry(
+            id: index,
+            startTimestamp: recentTimestamp + index,
+            queuedAt: recentTimestamp + index,
+            attemptCount: 0
+        )
+    }
+    let oversizedResult = cleanup(oversizedEntries, nowTimestamp: now)
+    expectEqual("cleanup trims oversized backlog to 5000 entries", oversizedResult.entries.count, 5_000)
+    expectEqual("cleanup reports excess trimmed count", oversizedResult.removedTooManyItemsCount, 10)
+    expect("cleanup preserves newest timestamp when trimming", oversizedResult.entries.contains(where: { $0.id == 5_009 }))
+    expect("cleanup drops oldest timestamp when trimming", !oversizedResult.entries.contains(where: { $0.id == 0 }))
+
+    let sameTimestampResult = cleanup([
+        CleanupBacklogEntry(id: 1, startTimestamp: recentTimestamp, queuedAt: recentTimestamp, attemptCount: 0),
+        CleanupBacklogEntry(id: 2, startTimestamp: recentTimestamp, queuedAt: recentTimestamp + 1, attemptCount: 0),
+        CleanupBacklogEntry(id: 3, startTimestamp: recentTimestamp, queuedAt: recentTimestamp + 2, attemptCount: 0),
+    ], nowTimestamp: now, maxPendingItems: 2)
+    expectEqual("cleanup breaks equal timestamps by newest queuedAt", sameTimestampResult.entries.map(\.id), [3, 2])
+
+    let clearResult = cleanup([], nowTimestamp: now)
+    expectEqual("clear-all equivalent leaves no pending entries", clearResult.entries.count, 0)
+}

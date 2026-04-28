@@ -9,6 +9,7 @@ struct LastFMClient {
         case invalidBaseURL
         case invalidRequestURL
         case invalidResponse
+        case httpStatus(code: Int, message: String?)
         case apiError(code: Int, message: String)
         case scrobbleIgnored(code: Int?, message: String)
 
@@ -20,6 +21,9 @@ struct LastFMClient {
             case .invalidBaseURL: return NSLocalizedString("Invalid Last.fm base URL.", comment: "")
             case .invalidRequestURL: return NSLocalizedString("Invalid Last.fm request URL.", comment: "")
             case .invalidResponse: return NSLocalizedString("Invalid response from Last.fm.", comment: "")
+            case .httpStatus(let code, let message):
+                if let message, !message.isEmpty { return message }
+                return String(format: NSLocalizedString("Last.fm returned HTTP %d.", comment: ""), code)
             case .apiError(_, let message): return message
             case .scrobbleIgnored(_, let message): return message
             }
@@ -30,6 +34,8 @@ struct LastFMClient {
             case .scrobbleIgnored(let code, _):
                 // Last.fm ignore code 5 is the daily scrobble limit; keep it retryable.
                 return code == 5
+            case .httpStatus(let code, _):
+                return code == 408 || code == 425 || code == 429 || (500...599).contains(code)
             case .apiError(let code, _):
                 return code == 8 || code == 11 || code == 16 || code == 29
             default:
@@ -265,7 +271,11 @@ struct LastFMClient {
         #endif
         request.setValue("FastScrobbler/1.0 (\(platform))", forHTTPHeaderField: "User-Agent")
 
-        let (data, _) = try await Self.session.data(for: request)
+        let (data, response) = try await Self.session.data(for: request)
+        if let http = response as? HTTPURLResponse,
+           !(200...299).contains(http.statusCode) {
+            throw ClientError.httpStatus(code: http.statusCode, message: responseMessage(from: data))
+        }
         let obj = try JSONSerialization.jsonObject(with: data)
         guard let json = obj as? [String: Any] else { throw ClientError.invalidResponse }
         if let code = json["error"] as? Int, let message = json["message"] as? String {
@@ -303,5 +313,20 @@ struct LastFMClient {
         let encoded = s
             .addingPercentEncoding(withAllowedCharacters: allowed) ?? s
         return encoded.replacingOccurrences(of: " ", with: "+")
+    }
+
+    private func responseMessage(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        if let obj = try? JSONSerialization.jsonObject(with: data),
+           let json = obj as? [String: Any],
+           let message = json["message"] as? String {
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
+
+        guard let string = String(data: data, encoding: .utf8) else { return nil }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : String(trimmed.prefix(200))
     }
 }

@@ -19,6 +19,7 @@ struct RunTestsMain {
         runBackgroundGracePeriodTests()
         runSettingsDefaultsTests()
         runBacklogTimestampPreservationTests()
+        runBacklogCleanupTests()
         runListeningHistoryScanTests()
         finishTests()
     }

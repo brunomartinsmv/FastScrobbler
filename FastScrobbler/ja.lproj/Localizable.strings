@@ -89,6 +89,7 @@
 "Help" = "ヘルプ";
 "Idle" = "待機中";
 "Imported %lld play(s)." = "%lld件の再生を取り込みました。";
+"Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "ライブラリ内の新しい再生が%lld件見つかりました。\n%lld件のスクロブルを送信しました。\n取り込み済みの再生を%lld件スキップしました。";
 "Invalid Last.fm base URL." = "Last.fmのベースURLが無効です。";
 "Invalid Last.fm request URL." = "Last.fmのリクエストURLが無効です。";
 "Invalid response from Last.fm." = "Last.fmからの応答が無効です。";

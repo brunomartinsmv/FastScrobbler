@@ -12,6 +12,7 @@ struct ContentView: View {
     @EnvironmentObject private var observer: AppleMusicNowPlayingObserver
     @EnvironmentObject private var engine: ScrobbleEngine
     @EnvironmentObject private var scrobbleLog: ScrobbleLogStore
+    @EnvironmentObject private var permissions: PermissionStatusStore
     @EnvironmentObject private var pro: ProPurchaseManager
 
     @Environment(\.openURL) private var openURL
@@ -28,7 +29,6 @@ struct ContentView: View {
     @State private var isShowingHelp = false
     @State private var isShowingSettings = false
     @State private var isShowingManualScrobble = false
-    @State private var mediaLibraryStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
 
     var body: some View {
         Group {
@@ -60,6 +60,9 @@ struct ContentView: View {
         }
         .onValueChange(of: observer.authorizationStatus) { _ in
             refreshPermissionStatusesIfNeeded()
+            presentSetupIfNeeded()
+        }
+        .onValueChange(of: permissions.automationStatus) { _ in
             presentSetupIfNeeded()
         }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
@@ -315,8 +318,8 @@ struct ContentView: View {
     @ViewBuilder
     private var macAttentionBanner: some View {
         let isLoggedOut = (auth.sessionKey == nil)
-        let isMediaLibraryPermissionOff = (mediaLibraryStatus == .denied || mediaLibraryStatus == .restricted)
-        let isMusicControlPermissionOff = (observer.authorizationStatus == .denied || observer.authorizationStatus == .restricted)
+        let isMediaLibraryPermissionOff = (permissions.mediaLibraryStatus != .authorized)
+        let isMusicControlPermissionOff = (permissions.automationStatus != .authorized)
         if isLoggedOut || isMediaLibraryPermissionOff || isMusicControlPermissionOff {
             VStack(alignment: .leading, spacing: 10) {
                 if isLoggedOut {
@@ -352,7 +355,7 @@ struct ContentView: View {
                         .tint(.white)
                     }
 
-                    if isMediaLibraryPermissionOff {
+                    if permissions.mediaLibraryStatus == .notDetermined {
                         Button("Request Media Library Access") {
                             Task { @MainActor in
                                 let status: MPMediaLibraryAuthorizationStatus = await withCheckedContinuation { cont in
@@ -360,9 +363,19 @@ struct ContentView: View {
                                         cont.resume(returning: s)
                                     }
                                 }
-                                mediaLibraryStatus = status
+                                await permissions.refreshNow(observer: observer)
                                 guard status == .authorized else { return }
                                 AppModel.shared.startIfNeeded()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.white)
+                    } else if permissions.mediaLibraryStatus == .denied || permissions.mediaLibraryStatus == .restricted {
+                        Button(NSLocalizedString("Open System Settings", comment: "")) {
+                            if let mediaSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Media") {
+                                openURL(mediaSettingsURL)
+                            } else if let privacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                                openURL(privacySettingsURL)
                             }
                         }
                         .buttonStyle(.bordered)
@@ -467,7 +480,7 @@ struct ContentView: View {
     }
 
     private func presentSetupIfNeeded() {
-        let shouldShow = (!hasSeenSetup || auth.sessionKey == nil || observer.authorizationStatus != .authorized)
+        let shouldShow = (!hasSeenSetup || auth.sessionKey == nil || permissions.automationStatus != .authorized)
         guard shouldShow else { return }
 
         isShowingHelp = false
@@ -477,11 +490,11 @@ struct ContentView: View {
     }
 
     private func refreshPermissionStatusesIfNeeded() {
-        mediaLibraryStatus = MPMediaLibrary.authorizationStatus()
-        observer.refreshOnceIfAuthorized()
+        Task { @MainActor in
+            await permissions.refreshNow(observer: observer)
+            observer.refreshOnceIfAuthorized()
 
-        if hasSeenSetup, auth.sessionKey != nil, observer.authorizationStatus == .authorized {
-            Task { @MainActor in
+            if hasSeenSetup, auth.sessionKey != nil, permissions.automationStatus == .authorized {
                 AppModel.shared.startIfNeeded()
             }
         }

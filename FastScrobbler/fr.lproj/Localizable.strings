@@ -89,6 +89,7 @@
 "Help" = "Aide";
 "Idle" = "Inactif";
 "Imported %lld play(s)." = "%lld lectures importées.";
+"Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "%lld nouvelles lectures de bibliothèque trouvées.\n%lld scrobbles envoyés.\n%lld lectures déjà importées ignorées.";
 "Invalid Last.fm base URL." = "URL de base Last.fm invalide.";
 "Invalid Last.fm request URL." = "URL de requête Last.fm invalide.";
 "Invalid response from Last.fm." = "Réponse invalide de Last.fm.";

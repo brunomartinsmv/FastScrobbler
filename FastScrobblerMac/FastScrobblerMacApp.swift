@@ -32,12 +32,14 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(model.observer)
             .environmentObject(model.engine)
             .environmentObject(model.scrobbleLog)
+            .environmentObject(model.permissions)
             .environmentObject(ProPurchaseManager.shared)
                 .environmentObject(AppLanguageStore.shared)
 
         MenuBarController.shared.start(rootView: rootView)
 
         Task { @MainActor in
+            model.permissions.startMonitoring(observer: model.observer)
             model.startIfNeeded()
             await ProPurchaseManager.shared.startIfNeeded()
         }
