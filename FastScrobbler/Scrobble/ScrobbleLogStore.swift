@@ -65,6 +65,10 @@ final class ScrobbleLogStore: ObservableObject {
         save()
     }
 
+    func reload() {
+        load()
+    }
+
     func isMostRecentScrobble(dedupeKey: String) -> Bool {
         entries.max(by: { $0.startTimestamp < $1.startTimestamp })?.track.dedupeKey == dedupeKey
     }

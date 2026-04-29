@@ -280,6 +280,58 @@ struct Track: Codable, Equatable, Hashable, Sendable {
     var isCompilation: Bool? = nil
 }
 
+struct ScrobbleMetadataPreferences: Sendable {
+    var useAlbumArtistForScrobbling: Bool
+    var removeBracketsFromSongTitles: Bool
+    var removeAllBracketsFromSongTitles: Bool
+    var songTitleBracketKeywords: [String]
+    var removeBracketsFromAlbumTitles: Bool
+    var removeAllBracketsFromAlbumTitles: Bool
+    var albumTitleBracketKeywords: [String]
+    var textReplacementRules: [TextReplacementRule]
+
+    static var current: ScrobbleMetadataPreferences {
+        ScrobbleMetadataPreferences(
+            useAlbumArtistForScrobbling: ProSettings.useAlbumArtistForScrobbling(),
+            removeBracketsFromSongTitles: ProSettings.removeBracketsFromSongTitlesEnabled(),
+            removeAllBracketsFromSongTitles: ProSettings.removeAllBracketsFromSongTitlesEnabled(),
+            songTitleBracketKeywords: ProSettings.removeBracketsFromSongTitleKeywords(),
+            removeBracketsFromAlbumTitles: ProSettings.removeBracketsFromAlbumTitlesEnabled(),
+            removeAllBracketsFromAlbumTitles: ProSettings.removeAllBracketsFromAlbumTitlesEnabled(),
+            albumTitleBracketKeywords: ProSettings.removeBracketsFromAlbumTitleKeywords(),
+            textReplacementRules: ProSettings.textReplacementRules()
+        )
+    }
+
+    func apply(to track: Track) -> Track {
+        var copy = track
+
+        if useAlbumArtistForScrobbling {
+            copy = copy.applyingAlbumArtistAsArtistIfAvailable()
+        }
+
+        if removeBracketsFromAlbumTitles {
+            copy = copy.removingConfiguredParentheticalAlbumSegments(
+                removeAll: removeAllBracketsFromAlbumTitles,
+                keywords: albumTitleBracketKeywords
+            )
+        }
+
+        if removeBracketsFromSongTitles {
+            copy = copy.removingConfiguredParentheticalTitleSegments(
+                removeAll: removeAllBracketsFromSongTitles,
+                keywords: songTitleBracketKeywords
+            )
+        }
+
+        if !textReplacementRules.isEmpty {
+            copy = copy.applyingTextReplacements(textReplacementRules)
+        }
+
+        return copy
+    }
+}
+
 extension Track {
     private static func normalizedMetadataComponent(_ value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -354,26 +406,11 @@ extension Track {
     }
 
     func applyingProScrobblePreferences() -> Track {
-        var copy = self
+        applyingScrobbleMetadataPreferences(.current)
+    }
 
-        if ProSettings.useAlbumArtistForScrobbling() {
-            copy = copy.applyingAlbumArtistAsArtistIfAvailable()
-        }
-
-        if ProSettings.removeBracketsFromAlbumTitlesEnabled() {
-            copy = copy.removingConfiguredParentheticalAlbumSegments()
-        }
-
-        if ProSettings.removeBracketsFromSongTitlesEnabled() {
-            copy = copy.removingConfiguredParentheticalTitleSegments()
-        }
-
-        let replacementRules = ProSettings.textReplacementRules()
-        if !replacementRules.isEmpty {
-            copy = copy.applyingTextReplacements(replacementRules)
-        }
-
-        return copy
+    func applyingScrobbleMetadataPreferences(_ preferences: ScrobbleMetadataPreferences) -> Track {
+        preferences.apply(to: self)
     }
 
     func applyingTextReplacements(_ rules: [TextReplacementRule]) -> Track {
@@ -428,10 +465,17 @@ extension Track {
     }
 
     func removingConfiguredParentheticalTitleSegments() -> Track {
-        let cleanedTitle = Self.cleanedMetadataByRemovingParentheticalSegments(
-            from: title,
+        removingConfiguredParentheticalTitleSegments(
             removeAll: ProSettings.removeAllBracketsFromSongTitlesEnabled(),
             keywords: ProSettings.removeBracketsFromSongTitleKeywords()
+        )
+    }
+
+    func removingConfiguredParentheticalTitleSegments(removeAll: Bool, keywords: [String]) -> Track {
+        let cleanedTitle = Self.cleanedMetadataByRemovingParentheticalSegments(
+            from: title,
+            removeAll: removeAll,
+            keywords: keywords
         )
         guard cleanedTitle != title else { return self }
 
@@ -441,12 +485,19 @@ extension Track {
     }
 
     func removingConfiguredParentheticalAlbumSegments() -> Track {
+        removingConfiguredParentheticalAlbumSegments(
+            removeAll: ProSettings.removeAllBracketsFromAlbumTitlesEnabled(),
+            keywords: ProSettings.removeBracketsFromAlbumTitleKeywords()
+        )
+    }
+
+    func removingConfiguredParentheticalAlbumSegments(removeAll: Bool, keywords: [String]) -> Track {
         guard let album, !album.isEmpty else { return self }
 
         let cleanedAlbum = Self.cleanedMetadataByRemovingParentheticalSegments(
             from: album,
-            removeAll: ProSettings.removeAllBracketsFromAlbumTitlesEnabled(),
-            keywords: ProSettings.removeBracketsFromAlbumTitleKeywords()
+            removeAll: removeAll,
+            keywords: keywords
         )
         guard cleanedAlbum != album else { return self }
 

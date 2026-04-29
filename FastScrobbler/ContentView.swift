@@ -139,7 +139,7 @@ struct ContentView: View {
             .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         }
         .refreshable {
-            await AppModel.shared.scanListeningHistory()
+            await refreshHome()
         }
         .overlay(alignment: .top) {
             GeometryReader { geo in
@@ -427,6 +427,13 @@ struct ContentView: View {
             if error is CancellationError { return }
             errorText = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func refreshHome() async {
+        await AppModel.shared.scanListeningHistory()
+        scrobbleLog.reload()
+        currentDate = .now
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
