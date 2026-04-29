@@ -45,7 +45,7 @@ When you connect Last.fm, FastScrobbler uses Apple’s authentication flow to ob
 
 FastScrobbler stores the following data locally:
 
-- **Last.fm session key**: stored in Apple Keychain services (iOS/macOS).
+- **Last.fm session key**: stored locally in shared app preferences so the app and its extensions can submit requests to Last.fm.
 - **Last.fm username**: stored locally (UserDefaults) after it is fetched from Last.fm.
 - **Retry backlog** (queued scrobbles): stored locally so scrobbles can be retried when the network is available (including timestamps used for scrobbling).
 - **Recent scrobble log**: stored locally to show recent activity in the app.
@@ -93,7 +93,7 @@ Scrobbles already submitted to Last.fm are stored by Last.fm under its own polic
 
 ## Security
 
-FastScrobbler uses HTTPS when communicating with Last.fm. The Last.fm session key is stored in Apple Keychain services.
+FastScrobbler uses HTTPS when communicating with Last.fm. The Last.fm session key is stored locally in shared app preferences.
 
 ## Children’s privacy
 

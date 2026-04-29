@@ -75,6 +75,8 @@
 "%lldm ago" = "%lld 分钟前";
 "%lldh ago" = "%lld 小时前";
 "%1$lldh %2$lldm ago" = "%1$lld 小时 %2$lld 分钟前";
+"%lldd ago" = "%lld 天前";
+"%1$lldd %2$lldh ago" = "%1$lld 天 %2$lld 小时前";
 "Back" = "返回";
 "Backlog" = "待处理";
 "Backgrounded (syncs when iOS allows)" = "在后台运行中（iOS 允许时同步）";

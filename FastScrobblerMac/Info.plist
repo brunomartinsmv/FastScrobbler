@@ -39,8 +39,6 @@
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>FastScrobblerKeychainAccessGroup</key>
-	<string>$(AppIdentifierPrefix)com.kevin.FastScrobbler.shared</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.music</string>
 	<key>LSUIElement</key>

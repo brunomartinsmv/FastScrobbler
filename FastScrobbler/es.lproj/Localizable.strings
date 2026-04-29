@@ -74,6 +74,8 @@
 "%lldm ago" = "hace %lld min";
 "%lldh ago" = "hace %lld h";
 "%1$lldh %2$lldm ago" = "hace %1$lld h %2$lld min";
+"%lldd ago" = "hace %lld d";
+"%1$lldd %2$lldh ago" = "hace %1$lld d %2$lld h";
 "Back" = "Atrás";
 "Backlog" = "Cola";
 "Backgrounded (syncs when iOS allows)" = "En segundo plano (sincroniza cuando iOS lo permite)";

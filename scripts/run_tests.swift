@@ -20,6 +20,14 @@ let allSources = try fileManager.contentsOfDirectory(
     return lhs.lastPathComponent < rhs.lastPathComponent
 }
 
+let projectDirectory = scriptsDirectory.deletingLastPathComponent()
+let sharedSources = [
+    projectDirectory
+        .appendingPathComponent("FastScrobbler", isDirectory: true)
+        .appendingPathComponent("Scrobble", isDirectory: true)
+        .appendingPathComponent("RelativeScrobbleTimeFormatter.swift")
+]
+
 let temporaryDirectory = fileManager.temporaryDirectory
     .appendingPathComponent("fastscrobbler-run-tests-\(UUID().uuidString)", isDirectory: true)
 try fileManager.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
@@ -38,7 +46,7 @@ func run(_ executablePath: String, _ arguments: [String]) throws -> Int32 {
 
 let compileStatus = try run(
     "/usr/bin/env",
-    ["swiftc"] + allSources.map(\.path) + ["-o", executable.path]
+    ["swiftc"] + sharedSources.map(\.path) + allSources.map(\.path) + ["-o", executable.path]
 )
 if compileStatus != 0 {
     exit(compileStatus)

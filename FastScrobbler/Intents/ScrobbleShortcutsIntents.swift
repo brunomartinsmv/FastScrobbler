@@ -133,7 +133,7 @@ struct SendNowPlayingIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let logger = Logger(subsystem: "FastScrobbler", category: "SendNowPlayingIntent")
 
-        guard let sessionKey = KeychainStore.readString(service: "FastScrobbler", account: "lastfm.sessionKey") else {
+        guard let sessionKey = LastFMSessionStore.readSessionKey() else {
             throw ShortcutsIntentError.notConnected
         }
 
@@ -169,7 +169,7 @@ struct ScrobbleSongIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let logger = Logger(subsystem: "FastScrobbler", category: "ScrobbleSongIntent")
 
-        guard let sessionKey = KeychainStore.readString(service: "FastScrobbler", account: "lastfm.sessionKey") else {
+        guard let sessionKey = LastFMSessionStore.readSessionKey() else {
             throw ShortcutsIntentError.notConnected
         }
 

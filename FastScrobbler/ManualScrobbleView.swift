@@ -283,7 +283,7 @@ struct ManualScrobbleView: View {
                     .foregroundColor(.secondary)
             }
             HStack(spacing: 8) {
-                Text(relativeHoursMinutes(from: displayDate(for: entry), to: now))
+                Text(RelativeScrobbleTimeFormatter.string(from: displayDate(for: entry), to: now))
                 if entry.lovedOnLastFM == true {
                     Text("Loved")
                         .padding(.horizontal, 8)
@@ -322,24 +322,6 @@ struct ManualScrobbleView: View {
             return Date(timeIntervalSince1970: TimeInterval(entry.startTimestamp))
         }
         return entry.scrobbledAt
-    }
-
-    private func relativeHoursMinutes(from date: Date, to now: Date) -> String {
-        let delta = max(0, now.timeIntervalSince(date))
-        let totalMinutes = Int(delta / 60)
-        if totalMinutes < 60 {
-            return String.localizedStringWithFormat(NSLocalizedString("%lldm ago", comment: ""), Int64(totalMinutes))
-        }
-        let hours = totalMinutes / 60
-        let minutes = totalMinutes % 60
-        if minutes == 0 {
-            return String.localizedStringWithFormat(NSLocalizedString("%lldh ago", comment: ""), Int64(hours))
-        }
-        return String.localizedStringWithFormat(
-            NSLocalizedString("%1$lldh %2$lldm ago", comment: ""),
-            Int64(hours),
-            Int64(minutes)
-        )
     }
 
 #if os(macOS)

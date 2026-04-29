@@ -90,13 +90,11 @@ These localisations are included across the iOS app, macOS app, and Control Cent
    - Fill in `LastFMSecrets.apiKey` and `LastFMSecrets.apiSecret`
    - Keep it uncommitted (it’s in `.gitignore`)
 3. Open `FastScrobbler.xcodeproj` and set your signing team / bundle identifiers.
-4. App Group + Keychain access groups (recommended for extensions):
-   - All targets are configured to use an App Group (`group.com.kevin.FastScrobbler`) and a Keychain access group via entitlements (`*.entitlements`).
+4. App Group (required for extensions):
+   - All targets are configured to use an App Group (`group.com.kevin.FastScrobbler`) via entitlements (`*.entitlements`).
    - If you change bundle IDs / team, make sure:
      - The App Group identifier exists in your developer account and matches the entitlements.
-     - The Keychain access group matches your Team ID.
-   - This repo’s `FastScrobbler/LastFM/KeychainStore.swift` includes a hard-coded access group string; you’ll likely need to update it for your Team ID if you want app+extensions Keychain sharing.
-     - Alternative: replace it with `FastScrobbler/LastFM/KeychainStore_template.swift` and provide the access group via Info.plist.
+   - The Last.fm session key is stored in shared App Group preferences so the app and extensions can access it without Keychain prompts.
 
 ### Run on iOS
 

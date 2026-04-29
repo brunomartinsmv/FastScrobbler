@@ -74,6 +74,8 @@
 "%lldm ago" = "il y a %lld min";
 "%lldh ago" = "il y a %lld h";
 "%1$lldh %2$lldm ago" = "il y a %1$lld h %2$lld min";
+"%lldd ago" = "il y a %lld j";
+"%1$lldd %2$lldh ago" = "il y a %1$lld j %2$lld h";
 "Back" = "Retour";
 "Backlog" = "File d’attente";
 "Backgrounded (syncs when iOS allows)" = "En arrière-plan (se synchronise quand iOS le permet)";

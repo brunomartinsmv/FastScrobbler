@@ -27,14 +27,12 @@ final class LastFMAuthManager: NSObject, ObservableObject {
     @Published private(set) var sessionKey: String?
     @Published private(set) var username: String?
 
-    private let keychainService = "FastScrobbler"
-    private let keychainAccount = "lastfm.sessionKey"
     private let usernameDefaultsKey = "FastScrobbler.lastfm.username"
     private var webAuth: ASWebAuthenticationSession?
 
     override init() {
         super.init()
-        sessionKey = KeychainStore.readString(service: keychainService, account: keychainAccount)
+        sessionKey = LastFMSessionStore.readSessionKey()
         username = UserDefaults.standard.string(forKey: usernameDefaultsKey)
     }
 
@@ -83,7 +81,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
         }
 
         let key = try await client.getSession(token: token)
-        try KeychainStore.writeString(key, service: keychainService, account: keychainAccount)
+        LastFMSessionStore.writeSessionKey(key)
         sessionKey = key
         do {
             try await refreshUserInfo()
@@ -93,7 +91,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
     }
 
     func disconnect() {
-        KeychainStore.delete(service: keychainService, account: keychainAccount)
+        LastFMSessionStore.deleteSessionKey()
         sessionKey = nil
         UserDefaults.standard.removeObject(forKey: usernameDefaultsKey)
         username = nil

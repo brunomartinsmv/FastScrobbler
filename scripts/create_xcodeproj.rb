@@ -34,15 +34,16 @@ end
 SHARED_CORE_SOURCES = %w[
   FastScrobbler/AppModel.swift
   FastScrobbler/ContentView.swift
-  FastScrobbler/LastFM/KeychainStore.swift
   FastScrobbler/LastFM/LastFMAuthManager.swift
   FastScrobbler/LastFM/LastFMClient.swift
+  FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
   FastScrobbler/Models/Track.swift
   FastScrobbler/Pro.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleEngine.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
+  FastScrobbler/Scrobble/RelativeScrobbleTimeFormatter.swift
   FastScrobbler/SettingsView.swift
 ].freeze
 
@@ -64,9 +65,9 @@ IOS_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
 ]).freeze
 
 MAC_APP_SOURCES = %w[
-  FastScrobbler/LastFM/KeychainStore.swift
   FastScrobbler/LastFM/LastFMAuthManager.swift
   FastScrobbler/LastFM/LastFMClient.swift
+  FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
   FastScrobbler/ManualScrobbleView.swift
   FastScrobbler/Models/Track.swift
@@ -75,6 +76,7 @@ MAC_APP_SOURCES = %w[
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleEngine.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
+  FastScrobbler/Scrobble/RelativeScrobbleTimeFormatter.swift
   FastScrobbler/TextReplacementSettingsPage.swift
   FastScrobbler/WhatsNewView.swift
   FastScrobblerMac/AppModel.swift
@@ -98,8 +100,8 @@ LIVE_ACTIVITY_SOURCES = %w[
 
 CONTROL_SHARED_SOURCES = %w[
   FastScrobbler/Intents/ScrobbleShortcutsIntents.swift
-  FastScrobbler/LastFM/KeychainStore.swift
   FastScrobbler/LastFM/LastFMClient.swift
+  FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
   FastScrobbler/Models/Track.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
@@ -170,7 +172,6 @@ TARGET_DEFINITIONS = [
       BackgroundTasks
       MediaPlayer
       SafariServices
-      Security
       StoreKit
       WidgetKit
     ],
@@ -198,7 +199,6 @@ TARGET_DEFINITIONS = [
       AuthenticationServices
       MediaPlayer
       MusicKit
-      Security
       ServiceManagement
       StoreKit
     ],
@@ -240,7 +240,6 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
-      Security
       WidgetKit
     ],
   },
@@ -261,7 +260,6 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
-      Security
       WidgetKit
     ],
   },
@@ -282,7 +280,6 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
-      Security
       WidgetKit
     ],
   },

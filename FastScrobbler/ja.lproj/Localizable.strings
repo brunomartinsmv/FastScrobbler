@@ -74,6 +74,8 @@
 "%lldm ago" = "%lld分前";
 "%lldh ago" = "%lld時間前";
 "%1$lldh %2$lldm ago" = "%1$lld時間%2$lld分前";
+"%lldd ago" = "%lld日前";
+"%1$lldd %2$lldh ago" = "%1$lld日%2$lld時間前";
 "Back" = "戻る";
 "Backlog" = "バックログ";
 "Backgrounded (syncs when iOS allows)" = "バックグラウンド中（iOSが許可したときに同期）";

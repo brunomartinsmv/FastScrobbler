@@ -15,6 +15,7 @@ struct RunTestsMain {
         runAdditionalBracketEdgeCaseTests()
         runAPITests()
         runManualScrobbleTests()
+        runRelativeScrobbleTimeFormatterTests()
         runTextReplacementTests()
         runBackgroundGracePeriodTests()
         runSettingsDefaultsTests()
