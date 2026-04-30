@@ -28,7 +28,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
-    @AppStorage(ProSettings.Keys.scrobbleListeningHistoryFromAllDevicesEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryFromAllDevicesEnabled = false
+    @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -231,8 +231,6 @@ struct SettingsView: View {
             }
 
             Section("Listening History") {
-                let allDevicesEnabled = scrobbleListeningHistoryEnabled && pro.isPro
-
                 Button {
                     Task { await scanListeningHistoryTapped() }
                 } label: {
@@ -247,11 +245,10 @@ struct SettingsView: View {
 
                 Text(
                     scrobbleListeningHistoryEnabled
-                        ? String.localizedStringWithFormat(
-                            NSLocalizedString("Imports plays from your Music app Listening History (%@).", comment: ""),
-                            allDevicesEnabled
-                                ? NSLocalizedString("all devices", comment: "")
-                                : NSLocalizedString("this device only", comment: "")
+                        ? (
+                            extendedListeningHistoryScanEnabled
+                                ? NSLocalizedString("Scan Listening History will import plays from the past 7 days.", comment: "")
+                                : NSLocalizedString("Scan Listening History will import plays from the past 36 hours.", comment: "")
                         )
                         : NSLocalizedString("Listening History scrobbling is turned off.", comment: "")
                 )
@@ -269,13 +266,10 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle(isOn: $scrobbleListeningHistoryFromAllDevicesEnabled) {
-                        Text("Scrobble Listening History from all devices")
-                            .foregroundStyle(.secondary)
-                    }
-                    .disabled(true)
-
-                    Text(NSLocalizedString("This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History.", comment: ""))
+                    Toggle("Extended History Scan", isOn: $extendedListeningHistoryScanEnabled)
+                        .disabled(!scrobbleListeningHistoryEnabled)
+                        .foregroundStyle(scrobbleListeningHistoryEnabled ? .primary : .secondary)
+                    Text("When off, \"Scan Listening History\" checks the past 36 hours. When on, \"Scan Listening History\" checks the past 7 days. Automatic scans still use 36 hours.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -420,7 +414,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromAlbumTitleKeywords)
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
-        defaults.removeObject(forKey: ProSettings.Keys.scrobbleListeningHistoryFromAllDevicesEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
 
         loveOnFavoriteEnabled = false
@@ -432,7 +426,7 @@ struct SettingsView: View {
         removeBracketsFromAlbumTitlesEnabled = false
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
-        scrobbleListeningHistoryFromAllDevicesEnabled = false
+        extendedListeningHistoryScanEnabled = false
     }
 
     @MainActor
@@ -442,7 +436,7 @@ struct SettingsView: View {
         isScanningListeningHistory = true
         defer { isScanningListeningHistory = false }
 
-        let result = await AppModel.shared.scanListeningHistory()
+        let result = await AppModel.shared.scanListeningHistory(allowExtendedLookback: true)
         if result.importedCount > 0 || result.flushedPlaybackHistoryCount > 0 || result.skippedDuplicateCount > 0 {
             activeAlert = .listeningHistoryScanResult(
                 message: String.localizedStringWithFormat(

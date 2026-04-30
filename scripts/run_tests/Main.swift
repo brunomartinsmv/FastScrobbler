@@ -16,6 +16,7 @@ struct RunTestsMain {
         runAPITests()
         runManualScrobbleTests()
         runRelativeScrobbleTimeFormatterTests()
+        runScrobbleLogStoreTests()
         runTextReplacementTests()
         runBackgroundGracePeriodTests()
         runSettingsDefaultsTests()

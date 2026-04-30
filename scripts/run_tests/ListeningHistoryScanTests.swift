@@ -108,38 +108,74 @@ func runListeningHistoryScanTests() {
 
     section("Listening History scan · First-scan lookback")
 
+    enum PlaybackHistoryImportMode {
+        case newPlaysOnly
+        case recentBackfill
+    }
+
     func playbackHistoryFetchCutoff(
         now: Int,
         lastImportAt: Int?,
-        maxLookbackDays: Int = 7,
-        sameDeviceRecoveryHours: Int = 24,
-        allDevices: Bool
+        mode: PlaybackHistoryImportMode,
+        extendedLookback: Bool = false,
+        maxStandardLookbackHours: Int = 36,
+        maxRecentBackfillLookbackDays: Int = 7
     ) -> Int {
-        let lookback = now - maxLookbackDays * 24 * 60 * 60
+        let standardLookback = now - maxStandardLookbackHours * 60 * 60
+        let recentBackfillLookback = now - maxRecentBackfillLookbackDays * 24 * 60 * 60
+        let lookback: Int = {
+            switch mode {
+            case .newPlaysOnly:
+                return standardLookback
+            case .recentBackfill:
+                return extendedLookback ? recentBackfillLookback : standardLookback
+            }
+        }()
         let cutoff = lastImportAt ?? lookback
 
+        if mode == .recentBackfill { return lookback }
         guard lastImportAt != nil else { return max(cutoff, lookback) }
-        if allDevices { return lookback }
-
-        let recoveryStart = cutoff - sameDeviceRecoveryHours * 60 * 60
-        return max(recoveryStart, lookback)
+        return lookback
     }
 
     let now = 1_000_000
     expectEqual(
-        "first scan uses 7-day lookback",
-        playbackHistoryFetchCutoff(now: now, lastImportAt: nil, allDevices: false),
+        "automatic import uses 36-hour lookback cap",
+        playbackHistoryFetchCutoff(now: now, lastImportAt: now - 2 * 60 * 60, mode: .newPlaysOnly),
+        now - 36 * 60 * 60
+    )
+    expectEqual(
+        "manual standard scan uses 36-hour lookback",
+        playbackHistoryFetchCutoff(now: now, lastImportAt: nil, mode: .recentBackfill),
+        now - 36 * 60 * 60
+    )
+    expectEqual(
+        "manual extended scan uses 7-day lookback",
+        playbackHistoryFetchCutoff(now: now, lastImportAt: nil, mode: .recentBackfill, extendedLookback: true),
         now - 7 * 24 * 60 * 60
     )
     expectEqual(
-        "later same-device scan looks back 24 hours from cursor",
-        playbackHistoryFetchCutoff(now: now, lastImportAt: now - 2 * 60 * 60, allDevices: false),
-        now - 26 * 60 * 60
+        "manual standard scan keeps 36-hour lookback even with an existing cursor",
+        playbackHistoryFetchCutoff(now: now, lastImportAt: now - 2 * 60 * 60, mode: .recentBackfill),
+        now - 36 * 60 * 60
     )
     expectEqual(
-        "all-devices scan uses bounded 7-day lookback",
-        playbackHistoryFetchCutoff(now: now, lastImportAt: now - 2 * 60 * 60, allDevices: true),
+        "manual extended scan keeps 7-day lookback even with an existing cursor",
+        playbackHistoryFetchCutoff(now: now, lastImportAt: now - 2 * 60 * 60, mode: .recentBackfill, extendedLookback: true),
         now - 7 * 24 * 60 * 60
+    )
+
+    func shouldInitializeCursorWithoutImport(lastImportAt: Int?, mode: PlaybackHistoryImportMode) -> Bool {
+        lastImportAt == nil && mode == .newPlaysOnly
+    }
+
+    expect(
+        "automatic first import initializes cursor instead of backfilling",
+        shouldInitializeCursorWithoutImport(lastImportAt: nil, mode: .newPlaysOnly)
+    )
+    expect(
+        "manual first scan remains an explicit recent-history backfill",
+        !shouldInitializeCursorWithoutImport(lastImportAt: nil, mode: .recentBackfill)
     )
 
     // ─── Listening History scan dialog summary ───────────────────────────────────

@@ -14,7 +14,9 @@
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "Général";
 "Home" = "Accueil";
-"Imports plays from your Music app Listening History (%@)." = "Importe les lectures depuis l’historique d’écoute de l’app Musique (%@).";
+"Import recent plays from your Music app Listening History." = "Importer les lectures récentes depuis l’historique d’écoute de l’app Musique.";
+"Scan Listening History will import plays from the past 36 hours." = "Analyser l’historique d’écoute importera les lectures des 36 dernières heures.";
+"Scan Listening History will import plays from the past 7 days." = "Analyser l’historique d’écoute importera les lectures des 7 derniers jours.";
 "Last.fm" = "Last.fm";
 "Listening History" = "Historique d’écoute";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "Les Activités en direct sont désactivées dans les réglages iOS pour FastScrobbler.";
@@ -55,7 +57,6 @@
 "Reset Settings?" = "Réinitialiser les réglages ?";
 "Scrobble at %@ of duration" = "Scrobbler à %@ de la durée";
 "Scrobble Controls" = "Contrôles de scrobble";
-"Scrobble Listening History from all devices" = "Scrobbler l’historique d’écoute de tous les appareils";
 "Scrobble Now" = "Scrobbler maintenant";
 "Settings" = "Réglages";
 "Setup" = "Configuration";
@@ -188,7 +189,6 @@
 "Recommended to periodically sync when the app is in the background." = "Recommandé pour synchroniser périodiquement lorsque l’app est en arrière-plan.";
 "Add Shortcut actions and Control Center buttons to scrobble or control playback without opening the app." = "Ajoutez des actions Raccourcis et des boutons du Centre de contrôle pour scrobbler ou contrôler la lecture sans ouvrir l’app.";
 "Choose when a track scrobbles: 10%, 25%, 50% or 75% of the song duration." = "Choisissez quand une piste est scrobblée : à 10 %, 25 %, 50 % ou 75 % de sa durée.";
-"Allow Listening History imports to include plays synced from your other devices." = "Autorisez les imports d’historique d’écoute à inclure les lectures synchronisées depuis vos autres appareils.";
 "Scrobble from Listening History" = "Scrobbler depuis l’historique d’écoute";
 "When off, FastScrobbler won’t import or scrobble plays from your Music app Listening History." = "Lorsque cette option est désactivée, FastScrobbler n’importe ni ne scrobble les lectures depuis l’historique d’écoute de l’app Musique.";
 "Listening History scrobbling is turned off." = "Le scrobbling depuis l’historique d’écoute est désactivé.";
@@ -207,7 +207,6 @@
 "View Profile in Last.fm" = "Voir le profil sur Last.fm";
 "When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "Quand macOS vous demande d’autoriser FastScrobbler à contrôler Musique, cliquez sur Autoriser. Cela permet à FastScrobbler de lire ce qui est joué pour le scrobbling.";
 "You’re signed out of Last.fm." = "Vous êtes déconnecté de Last.fm.";
-"all devices" = "tous les appareils";
 "interrupted" = "interrompu";
 "loved" = "aimé";
 "now playing sent" = "lecture en cours envoyée";
@@ -218,7 +217,6 @@
 "seeking backward" = "recherche vers l’arrière";
 "seeking forward" = "recherche vers l’avant";
 "stopped" = "arrêté";
-"this device only" = "cet appareil uniquement";
 "unknown" = "inconnu";
 "Previous Versions" = "Versions précédentes";
 "View Previous Versions" = "Voir les versions précédentes";
@@ -251,8 +249,9 @@
 "Blank" = "Vide";
 "Replace with" = "Remplacer par";
 "Song" = "Morceau";
-"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "Cette option est actuellement indisponible en raison de problèmes affectant la fiabilité du scrobbling depuis l'historique d'écoute.";
 "This will restore all settings to their defaults." = "Cela restaurera tous les réglages à leurs valeurs par défaut.";
+"Extended History Scan" = "Analyse étendue de l’historique";
+"When off, \"Scan Listening History\" checks the past 36 hours. When on, \"Scan Listening History\" checks the past 7 days. Automatic scans still use 36 hours." = "Lorsque cette option est désactivée, « Analyser l’historique d’écoute » vérifie les 36 dernières heures. Lorsqu’elle est activée, « Analyser l’historique d’écoute » vérifie les 7 derniers jours. Les analyses automatiques utilisent toujours 36 heures.";
 "Scrobble looped tracks" = "Scrobbler les morceaux en boucle";
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "Scrobble à nouveau le même morceau lorsqu'il boucle ou redémarre. Activez cette option si vous rejouez des morceaux et souhaitez que chaque écoute soit comptabilisée.";
 "View Pro features" = "Voir les fonctionnalités Pro";

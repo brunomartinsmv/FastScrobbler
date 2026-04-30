@@ -80,15 +80,21 @@ func runSettingsDefaultsTests() {
         "FastScrobbler.Pro.preventDuplicateScrobblesEnabled",
         "FastScrobbler.Pro.scrobbleLoopedTracksEnabled",
         "FastScrobbler.App.scrobbleListeningHistoryEnabled",
-        "FastScrobbler.Pro.scrobbleListeningHistoryFromAllDevicesEnabled",
+        "FastScrobbler.App.extendedListeningHistoryScanEnabled",
         "FastScrobbler.Pro.textReplacementRules",
     ]
 
     expect("reset clears scrobbleLoopedTracksEnabled", resetClearedKeys.contains("FastScrobbler.Pro.scrobbleLoopedTracksEnabled"))
+    expect("reset clears extendedListeningHistoryScanEnabled", resetClearedKeys.contains("FastScrobbler.App.extendedListeningHistoryScanEnabled"))
     expect("reset clears textReplacementRules", resetClearedKeys.contains("FastScrobbler.Pro.textReplacementRules"))
 
     let iOSLoopedTracksAfterReset = false
     expectEqual("iOS reset restores looped-track scrobbling default", iOSLoopedTracksAfterReset, false)
+
+    let extendedListeningHistoryScanDefault = false
+    let iOSExtendedListeningHistoryScanAfterReset = false
+    expectEqual("extended Listening History scan defaults off", extendedListeningHistoryScanDefault, false)
+    expectEqual("iOS reset restores extended Listening History scan default", iOSExtendedListeningHistoryScanAfterReset, extendedListeningHistoryScanDefault)
 
     let builtInRulesAfterReset: [(find: String, replace: String, enabled: Bool)] = [
         ("- Single", "", false),

@@ -98,62 +98,6 @@ func runBacklogTests() {
     expect("playback-history exact duplicate accepted", added5 && added6)
     expect("queue has 5 items (not 6)",                 bq.count == 5, detail: "got \(bq.count)")
 
-    // ─── Log merge identity ─────────────────────────────────────────────────────
-    // Replicates ScrobbleLogStore.load() merge semantics using stable entry IDs.
-
-    section("Scrobble Log · Merge preserves same-minute playback-history duplicates")
-
-    struct FakeLogEntry {
-        let id: String
-        let key: String
-        let ts: Int
-        let scrobbledAt: Int
-    }
-
-    func mergeLogEntries(shared: [FakeLogEntry], legacy: [FakeLogEntry]) -> [FakeLogEntry] {
-        var map: [String: FakeLogEntry] = [:]
-        for entry in shared {
-            map[entry.id] = entry
-        }
-        for entry in legacy {
-            if let existing = map[entry.id] {
-                if entry.scrobbledAt > existing.scrobbledAt {
-                    map[entry.id] = entry
-                }
-            } else {
-                map[entry.id] = entry
-            }
-        }
-        return Array(map.values)
-    }
-
-    let mergedSameMinute = mergeLogEntries(
-        shared: [
-            FakeLogEntry(id: "a", key: "track-a", ts: 4_000, scrobbledAt: 10),
-            FakeLogEntry(id: "b", key: "track-a", ts: 4_000, scrobbledAt: 11),
-        ],
-        legacy: []
-    )
-    expectEqual("distinct IDs with the same track and timestamp are preserved", mergedSameMinute.count, 2)
-
-    let mergedSameID = mergeLogEntries(
-        shared: [FakeLogEntry(id: "same", key: "track-a", ts: 4_000, scrobbledAt: 10)],
-        legacy: [FakeLogEntry(id: "same", key: "track-a", ts: 4_000, scrobbledAt: 12)]
-    )
-    expectEqual("same ID collapses to one merged entry", mergedSameID.count, 1)
-    expectEqual("same ID keeps the newer scrobbledAt value", mergedSameID.first?.scrobbledAt ?? -1, 12)
-
-    section("Scrobble Log · Display timestamp source")
-
-    func displayTimestamp(source: String, startTimestamp: Int, scrobbledAt: Int) -> Int {
-        if source == "playbackHistory" {
-            return startTimestamp
-        }
-        return scrobbledAt
-    }
-
-    expectEqual("playback-history rows display Apple's played timestamp", displayTimestamp(source: "playbackHistory", startTimestamp: 5_000, scrobbledAt: 6_000), 5_000)
-    expectEqual("live rows still display submission time", displayTimestamp(source: "live", startTimestamp: 5_000, scrobbledAt: 6_000), 6_000)
 }
 
 func runBacklogTimestampPreservationTests() {

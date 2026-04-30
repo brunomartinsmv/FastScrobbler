@@ -23,6 +23,7 @@ struct ContentView: View {
     @State private var currentDate: Date = .now
     // See iOS ContentView — secondTick drives per-second re-renders of time-sensitive views.
     @State private var secondTick: Int = 0
+    @State private var lastScrobbleLogRefreshDate: Date = .distantPast
     @State private var errorText: String?
     @State private var isShowingSetup = false
     @State private var isShowingWhatsNew = false
@@ -40,30 +41,22 @@ struct ContentView: View {
         // scenePhase doesn't fire reliably for popover-style menu bar apps, so we refresh
         // permissions each time the popover is about to become visible instead.
         .onReceive(NotificationCenter.default.publisher(for: .fastScrobblerPopoverWillShow)) { _ in
+            refreshScrobbleLogDisplay(now: .now, forceReload: true)
             refreshPermissionStatusesIfNeeded()
         }
         .onAppear {
+            refreshScrobbleLogDisplay(now: .now, forceReload: true)
             refreshPermissionStatusesIfNeeded()
-            presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
         }
         .onValueChange(of: scenePhase) { phase in
             guard phase == .active else { return }
+            refreshScrobbleLogDisplay(now: .now, forceReload: true)
             refreshPermissionStatusesIfNeeded()
-            presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
-            if hasSeenSetup {
-                Task { @MainActor in
-                    AppModel.shared.startIfNeeded()
-                }
-            }
         }
         .onValueChange(of: observer.authorizationStatus) { _ in
             refreshPermissionStatusesIfNeeded()
-            presentSetupIfNeeded()
-        }
-        .onValueChange(of: permissions.automationStatus) { _ in
-            presentSetupIfNeeded()
         }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
             guard hasSeenSetup else { return }
@@ -102,7 +95,7 @@ struct ContentView: View {
                 .padding(.trailing, 10)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            secondTick &+= 1
+            handleTimerTick(now: .now)
         }
         .navigationTitle("")
         .toolbar {}
@@ -420,7 +413,7 @@ struct ContentView: View {
                 Text("No scrobbles yet.")
                     .foregroundColor(.secondary)
             } else {
-                let entries = Array(scrobbleLog.entries.prefix(30))
+                let entries = scrobbleLog.recentEntries()
                 VStack(spacing: 10) {
                     ForEach(entries) { entry in
                         ScrobbleLogRowView(
@@ -438,9 +431,6 @@ struct ContentView: View {
         .background(.thinMaterial)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
-            currentDate = date
-        }
     }
 
     private func connectTapped() async {
@@ -452,6 +442,18 @@ struct ContentView: View {
             if error is CancellationError { return }
             errorText = error.localizedDescription
         }
+    }
+
+    private func handleTimerTick(now: Date) {
+        secondTick &+= 1
+        refreshScrobbleLogDisplay(now: now)
+    }
+
+    private func refreshScrobbleLogDisplay(now: Date, forceReload: Bool = false) {
+        currentDate = now
+        guard forceReload || now.timeIntervalSince(lastScrobbleLogRefreshDate) >= 60 else { return }
+        scrobbleLog.reload()
+        lastScrobbleLogRefreshDate = now
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
@@ -493,6 +495,7 @@ struct ContentView: View {
         Task { @MainActor in
             await permissions.refreshNow(observer: observer)
             observer.refreshOnceIfAuthorized()
+            presentSetupIfNeeded()
 
             if hasSeenSetup, auth.sessionKey != nil, permissions.automationStatus == .authorized {
                 AppModel.shared.startIfNeeded()

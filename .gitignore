@@ -9,3 +9,6 @@ FastScrobbler.xcodeproj
 AppIcon.icon
 Pro.swift
 FastScrobbler/Resources/Assets.xcassets/AppIcon.appiconset/
+FastScrobbler/Scrobble/ScrobbleEngine.swift
+FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
+FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift

@@ -16,7 +16,7 @@
 "Engine: " = "Motor: ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "General";
-"Imports plays from your Music app Listening History (%@)." = "Importa reproducciones del historial de reproducción de la app Música (%@).";
+"Import recent plays from your Music app Listening History." = "Importar reproducciones recientes del historial de reproducción de la app Música.";
 "Last.fm" = "Last.fm";
 "Listening History" = "Historial de reproducción";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "Las Actividades en Vivo están desactivadas en Ajustes de iOS para FastScrobbler.";
@@ -56,7 +56,6 @@
 "Reset Settings?" = "¿Restablecer ajustes?";
 "Scrobble at %@ of duration" = "Hacer scrobble al %@ de la duración";
 "Scrobble Controls" = "Controles de scrobble";
-"Scrobble Listening History from all devices" = "Hacer scrobble del historial de reproducción de todos los dispositivos";
 "Scrobble Now" = "Hacer scrobble ahora";
 "Settings" = "Ajustes";
 "Setup" = "Configuración";
@@ -191,7 +190,6 @@
 "View Profile in Last.fm" = "Ver perfil en Last.fm";
 "When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "Cuando macOS te pida permitir que FastScrobbler controle Música, pulsa Permitir. Esto permite que FastScrobbler lea lo que se está reproduciendo para hacer scrobbling.";
 "You’re signed out of Last.fm." = "Has cerrado sesión en Last.fm.";
-"all devices" = "todos los dispositivos";
 "interrupted" = "interrumpido";
 "loved" = "loved";
 "now playing sent" = "en reproducción enviado";
@@ -202,7 +200,6 @@
 "seeking backward" = "buscando hacia atrás";
 "seeking forward" = "buscando hacia delante";
 "stopped" = "detenido";
-"this device only" = "solo este dispositivo";
 "unknown" = "desconocido";
 "What's New" = "Novedades";
 
@@ -233,7 +230,6 @@
 "Blank" = "En blanco";
 "Replace with" = "Reemplazar con";
 "Song" = "Canción";
-"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "Esta opción no está disponible actualmente debido a problemas que afectan a la fiabilidad del scrobbling desde el Historial de reproducción.";
 "This will restore all settings to their defaults." = "Esto restaurará todos los ajustes a sus valores predeterminados.";
 "Scrobble looped tracks" = "Scrobble de canciones en bucle";
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "Vuelve a hacer scrobble de la misma pista cuando se repite o reinicia. Actívalo si vuelves a escuchar canciones y quieres que cada escucha cuente.";

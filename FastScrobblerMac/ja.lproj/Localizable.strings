@@ -16,7 +16,7 @@
 "Engine: " = "エンジン: ";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "一般";
-"Imports plays from your Music app Listening History (%@)." = "ミュージックアプリの再生履歴（%@）から再生を取り込みます。";
+"Import recent plays from your Music app Listening History." = "ミュージックアプリの再生履歴から最近の再生を取り込みます。";
 "Last.fm" = "Last.fm";
 "Listening History" = "再生履歴";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobblerのライブアクティビティがiOSの設定で無効になっています。";
@@ -56,7 +56,6 @@
 "Reset Settings?" = "設定をリセットしますか？";
 "Scrobble at %@ of duration" = "%@再生時点でスクロブル";
 "Scrobble Controls" = "スクロブル設定";
-"Scrobble Listening History from all devices" = "すべてのデバイスの再生履歴をスクロブル";
 "Scrobble Now" = "今すぐスクロブル";
 "Settings" = "設定";
 "Setup" = "セットアップ";
@@ -189,7 +188,6 @@
 "View Profile in Last.fm" = "Last.fmでプロフィールを見る";
 "When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "macOSがFastScrobblerによるミュージックの操作を許可するか尋ねたら、「許可」をクリックしてください。これにより再生中の情報を読み取ってスクロブルできます。";
 "You’re signed out of Last.fm." = "Last.fmからサインアウトしています。";
-"all devices" = "すべてのデバイス";
 "interrupted" = "中断";
 "loved" = "Loved";
 "now playing sent" = "再生中を送信済み";
@@ -200,7 +198,6 @@
 "seeking backward" = "巻き戻し中";
 "seeking forward" = "早送り中";
 "stopped" = "停止";
-"this device only" = "このデバイスのみ";
 "unknown" = "不明";
 "What's New" = "新機能";
 
@@ -231,7 +228,6 @@
 "Blank" = "空白";
 "Replace with" = "置換後";
 "Song" = "曲";
-"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "再生履歴からのスクロブルの信頼性に影響する問題のため、このトグルは現在利用できません。";
 "This will restore all settings to their defaults." = "すべての設定をデフォルト値に戻します。";
 "Scrobble looped tracks" = "ループした曲をスクロブル";
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "曲がループまたは再スタートしたときに再度スクロブルします。曲を繰り返し聴いて各回をカウントしたい場合はオンにしてください。";

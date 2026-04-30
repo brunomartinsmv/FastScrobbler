@@ -18,12 +18,18 @@ enum AppGroup {
 enum AppSettings {
     enum Keys {
         static let scrobbleListeningHistoryEnabled = "FastScrobbler.App.scrobbleListeningHistoryEnabled"
+        static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
     }
 
     static func scrobbleListeningHistoryEnabled() -> Bool {
         // nil means the key was never written; default to enabled.
         if AppGroup.userDefaults.object(forKey: Keys.scrobbleListeningHistoryEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleListeningHistoryEnabled)
+    }
+
+    static func extendedListeningHistoryScanEnabled() -> Bool {
+        if AppGroup.userDefaults.object(forKey: Keys.extendedListeningHistoryScanEnabled) == nil { return false }
+        return AppGroup.userDefaults.bool(forKey: Keys.extendedListeningHistoryScanEnabled)
     }
 }
 
@@ -63,7 +69,6 @@ enum ProSettings {
         static let removeAllBracketsFromAlbumTitlesEnabled = "FastScrobbler.Pro.removeAllBracketsFromAlbumTitlesEnabled"
         static let removeBracketsFromAlbumTitleKeywords = "FastScrobbler.Pro.removeBracketsFromAlbumTitleKeywords"
         static let preventDuplicateScrobblesEnabled = "FastScrobbler.Pro.preventDuplicateScrobblesEnabled"
-        static let scrobbleListeningHistoryFromAllDevicesEnabled = "FastScrobbler.Pro.scrobbleListeningHistoryFromAllDevicesEnabled"
         static let textReplacementRules = "FastScrobbler.Pro.textReplacementRules"
     }
 
@@ -134,12 +139,6 @@ enum ProSettings {
         // Default to true — safer to skip a duplicate scrobble than to send one.
         if AppGroup.userDefaults.object(forKey: Keys.preventDuplicateScrobblesEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.preventDuplicateScrobblesEnabled)
-    }
-
-    static func scrobbleListeningHistoryFromAllDevicesEnabled() -> Bool {
-        guard ProEntitlement.isPro else { return false }
-        if AppGroup.userDefaults.object(forKey: Keys.scrobbleListeningHistoryFromAllDevicesEnabled) == nil { return false }
-        return AppGroup.userDefaults.bool(forKey: Keys.scrobbleListeningHistoryFromAllDevicesEnabled)
     }
 
     static func scrobbleThresholdFraction() -> Double {

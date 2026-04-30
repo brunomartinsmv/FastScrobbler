@@ -44,10 +44,7 @@ struct ManualScrobbleView: View {
     }
 
     private var manualLogEntries: [ScrobbleLogStore.Entry] {
-        scrobbleLog.entries
-            .filter { $0.source == .manual }
-            .prefix(30)
-            .map { $0 }
+        scrobbleLog.manualEntries()
     }
 
     var body: some View {

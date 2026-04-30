@@ -103,6 +103,150 @@ func runListeningHistoryRecoveryTests() {
     )
     expect("unknown-duration first sighting falls back to Apple's timestamp", unknownDurationStarts == [3_000], detail: "got \(unknownDurationStarts)")
 
+    section("Listening History · Edge cases")
+
+    func productionPlaybackHistoryStartTimestamps(
+        playedAt: Int,
+        playCount: Int,
+        durationSeconds: Double?
+    ) -> [Int] {
+        let count = max(playCount, 1)
+
+        if let durationSeconds, durationSeconds > 0 {
+            let spacingSeconds = max(Int(durationSeconds.rounded(.down)), 1)
+            return (0..<count).map { index in
+                max(1, playedAt - spacingSeconds * (count - index))
+            }
+        }
+
+        guard count > 1 else { return [max(1, playedAt)] }
+
+        return (0..<count).map { index in
+            max(1, playedAt - (count - index - 1))
+        }
+    }
+
+    expectEqual(
+        "zero playCount is clamped to one import candidate",
+        productionPlaybackHistoryStartTimestamps(playedAt: 500, playCount: 0, durationSeconds: 30),
+        [470]
+    )
+    expectEqual(
+        "negative playCount is clamped to one import candidate",
+        productionPlaybackHistoryStartTimestamps(playedAt: 500, playCount: -4, durationSeconds: 30),
+        [470]
+    )
+    expectEqual(
+        "fractional durations are rounded down before spacing recovered plays",
+        productionPlaybackHistoryStartTimestamps(playedAt: 1_000, playCount: 3, durationSeconds: 30.9),
+        [910, 940, 970]
+    )
+    expectEqual(
+        "sub-second positive durations still space candidates at least one second apart",
+        productionPlaybackHistoryStartTimestamps(playedAt: 10, playCount: 3, durationSeconds: 0.4),
+        [7, 8, 9]
+    )
+    expectEqual(
+        "known-duration candidates are clamped to valid Last.fm timestamps",
+        productionPlaybackHistoryStartTimestamps(playedAt: 2, playCount: 3, durationSeconds: 5),
+        [1, 1, 1]
+    )
+    expectEqual(
+        "unknown-duration recovered candidates are clamped near the Unix epoch",
+        productionPlaybackHistoryStartTimestamps(playedAt: 2, playCount: 5, durationSeconds: nil),
+        [1, 1, 1, 1, 2]
+    )
+
+    func playbackHistoryPlayedAt(
+        startTimestamp: Int,
+        originalPlayedAt: Int,
+        durationSeconds: Double?
+    ) -> Int {
+        guard let durationSeconds, durationSeconds > 0 else {
+            return originalPlayedAt
+        }
+
+        return startTimestamp + max(Int(durationSeconds.rounded(.down)), 1)
+    }
+
+    expectEqual(
+        "candidate playedAt uses synthesized end time when duration is known",
+        playbackHistoryPlayedAt(startTimestamp: 970, originalPlayedAt: 1_000, durationSeconds: 30.9),
+        1_000
+    )
+    expectEqual(
+        "candidate playedAt preserves Apple's timestamp when duration is unknown",
+        playbackHistoryPlayedAt(startTimestamp: 999, originalPlayedAt: 1_050, durationSeconds: nil),
+        1_050
+    )
+    expectEqual(
+        "candidate playedAt uses at least one-second duration for tiny positive durations",
+        playbackHistoryPlayedAt(startTimestamp: 9, originalPlayedAt: 10, durationSeconds: 0.4),
+        10
+    )
+
+    struct FakeHistoryCandidate {
+        let artist: String?
+        let title: String?
+        let playedAt: Int
+        let previousSeenPlayedAt: Int?
+        let playCount: Int
+        let previousPlayCount: Int?
+    }
+
+    func shouldImportPlaybackHistoryCandidate(_ candidate: FakeHistoryCandidate, fetchCutoff: Int) -> Bool {
+        let artist = candidate.artist ?? ""
+        let title = candidate.title ?? ""
+        guard !artist.isEmpty, !title.isEmpty else { return false }
+
+        let playCutoff: Int = {
+            if let previousSeenPlayedAt = candidate.previousSeenPlayedAt {
+                return max(fetchCutoff, previousSeenPlayedAt)
+            }
+            return fetchCutoff
+        }()
+        let hasNewPlayedAt = candidate.playedAt > playCutoff
+        let hasCountIncreaseAtSamePlayedAt = candidate.previousSeenPlayedAt == candidate.playedAt &&
+            candidate.previousPlayCount.map { candidate.playCount > $0 } == true
+        return hasNewPlayedAt || hasCountIncreaseAtSamePlayedAt
+    }
+
+    expect(
+        "blank artist is skipped before cursor state changes",
+        !shouldImportPlaybackHistoryCandidate(
+            FakeHistoryCandidate(artist: "", title: "Song", playedAt: 2_001, previousSeenPlayedAt: nil, playCount: 1, previousPlayCount: nil),
+            fetchCutoff: 2_000
+        )
+    )
+    expect(
+        "blank title is skipped before cursor state changes",
+        !shouldImportPlaybackHistoryCandidate(
+            FakeHistoryCandidate(artist: "Artist", title: nil, playedAt: 2_001, previousSeenPlayedAt: nil, playCount: 1, previousPlayCount: nil),
+            fetchCutoff: 2_000
+        )
+    )
+    expect(
+        "play exactly at cutoff is skipped without a same-playedAt count increase",
+        !shouldImportPlaybackHistoryCandidate(
+            FakeHistoryCandidate(artist: "Artist", title: "Song", playedAt: 2_000, previousSeenPlayedAt: nil, playCount: 2, previousPlayCount: 1),
+            fetchCutoff: 2_000
+        )
+    )
+    expect(
+        "per-track cursor can skip an older backfilled play after global fetch cutoff",
+        !shouldImportPlaybackHistoryCandidate(
+            FakeHistoryCandidate(artist: "Artist", title: "Song", playedAt: 2_100, previousSeenPlayedAt: 2_200, playCount: 5, previousPlayCount: 4),
+            fetchCutoff: 2_000
+        )
+    )
+    expect(
+        "same playedAt with increased count is imported even at the per-track cursor",
+        shouldImportPlaybackHistoryCandidate(
+            FakeHistoryCandidate(artist: "Artist", title: "Song", playedAt: 2_200, previousSeenPlayedAt: 2_200, playCount: 5, previousPlayCount: 4),
+            fetchCutoff: 2_000
+        )
+    )
+
     func shouldAdvancePlaybackHistoryCursor(candidateCount: Int, importedBeforeTrack: Int, maxItems: Int) -> Bool {
         var importedCount = importedBeforeTrack
         var processedAllCandidateTimestamps = true
@@ -166,7 +310,7 @@ func runListeningHistoryRecoveryTests() {
             let directPlayedAtMatch = abs(item.startTimestamp - playedAt) <= playedTol
 
             switch item.style {
-            case "history", "manual":
+            case "history", "manual", "recentlyPlayed":
                 return exactMatch || directPlayedAtMatch
             case "live":
                 guard let durationSeconds = item.durationSeconds else { return exactMatch || directPlayedAtMatch }
@@ -221,6 +365,46 @@ func runListeningHistoryRecoveryTests() {
     }.count
     expectEqual("re-running import sees every synthesized timestamp already present", existingCandidateMatches, 3)
     expectEqual("re-running import does not enqueue more when counts already match", max(0, 3 - existingCandidateMatches), 0)
+
+    let edgeOriginMatches = [
+        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_000, durationSeconds: 200, style: "manual"),
+        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_200, durationSeconds: 200, style: "manual"),
+        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_400, durationSeconds: 200, style: "recentlyPlayed"),
+        FakeHistoryMatch(dedupeKey: "track-b", startTimestamp: 4_000, durationSeconds: 200, style: "history"),
+        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_600, durationSeconds: nil, style: "live")
+    ]
+    expectEqual(
+        "manual and recently-played direct timestamp matches suppress playback-history imports",
+        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_200, playedAt: 4_200, exactTolerance: 3, playedTolerance: 0),
+        1
+    )
+    expectEqual(
+        "dedupe key mismatch never suppresses a listening-history import",
+        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-b", startTimestamp: 4_200, playedAt: 4_200, exactTolerance: 3, playedTolerance: 0),
+        0
+    )
+    expectEqual(
+        "live items without duration do not end-match a playback-history playedAt timestamp",
+        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_410, playedAt: 4_610, exactTolerance: 3, playedTolerance: 0),
+        0
+    )
+    expectEqual(
+        "negative duplicate tolerances behave as zero",
+        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_001, playedAt: 4_001, exactTolerance: -10, playedTolerance: -10),
+        0
+    )
+    expectEqual(
+        "direct playedAt matching can be enabled for origin-less legacy backlog rows",
+        playbackHistoryImportMatchCount(
+            items: [FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_210, durationSeconds: nil, style: "legacy")],
+            key: "track-a",
+            startTimestamp: 4_000,
+            playedAt: 4_210,
+            exactTolerance: 3,
+            playedTolerance: 0
+        ),
+        1
+    )
 
     // ─── Dedup nearest-match selection ────────────────────────────────────────────
 }

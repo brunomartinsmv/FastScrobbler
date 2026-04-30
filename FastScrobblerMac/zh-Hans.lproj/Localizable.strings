@@ -16,7 +16,7 @@
 "Engine: " = "引擎：";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "通用";
-"Imports plays from your Music app Listening History (%@)." = "从音乐 App 播放历史记录（%@）导入播放记录。";
+"Import recent plays from your Music app Listening History." = "从音乐 App 播放历史记录导入最近播放记录。";
 "Last.fm" = "Last.fm";
 "Listening History" = "播放历史";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobbler 的实时活动已在 iOS 设置中关闭。";
@@ -56,7 +56,6 @@
 "Reset Settings?" = "要重置设置吗？";
 "Scrobble at %@ of duration" = "在播放到 %@ 时 scrobble";
 "Scrobble Controls" = "Scrobble 控制";
-"Scrobble Listening History from all devices" = "从所有设备的播放历史中 scrobble";
 "Scrobble Now" = "立即 Scrobble";
 "Settings" = "设置";
 "Setup" = "设置向导";
@@ -192,7 +191,6 @@
 "View Profile in Last.fm" = "在 Last.fm 中查看个人资料";
 "When macOS asks to let FastScrobbler control Music, click Allow. This lets FastScrobbler read what’s playing for scrobbling." = "当 macOS 请求允许 FastScrobbler 控制\"音乐\"时，请点击\"允许\"。这样 FastScrobbler 才能读取当前播放内容并进行 scrobble。";
 "You’re signed out of Last.fm." = "你已退出 Last.fm 登录。";
-"all devices" = "所有设备";
 "interrupted" = "已中断";
 "loved" = "Loved";
 "now playing sent" = "已发送正在播放";
@@ -203,7 +201,6 @@
 "seeking backward" = "向后拖动";
 "seeking forward" = "向前拖动";
 "stopped" = "已停止";
-"this device only" = "仅此设备";
 "unknown" = "未知";
 "What's New" = "新功能";
 
@@ -234,7 +231,6 @@
 "Blank" = "空白";
 "Replace with" = "替换为";
 "Song" = "歌曲";
-"This toggle is currently unavailable due to issues affecting the reliability of scrobbling from Listening History." = "由于影响播放历史 scrobble 可靠性的问题，此开关目前不可用。";
 "This will restore all settings to their defaults." = "这将把所有设置恢复为默认值。";
 "Scrobble looped tracks" = "Scrobble 循环曲目";
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "当曲目循环或重新开始时再次 scrobble。如果你会重播歌曲并希望每次收听都被计算，请开启此功能。";

@@ -57,7 +57,9 @@ struct WhatsNewView: View {
         let showsProBadge: Bool
     }
 
-    private let currentSections: [VersionSection] = [
+    private let currentSections: [VersionSection] = []
+
+    private let previousSections: [VersionSection] = [
         VersionSection(
             id: "4.0",
             version: "4.0",
@@ -78,10 +80,7 @@ struct WhatsNewView: View {
                     showsProBadge: false
                 )
             ]
-        )
-    ]
-
-    private let previousSections: [VersionSection] = [
+        ),
         VersionSection(
             id: "3.3",
             version: "3.3",
@@ -136,17 +135,6 @@ struct WhatsNewView: View {
                 )
             ]
         )
-        // VersionSection(
-        //     id: "1.2",
-        //     version: "1.2",
-        //     features: [
-        //         Feature(
-        //             systemImage: "clock.arrow.circlepath",
-        //             title: "\"Scrobble Listening History from all devices\" feature",
-        //             showsProBadge: true
-        //         )
-        //     ]
-        // )
     ]
 
     let onContinue: () -> Void

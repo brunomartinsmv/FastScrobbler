@@ -3,6 +3,13 @@ import OSLog
 
 @MainActor
 final class ScrobbleLogStore: ObservableObject {
+    enum Limits {
+        static let maxStoredEntries = 200
+        static let defaultDisplayLimit = 40
+        static let manualDisplayLimit = 30
+        static let maxEntryAge: TimeInterval = 45 * 24 * 60 * 60
+    }
+
     enum Source: String, Codable, Sendable {
         case live
         case backlog
@@ -25,10 +32,17 @@ final class ScrobbleLogStore: ObservableObject {
     @Published private(set) var entries: [Entry] = []
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "ScrobbleLogStore")
-    private let maxEntries = 200
 
     private init() {
         load()
+    }
+
+    func recentEntries(limit: Int = Limits.defaultDisplayLimit) -> [Entry] {
+        Array(entries.prefix(max(0, limit)))
+    }
+
+    func manualEntries(limit: Int = Limits.manualDisplayLimit) -> [Entry] {
+        Array(entries.filter { $0.source == .manual }.prefix(max(0, limit)))
     }
 
     func record(
@@ -53,10 +67,8 @@ final class ScrobbleLogStore: ObservableObject {
             return
         }
 
-        entries.insert(entry, at: 0)
-        if entries.count > maxEntries {
-            entries.removeLast(entries.count - maxEntries)
-        }
+        entries.append(entry)
+        normalizeEntries(now: Date())
         save()
     }
 
@@ -158,10 +170,10 @@ final class ScrobbleLogStore: ObservableObject {
 
             var map: [String: Entry] = [:]
             for e in sharedEntries {
-                map[e.id.uuidString] = e
+                map[mergeIdentity(for: e)] = e
             }
             for e in legacyEntries {
-                let key = e.id.uuidString
+                let key = mergeIdentity(for: e)
                 if let existing = map[key] {
                     if e.scrobbledAt > existing.scrobbledAt {
                         map[key] = e
@@ -171,25 +183,21 @@ final class ScrobbleLogStore: ObservableObject {
                 }
             }
 
-            var merged = Array(map.values)
-            merged.sort(by: { $0.startTimestamp > $1.startTimestamp })
-            if merged.count > maxEntries {
-                merged.removeLast(merged.count - maxEntries)
-            }
-            entries = merged
+            entries = normalizedEntries(Array(map.values), now: Date())
 
             // Persist into the shared container so app + extensions share the same dedupe history.
             do {
-                try persist(merged, preferredURL: sharedURL, fallbackURL: legacyURL)
+                try persist(entries, preferredURL: sharedURL, fallbackURL: legacyURL)
             } catch {
                 logger.warning("failed to persist merged scrobble log: \(error.localizedDescription, privacy: .public)")
             }
         } else {
-            entries = readEntries(from: legacyURL)
+            entries = normalizedEntries(readEntries(from: legacyURL), now: Date())
         }
     }
 
     private func save() {
+        normalizeEntries(now: Date())
         do {
             try persist(entries, preferredURL: sharedFileURL(), fallbackURL: legacyFileURL())
         } catch {
@@ -204,6 +212,29 @@ final class ScrobbleLogStore: ObservableObject {
             return Int(candidate.rounded(.down))
         }
         return nil
+    }
+
+    private func normalizeEntries(now: Date) {
+        entries = normalizedEntries(entries, now: now)
+    }
+
+    private func normalizedEntries(_ entries: [Entry], now: Date) -> [Entry] {
+        let cutoff = now.addingTimeInterval(-Limits.maxEntryAge)
+        var normalized = entries.filter { $0.scrobbledAt >= cutoff }
+        normalized.sort {
+            if $0.scrobbledAt == $1.scrobbledAt {
+                return $0.startTimestamp > $1.startTimestamp
+            }
+            return $0.scrobbledAt > $1.scrobbledAt
+        }
+        if normalized.count > Limits.maxStoredEntries {
+            normalized.removeLast(normalized.count - Limits.maxStoredEntries)
+        }
+        return normalized
+    }
+
+    private func mergeIdentity(for entry: Entry) -> String {
+        "\(entry.source.rawValue)|\(entry.track.dedupeKey)|\(entry.startTimestamp)"
     }
 
     private func matchesPlaybackHistoryImport(

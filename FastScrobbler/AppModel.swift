@@ -25,6 +25,15 @@ final class AppModel {
         static let maxFlushBatches = 80
     }
 
+    private enum LiveBackgroundScrobbling {
+        static let tickIntervalSeconds: TimeInterval = 4
+        static let backlogFlushIntervalSeconds: TimeInterval = 30
+        static let backgroundTimeSafetyMarginSeconds: TimeInterval = 2
+        static let backgroundLastChanceWindowSeconds: TimeInterval = 18
+        static let backgroundProjectionWindowSeconds: TimeInterval = 30
+        static let inactivePlaybackToleranceSeconds: TimeInterval = 8
+    }
+
     let auth: LastFMAuthManager
     let observer: AppleMusicNowPlayingObserver
     let engine: ScrobbleEngine
@@ -32,6 +41,7 @@ final class AppModel {
     let scrobbleLog: ScrobbleLogStore
 
     private var startTask: Task<Void, Never>?
+    private var liveBackgroundScrobbleTask: Task<Void, Never>?
 
     private init() {
         let auth = LastFMAuthManager()
@@ -115,7 +125,9 @@ final class AppModel {
     }
 
     func handleWillEnterForeground() {
+        stopLiveBackgroundScrobbleLoop()
         BackgroundTaskManager.shared.endLiveScrobbleGracePeriod()
+        observer.resumePolling()
         UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
         if #available(iOS 16.2, *) {
             LiveActivityManager.shared.clearEnteredBackground()
@@ -126,6 +138,7 @@ final class AppModel {
         let backgroundedAt = Date()
         UserDefaults.standard.set(backgroundedAt, forKey: Keys.lastEnteredBackgroundAt)
         LiveActivityManager.shared.recordEnteredBackground(at: backgroundedAt)
+        stopLiveBackgroundScrobbleLoop()
 
         let shouldKeepLiveScrobbling =
             UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) &&
@@ -141,9 +154,18 @@ final class AppModel {
                 await self?.finishBackgroundGracePeriodIfNeeded()
             }
             if !started {
+                observer.suspendPolling()
                 engine.pauseForBackground()
+            } else {
+                observer.suspendPolling()
+                engine.pauseForBackground()
+                Task { @MainActor [weak self] in
+                    await self?.performImmediateBackgroundScrobbleCheck()
+                }
+                startLiveBackgroundScrobbleLoop()
             }
         } else {
+            observer.suspendPolling()
             engine.pauseForBackground()
         }
 
@@ -157,10 +179,107 @@ final class AppModel {
     func finishBackgroundGracePeriodIfNeeded() async {
         guard UserDefaults.standard.object(forKey: Keys.lastEnteredBackgroundAt) != nil else { return }
 
+        stopLiveBackgroundScrobbleLoop()
         await engine.tickAsync()
         engine.pauseForBackground()
         BackgroundTaskManager.shared.scheduleAppRefresh()
         BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
+    }
+
+    private func performImmediateBackgroundScrobbleCheck() async {
+        guard shouldContinueLiveBackgroundScrobbling() else { return }
+
+        observer.refreshOnceIfAuthorized()
+        await engine.tickAsync()
+        BackgroundTaskManager.shared.recordLiveScrobbleGraceProjectionAttempt()
+        _ = await engine.attemptProjectedBackgroundScrobble(
+            maxProjectionSeconds: LiveBackgroundScrobbling.backgroundProjectionWindowSeconds
+        )
+    }
+
+    private func startLiveBackgroundScrobbleLoop() {
+        stopLiveBackgroundScrobbleLoop()
+
+        liveBackgroundScrobbleTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            var lastBacklogFlushAt = Date.distantPast
+            var inactivePlaybackStartedAt: Date?
+
+            while !Task.isCancelled {
+                self.observer.refreshOnceIfAuthorized()
+
+                let now = Date()
+                if self.shouldContinueLiveBackgroundScrobbling() {
+                    inactivePlaybackStartedAt = nil
+                } else {
+                    let inactiveStartedAt = inactivePlaybackStartedAt ?? now
+                    inactivePlaybackStartedAt = inactiveStartedAt
+                    guard now.timeIntervalSince(inactiveStartedAt) < LiveBackgroundScrobbling.inactivePlaybackToleranceSeconds else {
+                        break
+                    }
+                }
+
+                await self.engine.tickAsync()
+                BackgroundTaskManager.shared.recordLiveScrobbleGraceProjectionAttempt()
+                _ = await self.engine.attemptProjectedBackgroundScrobble(
+                    maxProjectionSeconds: LiveBackgroundScrobbling.backgroundProjectionWindowSeconds
+                )
+
+                if now.timeIntervalSince(lastBacklogFlushAt) >= LiveBackgroundScrobbling.backlogFlushIntervalSeconds,
+                   let sessionKey = self.auth.sessionKey {
+                    await self.flushBacklogIfNeeded(sessionKey: sessionKey)
+                    lastBacklogFlushAt = now
+                }
+
+                let remainingBackgroundTime = BackgroundTaskManager.shared.liveScrobbleBackgroundTimeRemaining
+                if remainingBackgroundTime.isFinite,
+                   remainingBackgroundTime <= LiveBackgroundScrobbling.backgroundLastChanceWindowSeconds {
+                    let renewed = BackgroundTaskManager.shared.attemptLiveScrobbleGraceRenewalIfAllowed()
+
+                    if !renewed,
+                       remainingBackgroundTime <= LiveBackgroundScrobbling.backgroundTimeSafetyMarginSeconds {
+                        await BackgroundTaskManager.shared.expireLiveScrobbleGracePeriodBecauseBackgroundTimeIsNearlyExhausted(
+                            remaining: remainingBackgroundTime
+                        )
+                        return
+                    }
+                }
+
+                let currentRemainingBackgroundTime = BackgroundTaskManager.shared.liveScrobbleBackgroundTimeRemaining
+                if currentRemainingBackgroundTime.isFinite,
+                   currentRemainingBackgroundTime <= LiveBackgroundScrobbling.backgroundTimeSafetyMarginSeconds {
+                    await BackgroundTaskManager.shared.expireLiveScrobbleGracePeriodBecauseBackgroundTimeIsNearlyExhausted(
+                        remaining: currentRemainingBackgroundTime
+                    )
+                    return
+                }
+
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(LiveBackgroundScrobbling.tickIntervalSeconds * 1_000_000_000))
+                } catch {
+                    return
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+            await BackgroundTaskManager.shared.expireLiveScrobbleGracePeriodBecausePlaybackIsNoLongerActive()
+        }
+    }
+
+    private func stopLiveBackgroundScrobbleLoop() {
+        liveBackgroundScrobbleTask?.cancel()
+        liveBackgroundScrobbleTask = nil
+    }
+
+    private func shouldContinueLiveBackgroundScrobbling() -> Bool {
+        UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) &&
+            auth.sessionKey != nil &&
+            !engine.isUserPaused &&
+            engine.isRunning &&
+            observer.isRunning &&
+            observer.track != nil &&
+            observer.playbackState == .playing
     }
 
     func backgroundTick() async {
@@ -187,12 +306,13 @@ final class AppModel {
 
     /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
     @discardableResult
-    func scanListeningHistory(maxItems: Int = 200) async -> ListeningHistoryScanResult {
+    func scanListeningHistory(maxItems: Int = 200, allowExtendedLookback: Bool = false) async -> ListeningHistoryScanResult {
         guard AppSettings.scrobbleListeningHistoryEnabled() else {
             await purgePlaybackHistoryBacklogIfNeeded()
             return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0, skippedDuplicateCount: 0)
         }
 
+        let extendedLookback = allowExtendedLookback && AppSettings.extendedListeningHistoryScanEnabled()
         var totalImported = 0
         var totalSkippedDuplicates = 0
         if maxItems > 0 {
@@ -203,7 +323,8 @@ final class AppModel {
                 let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
                     backlog: backlog,
                     scrobbleLog: scrobbleLog,
-                    maxItems: batchLimit
+                    maxItems: batchLimit,
+                    mode: .recentBackfill(extendedLookback: extendedLookback)
                 )
                 let imported = importResult.importedCount
                 totalSkippedDuplicates += importResult.skippedDuplicateCount

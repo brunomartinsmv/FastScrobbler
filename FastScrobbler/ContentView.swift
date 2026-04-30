@@ -27,6 +27,7 @@ struct ContentView: View {
     // Incrementing secondTick every second forces SwiftUI to re-evaluate computed views
     // (statusCard, trackCard) that display live elapsed time without a dedicated @Published property.
     @State private var secondTick: Int = 0
+    @State private var lastScrobbleLogRefreshDate: Date = .distantPast
     @State private var errorText: String?
     @State private var isShowingSetup = false
     @State private var isShowingWhatsNew = false
@@ -59,12 +60,14 @@ struct ContentView: View {
 
         }
         .onAppear {
+            refreshScrobbleLogDisplay(now: .now, forceReload: true)
             refreshMediaLibraryStatusIfNeeded()
             presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
         }
         .onValueChange(of: scenePhase) { phase in
             guard phase == .active else { return }
+            refreshScrobbleLogDisplay(now: .now, forceReload: true)
             refreshMediaLibraryStatusIfNeeded()
             presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
@@ -160,7 +163,7 @@ struct ContentView: View {
             .ignoresSafeArea(edges: .top)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            secondTick &+= 1 // &+= wraps on overflow instead of crashing after ~68 years of uptime
+            handleTimerTick(now: .now)
         }
         .navigationTitle("")
     }
@@ -395,7 +398,7 @@ struct ContentView: View {
                 Text("No scrobbles yet.")
                     .foregroundColor(.secondary)
             } else {
-                let entries = Array(scrobbleLog.entries.prefix(30))
+                let entries = scrobbleLog.recentEntries()
                 VStack(spacing: 10) {
                     ForEach(entries) { entry in
                         ScrobbleLogRowView(
@@ -413,9 +416,6 @@ struct ContentView: View {
         .background(.thinMaterial)
         .cornerRadius(12)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
-        .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { date in
-            currentDate = date
-        }
     }
 
     private func connectTapped() async {
@@ -434,6 +434,19 @@ struct ContentView: View {
         await AppModel.shared.scanListeningHistory()
         scrobbleLog.reload()
         currentDate = .now
+        lastScrobbleLogRefreshDate = currentDate
+    }
+
+    private func handleTimerTick(now: Date) {
+        secondTick &+= 1 // &+= wraps on overflow instead of crashing after ~68 years of uptime
+        refreshScrobbleLogDisplay(now: now)
+    }
+
+    private func refreshScrobbleLogDisplay(now: Date, forceReload: Bool = false) {
+        currentDate = now
+        guard forceReload || now.timeIntervalSince(lastScrobbleLogRefreshDate) >= 60 else { return }
+        scrobbleLog.reload()
+        lastScrobbleLogRefreshDate = now
     }
 
     private func formatTime(_ seconds: TimeInterval) -> String {
