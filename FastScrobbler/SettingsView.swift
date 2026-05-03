@@ -22,13 +22,16 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.loveOnFavoriteEnabled, store: AppGroup.userDefaults) private var loveOnFavoriteEnabled = false
     @AppStorage(ProSettings.Keys.scrobbleThresholdIndex, store: AppGroup.userDefaults) private var scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
     @AppStorage(ProSettings.Keys.useAlbumArtistForScrobbling, store: AppGroup.userDefaults) private var useAlbumArtistForScrobbling = false
+    @AppStorage(ProSettings.Keys.useFirstArtistOnlyForScrobbling, store: AppGroup.userDefaults) private var useFirstArtistOnlyForScrobbling = false
     @AppStorage(ProSettings.Keys.removeBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
+    @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
+    @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -55,6 +58,7 @@ struct SettingsView: View {
     }
 
     private enum SettingsRoute: Hashable {
+        case appleMusicAPI
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
         case textReplacement
@@ -67,7 +71,6 @@ struct SettingsView: View {
     @State private var isScanningListeningHistory = false
     @State private var isShowingWhatsNew = false
     @State private var navigationPath = NavigationPath()
-
     var isShowingHelp: Binding<Bool>?
 
     init(isShowingHelp: Binding<Bool>? = nil) {
@@ -79,6 +82,8 @@ struct SettingsView: View {
             settingsRootContent
                 .navigationDestination(for: SettingsRoute.self) { route in
                     switch route {
+                    case .appleMusicAPI:
+                        AppleMusicAPISettingsPage()
                     case .removeBracketsFromSongTitles:
                         RemoveBracketsSettingsPage(target: .songTitles)
                     case .removeBracketsFromAlbumTitles:
@@ -192,6 +197,7 @@ struct SettingsView: View {
             }
 
             Section("Scrobble Controls") {
+                appleMusicAPINavigationLink
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Prevent duplicate scrobbles", isOn: $preventDuplicateScrobblesEnabled)
                     Text("Avoids sending the same playback session to Last.fm more than once within a short time window.")
@@ -228,6 +234,25 @@ struct SettingsView: View {
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(isOn: proLockedBoolBinding($useFirstArtistOnlyForScrobbling, unlockedDefault: false)) {
+                        HStack {
+                            Text("Scrobble only the first credited artist")
+                                .foregroundStyle(pro.isPro ? .primary : .secondary)
+                            Spacer()
+                            proFeatureBadgePlaceholder
+                        }
+                    }
+                    .disabled(!pro.isPro)
+                    .tint(.yellow)
+                    .overlay(alignment: .trailing) {
+                        lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
+                    }
+
+                    Text("When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section("Listening History") {
@@ -238,10 +263,10 @@ struct SettingsView: View {
                         isScanningListeningHistory ? NSLocalizedString("Scanning…", comment: "") : NSLocalizedString("Scan Listening History", comment: ""),
                         systemImage: "clock.arrow.circlepath"
                     )
-                    .foregroundStyle(auth.sessionKey != nil && scrobbleListeningHistoryEnabled ? .primary : .secondary)
+                    .foregroundStyle(auth.sessionKey != nil && (scrobbleListeningHistoryEnabled || scrobbleAppleMusicAPIEnabled) ? .primary : .secondary)
                 }
                 .padding(.vertical, 8)
-                .disabled(auth.sessionKey == nil || isScanningListeningHistory || !scrobbleListeningHistoryEnabled)
+                .disabled(auth.sessionKey == nil || isScanningListeningHistory || (!scrobbleListeningHistoryEnabled && !scrobbleAppleMusicAPIEnabled))
 
                 Text(
                     scrobbleListeningHistoryEnabled
@@ -250,7 +275,11 @@ struct SettingsView: View {
                                 ? NSLocalizedString("Scan Listening History will import plays from the past 7 days.", comment: "")
                                 : NSLocalizedString("Scan Listening History will import plays from the past 36 hours.", comment: "")
                         )
-                        : NSLocalizedString("Listening History scrobbling is turned off.", comment: "")
+                        : (
+                            scrobbleAppleMusicAPIEnabled
+                                ? NSLocalizedString("Scan Listening History will import up to 30 most recently played Apple Music songs.", comment: "")
+                                : NSLocalizedString("Listening History scrobbling is turned off.", comment: "")
+                        )
                 )
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -301,6 +330,16 @@ struct SettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+
+#if os(iOS)
+            Section("Theme") {
+                Picker("Theme", selection: $themeSelectionRawValue) {
+                    Text("System").tag(AppTheme.system.rawValue)
+                    Text("Light").tag(AppTheme.light.rawValue)
+                    Text("Dark").tag(AppTheme.dark.rawValue)
+                }
+            }
+#endif
 
             Section("Account") {
                 HStack {
@@ -397,7 +436,9 @@ struct SettingsView: View {
 
     private func resetToInitialSettings() {
         UserDefaults.standard.removeObject(forKey: LiveActivityManager.enabledDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: AppSettings.Keys.themeSelection)
         liveActivityEnabled = false
+        themeSelectionRawValue = AppTheme.system.rawValue
         Task { @MainActor in
             await LiveActivityManager.shared.stop()
         }
@@ -406,6 +447,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.loveOnFavoriteEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.scrobbleThresholdIndex)
         defaults.removeObject(forKey: ProSettings.Keys.useAlbumArtistForScrobbling)
+        defaults.removeObject(forKey: ProSettings.Keys.useFirstArtistOnlyForScrobbling)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitleKeywords)
@@ -414,18 +456,22 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromAlbumTitleKeywords)
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.scrobbleAppleMusicAPIEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
+        AppleMusicRecentTracksImporter.shared.resetState()
 
         loveOnFavoriteEnabled = false
         scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
         preventDuplicateScrobblesEnabled = true
         useAlbumArtistForScrobbling = false
+        useFirstArtistOnlyForScrobbling = false
         removeBracketsFromSongTitlesEnabled = false
         removeAllBracketsFromSongTitlesEnabled = false
         removeBracketsFromAlbumTitlesEnabled = false
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
+        scrobbleAppleMusicAPIEnabled = false
         extendedListeningHistoryScanEnabled = false
     }
 
@@ -437,13 +483,35 @@ struct SettingsView: View {
         defer { isScanningListeningHistory = false }
 
         let result = await AppModel.shared.scanListeningHistory(allowExtendedLookback: true)
-        if result.importedCount > 0 || result.flushedPlaybackHistoryCount > 0 || result.skippedDuplicateCount > 0 {
+        if result.totalImportedCount > 0 || result.totalFlushedCount > 0 || result.skippedDuplicateCount > 0 {
             activeAlert = .listeningHistoryScanResult(
                 message: String.localizedStringWithFormat(
-                    NSLocalizedString("Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
+                    NSLocalizedString("Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
                     Int64(result.importedCount),
-                    Int64(result.flushedPlaybackHistoryCount),
+                    Int64(result.importedRecentTrackCount),
+                    Int64(result.totalFlushedCount),
                     Int64(result.skippedDuplicateCount)
+                )
+            )
+        } else if result.recentTracksAuthorizationUnavailable {
+            activeAlert = .listeningHistoryScanResult(
+                message: NSLocalizedString(
+                    "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled.",
+                    comment: ""
+                )
+            )
+        } else if result.recentTracksStatus == .seeded {
+            activeAlert = .listeningHistoryScanResult(
+                message: NSLocalizedString(
+                    "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays.",
+                    comment: ""
+                )
+            )
+        } else if result.recentTracksStatus == .fetchFailed {
+            activeAlert = .listeningHistoryScanResult(
+                message: NSLocalizedString(
+                    "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed.",
+                    comment: ""
                 )
             )
         } else {
@@ -529,7 +597,9 @@ struct SettingsView: View {
                         .font(.footnote.weight(.semibold))
                 }
                 .foregroundStyle(Color.black)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .listRowBackground(Color.yellow)
@@ -553,6 +623,13 @@ struct SettingsView: View {
         }
         .overlay(alignment: .trailing) {
             lockedProBadgeOverlay(trailingInset: Self.iosLockedProNavigationBadgeTrailingInset)
+        }
+    }
+
+    @ViewBuilder
+    private var appleMusicAPINavigationLink: some View {
+        NavigationLink(value: SettingsRoute.appleMusicAPI) {
+            Text(localized("Scrobble from Apple Music API"))
         }
     }
 

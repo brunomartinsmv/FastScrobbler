@@ -40,6 +40,49 @@ func runManualScrobbleTests() {
     expect("album whitespace trimmed",       ms3.album == "White Album",   detail: "got '\(ms3.album ?? "nil")'")
     expect("albumArtist whitespace trimmed", ms3.albumArtist == "The Beatles", detail: "got '\(ms3.albumArtist ?? "nil")'")
 
+    section("Manual Scrobble · Pro metadata preferences")
+
+    struct SimTrack {
+        var artist: String
+        var title: String
+        var album: String?
+        var albumArtist: String?
+    }
+
+    func applyAlbumArtistPreference(_ track: SimTrack, enabled: Bool) -> SimTrack {
+        guard enabled else { return track }
+        guard let albumArtist = track.albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines), !albumArtist.isEmpty else {
+            return track
+        }
+        guard albumArtist.compare("Various Artists", options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame else {
+            return track
+        }
+
+        var copy = track
+        copy.artist = albumArtist
+        copy.albumArtist = nil
+        return copy
+    }
+
+    let manualTrackWithAlbumArtist = SimTrack(
+        artist: "Track Artist",
+        title: "Song",
+        album: "Album",
+        albumArtist: "Album Artist"
+    )
+    let transformedManualTrack = applyAlbumArtistPreference(manualTrackWithAlbumArtist, enabled: true)
+    expect("manual scrobble uses albumArtist as artist when enabled", transformedManualTrack.artist == "Album Artist", detail: "got '\(transformedManualTrack.artist)'")
+    expect("manual scrobble clears albumArtist metadata after substitution", transformedManualTrack.albumArtist == nil, detail: "got '\(transformedManualTrack.albumArtist ?? "nil")'")
+
+    let manualVariousArtistsTrack = SimTrack(
+        artist: "Track Artist",
+        title: "Song",
+        album: "Compilation",
+        albumArtist: "Various Artists"
+    )
+    let unchangedVariousArtistsTrack = applyAlbumArtistPreference(manualVariousArtistsTrack, enabled: true)
+    expect("manual scrobble leaves 'Various Artists' unchanged", unchangedVariousArtistsTrack.artist == "Track Artist", detail: "got '\(unchangedVariousArtistsTrack.artist)'")
+
     // ─── Manual Scrobble — canSubmit validation ────────────────────────────────────
     // Replicates ManualScrobbleView.canSubmit logic.
 

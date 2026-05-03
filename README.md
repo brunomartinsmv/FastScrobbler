@@ -4,6 +4,7 @@ FastScrobbler is a lightweight scrobbler for Apple Music that sends:
 
 - `track.updateNowPlaying` (shows as "currently playing" on Last.fm)
 - `track.scrobble` once you’ve listened long enough (threshold is configurable)
+- recovery scrobbles for missed plays, including Apple Music recent tracks from all your devices when available
 
 It comprises:
 - An iOS app (`FastScrobbler/`)
@@ -37,12 +38,17 @@ https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
 - **Auto-scrobble with threshold**: scrobbles after 10% / 25% / 50% / 75% of track duration (default 50%).
 - **Manual "Scrobble Now"**: scrobble the current track immediately from the app.
 - **Manual Scrobble**: submit a scrobble for any track by entering artist, song, album, and an optional custom timestamp (up to two weeks in the past). Includes a log of the last 30 manual scrobbles.
+- **Scrobble Again from the log**: re-submit a previous scrobble directly from the scrobble log.
 - **Pause/Resume scrobbling**: stops all sending while paused.
 - **Offline / failure tolerant**: queues scrobbles locally and retries with exponential-ish backoff.
+- **Duplicate protection**: avoids sending the same playback session to Last.fm more than once within a short time window.
 - **Listening History import (iOS)**: uses the Apple Music app's Listening History functionality as a recovery backlog for plays missed while the app was suspended.
+- **Apple Music API recovery import (iOS, experimental)**: can import up to 30 recently played Apple Music tracks, including non-library tracks. This is the path that lets FastScrobbler recover and scrobble plays from all your devices signed into the same Apple Music account. Apple does not provide exact playback timestamps here, so FastScrobbler estimates them when submitting.
+- **Manual History Scan (iOS)**: run an on-demand scan for missed plays. Extended scans can check the past 7 days instead of the default 36 hours.
 - **Apple Music favourites → Last.fm love (optional)**: when enabled, favouriting a song in Apple Music can trigger `track.love` after scrobbling.
 - **Scrobble metadata controls**:
   - Use **Album Artist** as scrobble artist (when available, except compilation albums).
+  - **Scrobble only the first credited artist** when a track has multiple credited artists.
   - **Remove brackets from song and album titles when scrobbling**: remove all parenthetical / bracketed title segments, or only segments whose contents match configurable keywords (case-insensitive whole-word matching).
   - **Text Replacement**: define find-and-replace rules applied to artist, song, and/or album fields before scrobbling. Rules support exact text matching and can be scoped to specific fields. Built-in rules for stripping `- Single` / `- EP` are included.
 - **Live Activity (iOS 16.1+)**: shows scrobbling status on Lock Screen / Dynamic Island.
@@ -50,7 +56,9 @@ https://apps.apple.com/sg/app/fastscrobbler-for-last-fm/id6759501541
   - **Send Now Playing** (updates Last.fm "currently playing")
   - **Scrobble Song** (immediate scrobble)
   - **Manual Scrobble** (opens the Manual Scrobble screen)
-- **Control Center buttons (iOS 18+)**: Control Widgets for **Send Now Playing**, **Scrobble Song**, and **Manual Scrobble**.
+  - **Scan History** (checks for missed plays to scrobble)
+- **Control Center buttons (iOS 18+)**: Control Widgets for **Send Now Playing**, **Scrobble Song**, **Manual Scrobble**, and **Scan History**.
+- **Theme support (iOS)**: System / Light / Dark appearance selection.
 - **macOS menu bar UI**: no dock icon/windows; click the menu bar icon to open the popover UI.
 - **Start at login (macOS)**: optional toggle in Settings.
 
@@ -95,6 +103,9 @@ These localisations are included across the iOS app, macOS app, and Control Cent
    - If you change bundle IDs / team, make sure:
      - The App Group identifier exists in your developer account and matches the entitlements.
    - The Last.fm session key is stored in shared App Group preferences so the app and extensions can access it without Keychain prompts.
+5. MusicKit (required for Apple Music API access):
+   - Enable the MusicKit service for the iOS and macOS app IDs in Certificates, Identifiers & Profiles.
+   - Regenerate/download provisioning profiles after enabling it. Do not add MusicKit token keys manually to `*.entitlements`; Xcode will reject unsupported entitlement keys.
 
 ### Run on iOS
 
@@ -118,6 +129,7 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - Background scrobbling is **best-effort**. FastScrobbler keeps live scrobbling running for a short period immediately after the app is backgrounded, then falls back to `BGAppRefreshTask` / `BGProcessingTask`. iOS can still suspend the app earlier than requested, so always-on behavior is not guaranteed.
 - Scrobbling requires a track duration. If Apple Music doesn’t provide a duration, FastScrobbler can still send **Now Playing**, but may not auto-scrobble.
 - Listening History import is a backup path for missed plays and only works for songs added to your library.
+- Apple Music API recovery can import recent Apple Music plays from all your devices, but it is experimental, limited to recent tracks Apple exposes, and uses estimated timestamps because Apple does not provide exact playback times.
 - Live Activities, Shortcuts, and Control Center widgets may update with a delay (iOS can throttle background/intent execution).
 
 ## Troubleshooting
@@ -139,7 +151,7 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - iOS app: `FastScrobbler/`
 - macOS app: `FastScrobblerMac/`
 - Live Activity widget extension: `FastScrobblerLiveActivity/`
-- iOS 18 Control Center widgets: `FastScrobblerNowPlayingControl/`, `FastScrobblerScrobbleControl/`
+- iOS 18 Control Center widgets: `FastScrobblerNowPlayingControl/`, `FastScrobblerScrobbleControl/`, `FastScrobblerManualScrobbleControl/`, `FastScrobblerListeningHistoryControl/`
 
 ## Pro upgrade (In‑App Purchase)
 

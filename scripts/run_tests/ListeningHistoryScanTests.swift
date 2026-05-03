@@ -8,6 +8,13 @@ func runListeningHistoryScanTests() {
         case manual
     }
 
+    enum RecentTracksStatus {
+        case authorizationUnavailable
+        case seeded
+        case fetchFailed
+        case other
+    }
+
     // ─── Listening History scan orchestration ────────────────────────────────────
 
     section("Listening History scan · One-press orchestration")
@@ -190,6 +197,19 @@ func runListeningHistoryScanTests() {
         return "Found \(importedCount); Submitted \(flushedPlaybackHistoryCount); Skipped \(skippedDuplicateCount)"
     }
 
+    func listeningHistoryEmptyStateMessage(recentTracksStatus: RecentTracksStatus) -> String {
+        switch recentTracksStatus {
+        case .authorizationUnavailable:
+            return "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled."
+        case .seeded:
+            return "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays."
+        case .fetchFailed:
+            return "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed."
+        case .other:
+            return "No new plays found. Scrobbling from Listening History only works for songs added to your Library."
+        }
+    }
+
     expectEqual(
         "summary reports flushed playback-history plays separately",
         listeningHistorySummary(importedCount: 0, skippedDuplicateCount: 0, flushedOrigins: [.playbackHistory, .playbackHistory]),
@@ -214,5 +234,20 @@ func runListeningHistoryScanTests() {
         "mixed flush origins count only playback-history submissions",
         listeningHistorySummary(importedCount: 4, skippedDuplicateCount: 1, flushedOrigins: [.live, .playbackHistory, .manual, .playbackHistory]),
         "Found 4; Submitted 2; Skipped 1"
+    )
+    expectEqual(
+        "empty-state auth message remains specific",
+        listeningHistoryEmptyStateMessage(recentTracksStatus: .authorizationUnavailable),
+        "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled."
+    )
+    expectEqual(
+        "empty-state seeded message explains first-run behavior",
+        listeningHistoryEmptyStateMessage(recentTracksStatus: .seeded),
+        "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays."
+    )
+    expectEqual(
+        "empty-state fetch-failed message is distinct",
+        listeningHistoryEmptyStateMessage(recentTracksStatus: .fetchFailed),
+        "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed."
     )
 }

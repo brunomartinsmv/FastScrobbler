@@ -67,6 +67,8 @@
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "Cela réinitialise les réglages à leurs valeurs initiales (votre compte Last.fm reste connecté).";
 "Upgrade to unlock more scrobble controls." = "Passez à la version supérieure pour débloquer plus de contrôles de scrobble.";
 "Replace song artist with album artist when scrobbling" = "Remplacer l’artiste du morceau par l’artiste de l’album lors du scrobble";
+"Scrobble only the first credited artist" = "Scrobbler uniquement le premier artiste crédité";
+"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "Lorsqu’un morceau liste plusieurs artistes séparés par « & » ou des virgules, ne scrobbler que le premier artiste.";
 "Username" = "Nom d’utilisateur";
 "You’ll need to sign in again to scrobble." = "Vous devrez vous reconnecter pour scrobbler.";
 "You’re upgraded." = "Mise à niveau effectuée.";

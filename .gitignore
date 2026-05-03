@@ -1,10 +1,13 @@
+.DS_Store
+xcuserdata/
+DerivedData/
+*.xcuserstate
 FastScrobbler/LastFMSecrets.swift
 FastScrobbler/LastFM/KeychainStore.swift
 Images/
 build/
 FastScrobblerMac/DerivedData/
 FastScrobbler.storekit/
-.DS_Store
 FastScrobbler.xcodeproj
 AppIcon.icon
 Pro.swift

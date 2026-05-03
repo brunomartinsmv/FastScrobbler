@@ -98,6 +98,43 @@ func runProMetadataTests() {
     expect("'various artists' (lowercase) nil",  usableAlbumArtist("various artists", isCompilation: nil) == nil)
     expect("non-compilation uses albumArtist",   usableAlbumArtist("The Band", isCompilation: false) == "The Band")
 
+    // ─── First-artist-only parsing ───────────────────────────────────────────────
+
+    section("Pro · First artist only parsing")
+
+    func firstArtistOnly(from artist: String) -> String? {
+        let trimmedArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedArtist.isEmpty else { return nil }
+
+        let separators: [Character] = ["&", ","]
+        var earliestSeparatorIndex: String.Index?
+
+        for separator in separators {
+            guard let index = trimmedArtist.firstIndex(of: separator) else { continue }
+            if let currentEarliest = earliestSeparatorIndex {
+                if index < currentEarliest {
+                    earliestSeparatorIndex = index
+                }
+            } else {
+                earliestSeparatorIndex = index
+            }
+        }
+
+        guard let splitIndex = earliestSeparatorIndex else {
+            return trimmedArtist == artist ? nil : trimmedArtist
+        }
+
+        let firstArtist = trimmedArtist[..<splitIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !firstArtist.isEmpty else { return nil }
+        return firstArtist == artist ? nil : firstArtist
+    }
+
+    expectEqual("ampersand keeps only first artist", firstArtistOnly(from: "Lady Gaga & Doechii"), "Lady Gaga")
+    expectEqual("comma keeps only first artist", firstArtistOnly(from: "Lady Gaga, Doechii"), "Lady Gaga")
+    expectEqual("no separator is unchanged", firstArtistOnly(from: "Lady Gaga"), nil)
+    expectEqual("leading and trailing whitespace are trimmed", firstArtistOnly(from: "  Lady Gaga  "), "Lady Gaga")
+    expectEqual("empty leading segment is ignored", firstArtistOnly(from: ", Doechii"), nil)
+
     // ─── Track dedup key (libraryIdentityKey) ────────────────────────────────────
     // Replicates stableLibraryIdentity from Track.swift.
 

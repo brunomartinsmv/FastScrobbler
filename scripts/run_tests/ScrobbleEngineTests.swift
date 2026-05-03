@@ -148,6 +148,28 @@ func runScrobbleEngineTests() {
         return bits.joined(separator: " | ")
     }
 
+    func autoStartTimestampIsReliable(hasObservedPlaybackProgress: Bool, pendingColdStartDedupeCheck: Bool) -> Bool {
+        !pendingColdStartDedupeCheck && hasObservedPlaybackProgress
+    }
+
+    func shouldDeferColdStartDedupe(playbackTime: Double, gapSeconds: Double?) -> Bool {
+        playbackTime <= 0 || gapSeconds == nil || (gapSeconds ?? 0) > 12
+    }
+
+    func normalizedAutoPlaybackState(
+        rawPlaybackState: SimPlaybackState,
+        previousPlaybackTime: Double?,
+        playbackTime: Double,
+        wallDelta: Double?
+    ) -> SimPlaybackState {
+        guard rawPlaybackState != .playing else { return .playing }
+        guard let previousPlaybackTime, let wallDelta else { return rawPlaybackState }
+        let playbackDelta = playbackTime - previousPlaybackTime
+        guard wallDelta > 0, wallDelta <= 3 else { return rawPlaybackState }
+        guard playbackDelta >= 0.75, playbackDelta <= wallDelta + 0.75 else { return rawPlaybackState }
+        return .playing
+    }
+
     // 10% threshold (index 0): 60s song → need 6s
     expect("10% threshold: 6s of 60s triggers",  shouldScrobble(played: 6, duration: 60, thresholdIndex: 0))
     expect("10% threshold: 5s of 60s blocked",   !shouldScrobble(played: 5, duration: 60, thresholdIndex: 0))
@@ -259,6 +281,30 @@ func runScrobbleEngineTests() {
     expect("paused threshold-qualified status says it is ready on resume",
            thresholdReadyStatus.contains("Ready to scrobble when playback resumes."),
            detail: "got '\(thresholdReadyStatus)'")
+
+    section("Engine · Auto timestamp trust and mac playback-state normalization")
+
+    expect("cold start dedupe is deferred when playback time starts at zero",
+           shouldDeferColdStartDedupe(playbackTime: 0, gapSeconds: 1))
+    expect("cold start dedupe is deferred after a long execution gap",
+           shouldDeferColdStartDedupe(playbackTime: 42, gapSeconds: 20))
+    expect("normal track changes keep immediate dedupe when timing is credible",
+           !shouldDeferColdStartDedupe(playbackTime: 4, gapSeconds: 1))
+
+    expect("auto timestamp is not trusted before playback progression is observed",
+           !autoStartTimestampIsReliable(hasObservedPlaybackProgress: false, pendingColdStartDedupeCheck: true))
+    expect("auto timestamp becomes trusted after playback progression clears the cold-start guard",
+           autoStartTimestampIsReliable(hasObservedPlaybackProgress: true, pendingColdStartDedupeCheck: false))
+
+    expectEqual("mac stale paused state is normalized to playing when position clearly advances",
+                normalizedAutoPlaybackState(rawPlaybackState: .paused, previousPlaybackTime: 12, playbackTime: 13.2, wallDelta: 1.0),
+                .playing)
+    expectEqual("normalization stays off for truly paused playback",
+                normalizedAutoPlaybackState(rawPlaybackState: .paused, previousPlaybackTime: 12, playbackTime: 12, wallDelta: 1.0),
+                .paused)
+    expectEqual("normalization stays off for implausibly large jumps",
+                normalizedAutoPlaybackState(rawPlaybackState: .paused, previousPlaybackTime: 12, playbackTime: 18, wallDelta: 1.0),
+                .paused)
 
     section("Engine · Auto-scrobble attempt outcomes")
 

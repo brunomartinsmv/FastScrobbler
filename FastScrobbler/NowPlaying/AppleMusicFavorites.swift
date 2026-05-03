@@ -19,6 +19,11 @@ enum AppleMusicFavorites {
             if !sid.isEmpty, playbackStoreIDs.contains(sid) { return true }
             return false
         }
+
+        func contains(playbackStoreID: String?) -> Bool {
+            guard let playbackStoreID, !playbackStoreID.isEmpty else { return false }
+            return playbackStoreIDs.contains(playbackStoreID)
+        }
     }
 
     static func buildIndex() -> Index? {
@@ -55,5 +60,9 @@ enum AppleMusicFavorites {
         // Only trust the Favorites playlist index. Library rating metadata can be non-zero for tracks
         // that are merely saved in Apple Music, which causes false Last.fm loves.
         return index?.contains(item) == true
+    }
+
+    static func isFavorited(playbackStoreID: String?, index: Index?) -> Bool {
+        index?.contains(playbackStoreID: playbackStoreID) == true
     }
 }

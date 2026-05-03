@@ -19,6 +19,8 @@ struct RunTestsMain {
         runScrobbleLogStoreTests()
         runTextReplacementTests()
         runBackgroundGracePeriodTests()
+        runAppleMusicRecentTracksImporterTests()
+        runControlWidgetStatusTests()
         runSettingsDefaultsTests()
         runBacklogTimestampPreservationTests()
         runBacklogCleanupTests()

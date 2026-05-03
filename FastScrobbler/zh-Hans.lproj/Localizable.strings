@@ -5,9 +5,11 @@
 "75%" = "75%";
 "Account" = "账户";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一播放会话。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。\n\n注意：这里的播放时间戳并非由 Apple 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
 "Connected" = "已连接";
 "Done" = "完成";
+"Dark" = "深色";
 "Duration: %@s | Playback: %@s" = "时长：%1$@ 秒 | 播放：%2$@ 秒";
 "Engine: " = "引擎：";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobbler 需要一些权限和设置才能稳定运行。";
@@ -17,8 +19,10 @@
 "Import recent plays from your Music app Listening History." = "从音乐 App 播放历史记录导入最近播放记录。";
 "Scan Listening History will import plays from the past 36 hours." = "“扫描播放历史”将导入过去 36 小时的播放记录。";
 "Scan Listening History will import plays from the past 7 days." = "“扫描播放历史”将导入过去 7 天的播放记录。";
+"Scan Listening History will import up to 30 most recently played Apple Music songs." = "“扫描播放历史”将导入最多 30 首 Apple Music 最近播放歌曲。";
 "Last.fm" = "Last.fm";
 "Listening History" = "播放历史";
+"Light" = "浅色";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobbler 的实时活动已在 iOS 设置中关闭。";
 "Love Apple Music favourites on Last.fm" = "在 Last.fm 上同步喜爱 Apple Music 收藏歌曲";
 "Loved" = "Loved";
@@ -57,6 +61,7 @@
 "Reset Settings?" = "要重置设置吗？";
 "Scrobble at %@ of duration" = "在播放到 %@ 时 scrobble";
 "Scrobble Controls" = "Scrobble 控制";
+"Scrobble from Apple Music API" = "从 Apple Music API scrobble";
 "Scrobble Now" = "立即 Scrobble";
 "Settings" = "设置";
 "Setup" = "设置向导";
@@ -68,6 +73,8 @@
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "这会将设置恢复为初始值（你的 Last.fm 账户仍会保持连接）。";
 "Upgrade to unlock more scrobble controls." = "升级以解锁更多 scrobble 控制项。";
 "Replace song artist with album artist when scrobbling" = "Scrobble 时用专辑艺人替换歌曲艺人";
+"Scrobble only the first credited artist" = "仅 scrobble 第一位署名艺人";
+"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "当歌曲列出多个艺人且艺人之间以“&”或逗号分隔时，只 scrobble 第一位艺人。";
 "Username" = "用户名";
 "You’ll need to sign in again to scrobble." = "你需要重新登录才能 scrobble。";
 "You’re upgraded." = "你已升级。";
@@ -93,6 +100,7 @@
 "Idle" = "空闲";
 "Imported %lld play(s)." = "已导入 %lld 次播放。";
 "Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "找到 %lld 次新的资料库播放。\n已提交 %lld 条 scrobble。\n已跳过 %lld 次已导入的播放。";
+"Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "找到 %lld 次新的资料库播放和 %lld 首新的 Apple Music 最近播放歌曲。\n已提交 %lld 条 scrobble。\n已跳过 %lld 次已导入的播放。";
 "Invalid Last.fm base URL." = "无效的 Last.fm 基础 URL。";
 "Invalid Last.fm request URL." = "无效的 Last.fm 请求 URL。";
 "Invalid response from Last.fm." = "来自 Last.fm 的响应无效。";
@@ -117,6 +125,8 @@
 "Missing Last.fm API secret." = "缺少 Last.fm API Secret。";
 "Music control permission is off. Enable it in System Settings → Privacy & Security → Automation." = "音乐控制权限已关闭。请在系统设置 → 隐私与安全性 → 自动化中启用。";
 "No new plays found. Scrobbling from Listening History only works for songs added to your Library." = "未找到新的播放记录。从播放历史进行 scrobble 仅适用于已添加到资料库的歌曲。";
+"No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled." = "未找到新的资料库播放。由于音乐访问权限已关闭，无法检查 Apple Music 最近播放歌曲。";
+"No new plays found. Library plays use local Listening History; non-library Apple Music tracks can be recovered from Apple Music Recent Tracks when Apple provides them." = "未找到新的播放记录。资料库歌曲使用本机播放历史；非资料库 Apple Music 歌曲可在 Apple 提供时从 Apple Music 最近播放中恢复。";
 "Scrobbling from Listening History only works for songs added to your Library." = "从播放历史进行 scrobble 仅适用于已添加到资料库的歌曲。";
 "No now-playing item found." = "未找到当前播放项目。";
 "No now-playing track." = "当前没有正在播放的歌曲。";
@@ -156,11 +166,14 @@
 "Running" = "运行中";
 "Scan Listening History" = "扫描播放历史";
 "Scanning…" = "扫描中…";
+"Scanned" = "已扫描";
 "AutoMix" = "自动过渡";
 "Scrobbled" = "已 Scrobble";
 "Scrobbled: %@ — %@" = "已 Scrobble：%@ — %@";
 "Scrobbling from Listening History may be affected when AutoMix is on." = "启用自动过渡时，从播放历史进行 scrobble 可能会受到影响。";
 "Scrobbling…" = "Scrobble 中…";
+"Sending…" = "发送中…";
+"Sent" = "已发送";
 "Note" = "注意";
 "Issues Scrobbling?" = "Scrobble 有问题？";
 "Questions or Bug Reports?" = "有问题或要报告错误？";
@@ -183,6 +196,8 @@
 "Start at login" = "登录时启动";
 "Stopped" = "已停止";
 "Support development of the app" = "支持应用开发";
+"System" = "系统";
+"Theme" = "主题";
 "Background App Refresh" = "后台 App 刷新";
 "Live Activities" = "实时活动";
 "Required to read Apple Music now-playing metadata." = "读取 Apple Music 当前播放元数据所必需。";
@@ -221,6 +236,7 @@
 "Previous Versions" = "旧版本";
 "View Previous Versions" = "查看旧版本";
 "What's New" = "新功能";
+"New" = "新";
 
 /* Manual Scrobble */
 "Manual Scrobble" = "手动 Scrobble";

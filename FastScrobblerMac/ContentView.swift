@@ -8,6 +8,91 @@ struct ContentView: View {
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
     }
 
+    private enum Layout {
+        static let sectionSpacing: CGFloat = 12
+        static let cardPadding: CGFloat = 14
+        static let controlsSpacing: CGFloat = 10
+        static let controlsTopPadding: CGFloat = 10
+        static let progressTopPadding: CGFloat = 8
+        static let logRowSpacing: CGFloat = 8
+    }
+
+    private enum ActionButtonPalette {
+        static let cardBackgroundOverlay = dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.62),
+            dark: NSColor(white: 0.08, alpha: 0.74)
+        )
+        static let resume = dynamicColor(
+            light: NSColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 1.0),
+            dark: NSColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 1.0)
+        )
+        static let resumeForeground = dynamicColor(
+            light: NSColor(red: 0.18, green: 0.58, blue: 0.29, alpha: 1.0),
+            dark: NSColor(red: 0.58, green: 0.90, blue: 0.67, alpha: 1.0)
+        )
+        static let resumeBorder = dynamicColor(
+            light: NSColor(red: 0.00, green: 0.72, blue: 0.20, alpha: 1.0),
+            dark: NSColor(red: 0.00, green: 0.84, blue: 0.31, alpha: 1.0)
+        )
+        static let resumeFill = dynamicColor(
+            light: NSColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 0.18),
+            dark: NSColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 0.24)
+        )
+        static let scrobbleNow = dynamicColor(
+            light: NSColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 1.0),
+            dark: NSColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 1.0)
+        )
+        static let scrobbleNowForeground = dynamicColor(
+            light: NSColor(red: 0.60, green: 0.27, blue: 0.72, alpha: 1.0),
+            dark: NSColor(red: 0.86, green: 0.68, blue: 0.96, alpha: 1.0)
+        )
+        static let scrobbleNowBorder = dynamicColor(
+            light: NSColor(red: 0.66, green: 0.00, blue: 1.00, alpha: 1.0),
+            dark: NSColor(red: 0.76, green: 0.10, blue: 1.00, alpha: 1.0)
+        )
+        static let scrobbleNowFill = dynamicColor(
+            light: NSColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 0.16),
+            dark: NSColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 0.24)
+        )
+        static let account = dynamicColor(
+            light: NSColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 1.0),
+            dark: NSColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 1.0)
+        )
+        static let accountForeground = dynamicColor(
+            light: NSColor(red: 0.18, green: 0.46, blue: 0.78, alpha: 1.0),
+            dark: NSColor(red: 0.66, green: 0.81, blue: 0.96, alpha: 1.0)
+        )
+        static let accountBorder = dynamicColor(
+            light: NSColor(red: 0.00, green: 0.48, blue: 1.00, alpha: 1.0),
+            dark: NSColor(red: 0.00, green: 0.59, blue: 1.00, alpha: 1.0)
+        )
+        static let accountFill = dynamicColor(
+            light: NSColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 0.14),
+            dark: NSColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 0.22)
+        )
+        static let manualForeground = dynamicColor(
+            light: NSColor(white: 0.12, alpha: 1.0),
+            dark: NSColor(white: 0.82, alpha: 1.0)
+        )
+        static let manualFill = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.06),
+            dark: NSColor(white: 1.0, alpha: 0.10)
+        )
+        static let disabledFill = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.05),
+            dark: NSColor(white: 1.0, alpha: 0.08)
+        )
+
+        private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+            Color(
+                NSColor(name: nil) { appearance in
+                    let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                    return bestMatch == .darkAqua ? dark : light
+                }
+            )
+        }
+    }
+
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var observer: AppleMusicNowPlayingObserver
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -70,7 +155,7 @@ struct ContentView: View {
     private var mainContent: some View {
         ZStack(alignment: .topTrailing) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
                     macAttentionBanner
                     controls
                     statusCard
@@ -127,6 +212,15 @@ struct ContentView: View {
         }
     }
 
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(ActionButtonPalette.cardBackgroundOverlay)
+            }
+    }
+
     private var statusCard: some View {
         let _ = secondTick
         return VStack(alignment: .leading, spacing: 8) {
@@ -139,13 +233,18 @@ struct ContentView: View {
             }
             engineStatusText(engine.statusText)
                 .font(.footnote)
+            if let blocker = engine.autoScrobbleBlocker, auth.sessionKey != nil {
+                Text(blocker.statusText())
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
         .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .padding(Layout.cardPadding)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
@@ -191,7 +290,12 @@ struct ContentView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.top, 12)
+                    .padding(.top, Layout.progressTopPadding)
+                } else if auth.sessionKey != nil {
+                    Text("Auto-scrobble needs a stable playback duration and timestamp before it can submit automatically.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
                 }
             } else {
                 Text("No track detected.")
@@ -200,32 +304,16 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: observer.track)
         .animation(.easeInOut(duration: 0.3), value: observer.playbackState)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .padding(Layout.cardPadding)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private var controls: some View {
         let actionButtonHeight: CGFloat = 32
-        let actionButtonSpacing: CGFloat = 12
+        let actionButtonSpacing: CGFloat = Layout.controlsSpacing
 
-        return VStack(spacing: 12) {
-            Button {
-                if let url = URL(string: "music://") {
-                    openURL(url)
-                }
-            } label: {
-                Label(NSLocalizedString("Open Music App", comment: ""), systemImage: "music.note")
-                    .font(.body.weight(.bold))
-                    .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
-            }
-            .buttonStyle(.borderedProminent)
-            .pillButtonBorder()
-            .tint(.red)
-            .buttonGlow(.red)
-            .padding(.top, 8)
-
+        return VStack(spacing: Layout.controlsSpacing) {
             HStack(spacing: actionButtonSpacing) {
                 Button {
                     engine.setUserPaused(!engine.isUserPaused)
@@ -235,12 +323,15 @@ struct ContentView: View {
                         Text(engine.isUserPaused ? NSLocalizedString("Resume", comment: "") : NSLocalizedString("Pause", comment: ""))
                     }
                     .font(.body.weight(.bold))
+                    .foregroundStyle(engine.isUserPaused ? ActionButtonPalette.resumeForeground : ActionButtonPalette.scrobbleNowForeground)
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(engine.isUserPaused ? .green : .orange)
-                .buttonGlow(engine.isUserPaused ? .green : .orange)
+                .tint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
+                .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill)
+                .brightButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder)
+                .buttonGlow(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
                 .disabled(auth.sessionKey == nil)
 
                 if auth.sessionKey == nil {
@@ -249,12 +340,15 @@ struct ContentView: View {
                     } label: {
                         Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
                             .font(.body.weight(.bold))
+                            .foregroundStyle(ActionButtonPalette.accountForeground)
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(.blue)
-                    .buttonGlow(.blue)
+                    .tint(ActionButtonPalette.account)
+                    .prominentButtonBackground(ActionButtonPalette.accountFill)
+                    .brightButtonBorder(ActionButtonPalette.accountBorder)
+                    .buttonGlow(ActionButtonPalette.account)
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
@@ -268,12 +362,15 @@ struct ContentView: View {
                                 .allowsTightening(true)
                         }
                         .font(.body.weight(.bold))
+                        .foregroundStyle(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNowForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight, alignment: .center)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(.purple)
-                    .buttonGlow(.purple)
+                    .tint(ActionButtonPalette.scrobbleNow)
+                    .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.disabledFill : ActionButtonPalette.scrobbleNowFill)
+                    .brightButtonBorder(engine.isUserPaused ? .secondary.opacity(0.35) : ActionButtonPalette.scrobbleNowBorder)
+                    .buttonGlow(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNow)
                     .disabled(engine.isUserPaused)
                 }
             }
@@ -286,12 +383,15 @@ struct ContentView: View {
                 } label: {
                     Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
                         .font(.body.weight(.bold))
+                        .foregroundStyle(ActionButtonPalette.accountForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(.blue)
-                .buttonGlow(.blue)
+                .tint(ActionButtonPalette.account)
+                .prominentButtonBackground(ActionButtonPalette.accountFill)
+                .brightButtonBorder(ActionButtonPalette.accountBorder)
+                .buttonGlow(ActionButtonPalette.account)
                 .disabled(auth.profileURL == nil)
 
                 Button {
@@ -299,12 +399,17 @@ struct ContentView: View {
                 } label: {
                     Label(NSLocalizedString("Manual Scrobble", comment: ""), systemImage: "plus.circle")
                         .font(.body.weight(.bold))
+                        .foregroundStyle(ActionButtonPalette.manualForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
+                .tint(.clear)
+                .prominentButtonBackground(ActionButtonPalette.manualFill)
+                .brightButtonBorder(ActionButtonPalette.manualForeground)
             }
         }
+        .padding(.top, Layout.controlsTopPadding)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
@@ -376,12 +481,8 @@ struct ContentView: View {
                     }
 
                     if isMusicControlPermissionOff {
-                        Button(NSLocalizedString("Open System Settings", comment: "")) {
-                            if let automationSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
-                                openURL(automationSettingsURL)
-                            } else if let privacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                                openURL(privacySettingsURL)
-                            }
+                        Button(musicControlActionTitle) {
+                            handleMusicControlPermissionAction()
                         }
                         .buttonStyle(.bordered)
                         .tint(.white)
@@ -414,7 +515,7 @@ struct ContentView: View {
                     .foregroundColor(.secondary)
             } else {
                 let entries = scrobbleLog.recentEntries()
-                VStack(spacing: 10) {
+                VStack(spacing: Layout.logRowSpacing) {
                     ForEach(entries) { entry in
                         ScrobbleLogRowView(
                             entry: entry,
@@ -427,9 +528,8 @@ struct ContentView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .padding(Layout.cardPadding)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
@@ -441,6 +541,32 @@ struct ContentView: View {
         } catch {
             if error is CancellationError { return }
             errorText = error.localizedDescription
+        }
+    }
+
+    private var musicControlActionTitle: String {
+        switch permissions.automationStatus {
+        case .notDetermined:
+            return NSLocalizedString("Allow Music Control", comment: "")
+        case .denied, .restricted, .authorized:
+            return NSLocalizedString("Open System Settings", comment: "")
+        }
+    }
+
+    private func handleMusicControlPermissionAction() {
+        switch permissions.automationStatus {
+        case .notDetermined:
+            Task { @MainActor in
+                await observer.requestMusicControlPermission()
+                await permissions.refreshNow(observer: observer)
+                AppModel.shared.startIfNeeded()
+            }
+        case .denied, .restricted, .authorized:
+            if let automationSettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                openURL(automationSettingsURL)
+            } else if let privacySettingsURL = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                openURL(privacySettingsURL)
+            }
         }
     }
 
@@ -668,7 +794,27 @@ extension View {
     }
 
     func buttonGlow(_ color: Color) -> some View {
-        self.shadow(color: color.opacity(0.30), radius: 6, x: 0, y: 0)
+        self.overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(.clear, lineWidth: 1.5)
+                .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 0)
+                .shadow(color: color.opacity(0.12), radius: 2, x: 0, y: 0)
+        }
+    }
+
+    func prominentButtonBackground(_ color: Color) -> some View {
+        self.background {
+            Capsule(style: .continuous)
+                .fill(color)
+        }
+    }
+
+    func brightButtonBorder(_ color: Color) -> some View {
+        self.overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(color.opacity(0.95), lineWidth: 1.5)
+                .shadow(color: color.opacity(0.12), radius: 2.5, x: 0, y: 0)
+        }
     }
 }
 

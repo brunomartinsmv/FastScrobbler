@@ -12,6 +12,97 @@ struct ContentView: View {
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
     }
 
+    private enum ActionButtonPalette {
+        static let cardBackgroundOverlay = dynamicColor(
+            light: UIColor(white: 1.0, alpha: 0.62),
+            dark: UIColor(white: 0.08, alpha: 0.74)
+        )
+        static let openMusic = dynamicColor(
+            light: UIColor(red: 1.00, green: 0.34, blue: 0.42, alpha: 1.0),
+            dark: UIColor(red: 1.00, green: 0.46, blue: 0.54, alpha: 1.0)
+        )
+        static let openMusicForeground = dynamicColor(
+            light: UIColor(red: 0.76, green: 0.18, blue: 0.22, alpha: 1.0),
+            dark: UIColor(red: 1.00, green: 0.72, blue: 0.76, alpha: 1.0)
+        )
+        static let openMusicBorder = dynamicColor(
+            light: UIColor(red: 1.00, green: 0.08, blue: 0.22, alpha: 1.0),
+            dark: UIColor(red: 1.00, green: 0.16, blue: 0.34, alpha: 1.0)
+        )
+        static let openMusicFill = dynamicColor(
+            light: UIColor(red: 0.94, green: 0.52, blue: 0.57, alpha: 0.14),
+            dark: UIColor(red: 0.90, green: 0.56, blue: 0.62, alpha: 0.20)
+        )
+        static let resume = dynamicColor(
+            light: UIColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 1.0),
+            dark: UIColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 1.0)
+        )
+        static let resumeForeground = dynamicColor(
+            light: UIColor(red: 0.18, green: 0.58, blue: 0.29, alpha: 1.0),
+            dark: UIColor(red: 0.58, green: 0.90, blue: 0.67, alpha: 1.0)
+        )
+        static let resumeBorder = dynamicColor(
+            light: UIColor(red: 0.00, green: 0.72, blue: 0.20, alpha: 1.0),
+            dark: UIColor(red: 0.00, green: 0.84, blue: 0.31, alpha: 1.0)
+        )
+        static let resumeFill = dynamicColor(
+            light: UIColor(red: 0.46, green: 0.78, blue: 0.56, alpha: 0.15),
+            dark: UIColor(red: 0.42, green: 0.73, blue: 0.50, alpha: 0.20)
+        )
+        static let scrobbleNow = dynamicColor(
+            light: UIColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 1.0),
+            dark: UIColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 1.0)
+        )
+        static let scrobbleNowForeground = dynamicColor(
+            light: UIColor(red: 0.60, green: 0.27, blue: 0.72, alpha: 1.0),
+            dark: UIColor(red: 0.86, green: 0.68, blue: 0.96, alpha: 1.0)
+        )
+        static let scrobbleNowBorder = dynamicColor(
+            light: UIColor(red: 0.66, green: 0.00, blue: 1.00, alpha: 1.0),
+            dark: UIColor(red: 0.76, green: 0.10, blue: 1.00, alpha: 1.0)
+        )
+        static let scrobbleNowFill = dynamicColor(
+            light: UIColor(red: 0.80, green: 0.50, blue: 0.90, alpha: 0.14),
+            dark: UIColor(red: 0.72, green: 0.50, blue: 0.82, alpha: 0.20)
+        )
+        static let account = dynamicColor(
+            light: UIColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 1.0),
+            dark: UIColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 1.0)
+        )
+        static let accountForeground = dynamicColor(
+            light: UIColor(red: 0.18, green: 0.46, blue: 0.78, alpha: 1.0),
+            dark: UIColor(red: 0.66, green: 0.81, blue: 0.96, alpha: 1.0)
+        )
+        static let accountBorder = dynamicColor(
+            light: UIColor(red: 0.00, green: 0.48, blue: 1.00, alpha: 1.0),
+            dark: UIColor(red: 0.00, green: 0.59, blue: 1.00, alpha: 1.0)
+        )
+        static let accountFill = dynamicColor(
+            light: UIColor(red: 0.42, green: 0.70, blue: 0.92, alpha: 0.13),
+            dark: UIColor(red: 0.40, green: 0.65, blue: 0.84, alpha: 0.19)
+        )
+        static let manualForeground = dynamicColor(
+            light: UIColor(white: 0.12, alpha: 1.0),
+            dark: UIColor(white: 0.82, alpha: 1.0)
+        )
+        static let manualFill = dynamicColor(
+            light: UIColor(white: 0.0, alpha: 0.06),
+            dark: UIColor(white: 1.0, alpha: 0.10)
+        )
+        static let disabledFill = dynamicColor(
+            light: UIColor(white: 0.0, alpha: 0.05),
+            dark: UIColor(white: 1.0, alpha: 0.08)
+        )
+
+        private static func dynamicColor(light: UIColor, dark: UIColor) -> Color {
+            Color(
+                UIColor { traits in
+                    traits.userInterfaceStyle == .dark ? dark : light
+                }
+            )
+        }
+    }
+
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var observer: AppleMusicNowPlayingObserver
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -22,6 +113,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
+    @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
 
     @State private var currentDate: Date = .now
     // Incrementing secondTick every second forces SwiftUI to re-evaluate computed views
@@ -120,6 +212,11 @@ struct ContentView: View {
                     .ignoresSafeArea()
             }
         }
+        .preferredColorScheme(selectedAppTheme.preferredColorScheme)
+    }
+
+    private var selectedAppTheme: AppTheme {
+        AppTheme(rawValue: themeSelectionRawValue) ?? .system
     }
 
     private var mainContent: some View {
@@ -173,6 +270,15 @@ struct ContentView: View {
             .environment(\.isEmbeddedInTab, true)
     }
 
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(ActionButtonPalette.cardBackgroundOverlay)
+            }
+    }
+
     private var statusCard: some View {
         let _ = secondTick
         return VStack(alignment: .leading, spacing: 8) {
@@ -190,8 +296,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
@@ -277,8 +382,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: observer.playbackState)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
@@ -294,12 +398,15 @@ struct ContentView: View {
             } label: {
                 Label(NSLocalizedString("Open Music App", comment: ""), systemImage: "music.note")
                     .font(.body.weight(.bold))
+                    .foregroundStyle(ActionButtonPalette.openMusicForeground)
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.bordered)
             .pillButtonBorder()
-            .tint(.red)
-            .buttonGlow(.red)
+            .tint(ActionButtonPalette.openMusic)
+            .prominentButtonBackground(ActionButtonPalette.openMusicFill)
+            .brightButtonBorder(ActionButtonPalette.openMusicBorder)
+            .buttonGlow(ActionButtonPalette.openMusic)
 
             HStack(spacing: actionButtonSpacing) {
                 Button {
@@ -310,12 +417,15 @@ struct ContentView: View {
                         Text(engine.isUserPaused ? NSLocalizedString("Resume", comment: "") : NSLocalizedString("Pause", comment: ""))
                     }
                     .font(.body.weight(.bold))
+                    .foregroundStyle(engine.isUserPaused ? ActionButtonPalette.resumeForeground : ActionButtonPalette.scrobbleNowForeground)
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(engine.isUserPaused ? .green : .orange)
-                .buttonGlow(engine.isUserPaused ? .green : .orange)
+                .tint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
+                .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill)
+                .brightButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder)
+                .buttonGlow(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
                 .disabled(auth.sessionKey == nil)
 
                 if auth.sessionKey == nil {
@@ -324,12 +434,15 @@ struct ContentView: View {
                     } label: {
                         Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
                             .font(.body.weight(.bold))
+                            .foregroundStyle(ActionButtonPalette.accountForeground)
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(.blue)
-                    .buttonGlow(.blue)
+                    .tint(ActionButtonPalette.account)
+                    .prominentButtonBackground(ActionButtonPalette.accountFill)
+                    .brightButtonBorder(ActionButtonPalette.accountBorder)
+                    .buttonGlow(ActionButtonPalette.account)
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
@@ -343,12 +456,15 @@ struct ContentView: View {
                                 .allowsTightening(true)
                         }
                         .font(.body.weight(.bold))
+                        .foregroundStyle(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNowForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight, alignment: .center)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(.purple)
-                    .buttonGlow(.purple)
+                    .tint(ActionButtonPalette.scrobbleNow)
+                    .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.disabledFill : ActionButtonPalette.scrobbleNowFill)
+                    .brightButtonBorder(engine.isUserPaused ? .secondary.opacity(0.35) : ActionButtonPalette.scrobbleNowBorder)
+                    .buttonGlow(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNow)
                     .disabled(engine.isUserPaused)
                 }
             }
@@ -361,12 +477,15 @@ struct ContentView: View {
                 } label: {
                     Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
                         .font(.body.weight(.bold))
+                        .foregroundStyle(ActionButtonPalette.accountForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(.blue)
-                .buttonGlow(.blue)
+                .tint(ActionButtonPalette.account)
+                .prominentButtonBackground(ActionButtonPalette.accountFill)
+                .brightButtonBorder(ActionButtonPalette.accountBorder)
+                .buttonGlow(ActionButtonPalette.account)
                 .disabled(auth.profileURL == nil)
 
                 Button {
@@ -374,10 +493,14 @@ struct ContentView: View {
                 } label: {
                     Label(NSLocalizedString("Manual Scrobble", comment: ""), systemImage: "plus.circle")
                         .font(.body.weight(.bold))
+                        .foregroundStyle(ActionButtonPalette.manualForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
+                .tint(.clear)
+                .prominentButtonBackground(ActionButtonPalette.manualFill)
+                .brightButtonBorder(ActionButtonPalette.manualForeground)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -413,8 +536,7 @@ struct ContentView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
+        .background(contentCardBackground)
         .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
@@ -503,6 +625,19 @@ struct ContentView: View {
     }
 }
 
+private extension AppTheme {
+    var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+}
+
 
 private struct IsEmbeddedInTabKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -553,7 +688,8 @@ private struct ScrobbleLogRowView: View {
                     Text(sourceLabel(entry.source))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.15))
+                        .foregroundStyle(sourceBadgeForeground(entry.source))
+                        .background(sourceBadgeBackground(entry.source))
                         .clipShape(Capsule())
                 }
                 Spacer()
@@ -614,7 +750,8 @@ private struct ScrobbleLogRowView: View {
                         Text(sourceLabel(entry.source))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.15))
+                            .foregroundStyle(sourceBadgeForeground(entry.source))
+                            .background(sourceBadgeBackground(entry.source))
                             .clipShape(Capsule())
                     }
                     Spacer()
@@ -638,6 +775,46 @@ private struct ScrobbleLogRowView: View {
         case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
         case .manual: return NSLocalizedString("Manual", comment: "")
         }
+    }
+
+    private func sourceBadgeBackground(_ source: ScrobbleLogStore.Source) -> Color {
+        switch source {
+        case .recentlyPlayed:
+            return recentTracksBadgeBackground
+        case .live, .backlog, .playbackHistory, .manual:
+            return Color.secondary.opacity(0.15)
+        }
+    }
+
+    private func sourceBadgeForeground(_ source: ScrobbleLogStore.Source) -> Color {
+        switch source {
+        case .recentlyPlayed:
+            return recentTracksBadgeForeground
+        case .live, .backlog, .playbackHistory, .manual:
+            return .primary
+        }
+    }
+
+    private var recentTracksBadgeBackground: Color {
+        Color(
+            UIColor { traits in
+                if traits.userInterfaceStyle == .dark {
+                    return UIColor(red: 0.20, green: 0.40, blue: 0.68, alpha: 1.0)
+                }
+                return UIColor(red: 0.82, green: 0.92, blue: 1.0, alpha: 1.0)
+            }
+        )
+    }
+
+    private var recentTracksBadgeForeground: Color {
+        Color(
+            UIColor { traits in
+                if traits.userInterfaceStyle == .dark {
+                    return .white
+                }
+                return UIColor(red: 0.00, green: 0.29, blue: 0.56, alpha: 1.0)
+            }
+        )
     }
 
     private func displayDate(for entry: ScrobbleLogStore.Entry) -> Date {
@@ -730,7 +907,27 @@ extension View {
     }
 
     func buttonGlow(_ color: Color) -> some View {
-        self.shadow(color: color.opacity(0.25), radius: 8, x: 0, y: 4)
-            .shadow(color: color.opacity(0.40), radius: 7, x: 0, y: 4)
+        self.overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(.clear, lineWidth: 2.0)
+                .shadow(color: color.opacity(0.12), radius: 5, x: 0, y: 0)
+                .shadow(color: color.opacity(0.16), radius: 2.5, x: 0, y: 0)
+        }
+    }
+
+    func prominentButtonBackground(_ color: Color) -> some View {
+        self.background {
+            Capsule(style: .continuous)
+                .fill(color)
+        }
+    }
+
+    func brightButtonBorder(_ color: Color) -> some View {
+        self.overlay {
+            Capsule(style: .continuous)
+                .strokeBorder(color.opacity(0.95), lineWidth: 2.0)
+                .shadow(color: color.opacity(0.12), radius: 3, x: 0, y: 0)
+                .shadow(color: color.opacity(0.16), radius: 2, x: 0, y: 0)
+        }
     }
 }

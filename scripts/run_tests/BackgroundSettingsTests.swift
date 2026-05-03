@@ -71,6 +71,7 @@ func runSettingsDefaultsTests() {
         "FastScrobbler.Pro.loveOnFavoriteEnabled",
         "FastScrobbler.Pro.scrobbleThresholdIndex",
         "FastScrobbler.Pro.useAlbumArtistForScrobbling",
+        "FastScrobbler.Pro.useFirstArtistOnlyForScrobbling",
         "FastScrobbler.Pro.removeBracketsEnabled",
         "FastScrobbler.Pro.removeAllBracketsEnabled",
         "FastScrobbler.Pro.removeBracketsKeywords",
@@ -80,21 +81,41 @@ func runSettingsDefaultsTests() {
         "FastScrobbler.Pro.preventDuplicateScrobblesEnabled",
         "FastScrobbler.Pro.scrobbleLoopedTracksEnabled",
         "FastScrobbler.App.scrobbleListeningHistoryEnabled",
+        "FastScrobbler.App.scrobbleAppleMusicAPIEnabled",
         "FastScrobbler.App.extendedListeningHistoryScanEnabled",
+        "FastScrobbler.App.themeSelection",
         "FastScrobbler.Pro.textReplacementRules",
     ]
 
     expect("reset clears scrobbleLoopedTracksEnabled", resetClearedKeys.contains("FastScrobbler.Pro.scrobbleLoopedTracksEnabled"))
+    expect("reset clears scrobbleAppleMusicAPIEnabled", resetClearedKeys.contains("FastScrobbler.App.scrobbleAppleMusicAPIEnabled"))
     expect("reset clears extendedListeningHistoryScanEnabled", resetClearedKeys.contains("FastScrobbler.App.extendedListeningHistoryScanEnabled"))
+    expect("reset clears themeSelection", resetClearedKeys.contains("FastScrobbler.App.themeSelection"))
     expect("reset clears textReplacementRules", resetClearedKeys.contains("FastScrobbler.Pro.textReplacementRules"))
+    expect("reset clears useFirstArtistOnlyForScrobbling", resetClearedKeys.contains("FastScrobbler.Pro.useFirstArtistOnlyForScrobbling"))
 
     let iOSLoopedTracksAfterReset = false
     expectEqual("iOS reset restores looped-track scrobbling default", iOSLoopedTracksAfterReset, false)
 
     let extendedListeningHistoryScanDefault = false
     let iOSExtendedListeningHistoryScanAfterReset = false
+    let appleMusicAPIScrobblingDefault = false
+    let iOSAppleMusicAPIScrobblingAfterReset = false
+    let firstArtistOnlyDefault = false
+    let iOSFirstArtistOnlyAfterReset = false
+    let themeSelectionDefault = "system"
+    let iOSThemeSelectionAfterReset = "system"
+    expectEqual("Apple Music API scrobbling defaults off", appleMusicAPIScrobblingDefault, false)
+    expectEqual("iOS reset restores Apple Music API scrobbling default", iOSAppleMusicAPIScrobblingAfterReset, appleMusicAPIScrobblingDefault)
     expectEqual("extended Listening History scan defaults off", extendedListeningHistoryScanDefault, false)
     expectEqual("iOS reset restores extended Listening History scan default", iOSExtendedListeningHistoryScanAfterReset, extendedListeningHistoryScanDefault)
+    expectEqual("first-artist-only scrobbling defaults off", firstArtistOnlyDefault, false)
+    expectEqual("iOS reset restores first-artist-only scrobbling default", iOSFirstArtistOnlyAfterReset, firstArtistOnlyDefault)
+    expectEqual("theme selection defaults to system", themeSelectionDefault, "system")
+    expectEqual("iOS reset restores theme selection default", iOSThemeSelectionAfterReset, themeSelectionDefault)
+
+    let recentTracksImporterStateAfterReset: [String: Any] = [:]
+    expect("reset clears Apple Music recent-tracks importer state", recentTracksImporterStateAfterReset.isEmpty)
 
     let builtInRulesAfterReset: [(find: String, replace: String, enabled: Bool)] = [
         ("- Single", "", false),

@@ -18,7 +18,9 @@ enum AppGroup {
 enum AppSettings {
     enum Keys {
         static let scrobbleListeningHistoryEnabled = "FastScrobbler.App.scrobbleListeningHistoryEnabled"
+        static let scrobbleAppleMusicAPIEnabled = "FastScrobbler.App.scrobbleAppleMusicAPIEnabled"
         static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
+        static let themeSelection = "FastScrobbler.App.themeSelection"
     }
 
     static func scrobbleListeningHistoryEnabled() -> Bool {
@@ -30,6 +32,28 @@ enum AppSettings {
     static func extendedListeningHistoryScanEnabled() -> Bool {
         if AppGroup.userDefaults.object(forKey: Keys.extendedListeningHistoryScanEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.extendedListeningHistoryScanEnabled)
+    }
+
+    static func scrobbleAppleMusicAPIEnabled() -> Bool {
+        if AppGroup.userDefaults.object(forKey: Keys.scrobbleAppleMusicAPIEnabled) == nil { return false }
+        return AppGroup.userDefaults.bool(forKey: Keys.scrobbleAppleMusicAPIEnabled)
+    }
+
+    static func themeSelection() -> AppTheme {
+        guard let rawValue = UserDefaults.standard.string(forKey: Keys.themeSelection) else {
+            return .system
+        }
+        return AppTheme(rawValue: rawValue) ?? .system
+    }
+}
+
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system
+    case light
+    case dark
+
+    var id: String {
+        rawValue
     }
 }
 
@@ -61,6 +85,7 @@ enum ProSettings {
         static let loveOnFavoriteEnabled = "FastScrobbler.Pro.loveOnFavoriteEnabled"
         static let scrobbleThresholdIndex = "FastScrobbler.Pro.scrobbleThresholdIndex"
         static let useAlbumArtistForScrobbling = "FastScrobbler.Pro.useAlbumArtistForScrobbling"
+        static let useFirstArtistOnlyForScrobbling = "FastScrobbler.Pro.useFirstArtistOnlyForScrobbling"
         static let stripEpAndSingleSuffixFromAlbum = "FastScrobbler.Pro.stripEpAndSingleSuffixFromAlbum"
         static let removeBracketsFromSongTitlesEnabled = "FastScrobbler.Pro.removeBracketsEnabled"
         static let removeAllBracketsFromSongTitlesEnabled = "FastScrobbler.Pro.removeAllBracketsEnabled"
@@ -103,6 +128,12 @@ enum ProSettings {
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.useAlbumArtistForScrobbling) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.useAlbumArtistForScrobbling)
+    }
+
+    static func useFirstArtistOnlyForScrobbling() -> Bool {
+        guard ProEntitlement.isPro else { return false }
+        if AppGroup.userDefaults.object(forKey: Keys.useFirstArtistOnlyForScrobbling) == nil { return false }
+        return AppGroup.userDefaults.bool(forKey: Keys.useFirstArtistOnlyForScrobbling)
     }
 
     static func stripEpAndSingleSuffixFromAlbum() -> Bool {
@@ -281,6 +312,7 @@ struct Track: Codable, Equatable, Hashable, Sendable {
 
 struct ScrobbleMetadataPreferences: Sendable {
     var useAlbumArtistForScrobbling: Bool
+    var useFirstArtistOnlyForScrobbling: Bool
     var removeBracketsFromSongTitles: Bool
     var removeAllBracketsFromSongTitles: Bool
     var songTitleBracketKeywords: [String]
@@ -292,6 +324,7 @@ struct ScrobbleMetadataPreferences: Sendable {
     static var current: ScrobbleMetadataPreferences {
         ScrobbleMetadataPreferences(
             useAlbumArtistForScrobbling: ProSettings.useAlbumArtistForScrobbling(),
+            useFirstArtistOnlyForScrobbling: ProSettings.useFirstArtistOnlyForScrobbling(),
             removeBracketsFromSongTitles: ProSettings.removeBracketsFromSongTitlesEnabled(),
             removeAllBracketsFromSongTitles: ProSettings.removeAllBracketsFromSongTitlesEnabled(),
             songTitleBracketKeywords: ProSettings.removeBracketsFromSongTitleKeywords(),
@@ -307,6 +340,10 @@ struct ScrobbleMetadataPreferences: Sendable {
 
         if useAlbumArtistForScrobbling {
             copy = copy.applyingAlbumArtistAsArtistIfAvailable()
+        }
+
+        if useFirstArtistOnlyForScrobbling {
+            copy = copy.applyingFirstArtistOnlyIfNeeded()
         }
 
         if removeBracketsFromAlbumTitles {
@@ -434,13 +471,23 @@ extension Track {
 
     func applyingAlbumArtistAsArtistIfAvailable() -> Track {
         guard let a = Self.usableAlbumArtistForArtistSubstitution(
-            albumArtist, isCompilation: isCompilation, respectsCompilationFlag: false
+            albumArtist, isCompilation: isCompilation
         ) else {
             return self
         }
         var copy = self
         copy.artist = a
         copy.albumArtist = nil  // artist field now carries the album artist; avoid sending it twice
+        return copy
+    }
+
+    func applyingFirstArtistOnlyIfNeeded() -> Track {
+        guard let firstArtist = Self.firstArtistOnly(from: artist) else {
+            return self
+        }
+
+        var copy = self
+        copy.artist = firstArtist
         return copy
     }
 
@@ -507,6 +554,31 @@ extension Track {
 
     // Matches one level of (…) or […] — nested brackets require multiple passes.
     private static let parentheticalSegmentRegex = try? NSRegularExpression(pattern: #"\([^()]*\)|\[[^\[\]]*\]"#)
+
+    static func firstArtistOnly(from artist: String) -> String? {
+        let trimmedArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedArtist.isEmpty else { return nil }
+
+        let separators: [Character] = ["&", ","]
+        var earliestSeparatorIndex: String.Index?
+
+        for separator in separators {
+            guard let index = trimmedArtist.firstIndex(of: separator) else { continue }
+            if let currentEarliest = earliestSeparatorIndex {
+                if index < currentEarliest {
+                    earliestSeparatorIndex = index
+                }
+            } else {
+                earliestSeparatorIndex = index
+            }
+        }
+
+        guard let splitIndex = earliestSeparatorIndex else { return trimmedArtist == artist ? nil : trimmedArtist }
+
+        let firstArtist = trimmedArtist[..<splitIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !firstArtist.isEmpty else { return nil }
+        return firstArtist == artist ? nil : firstArtist
+    }
 
     private static func cleanedMetadataByRemovingParentheticalSegments(
         from value: String,

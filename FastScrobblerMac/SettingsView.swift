@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.loveOnFavoriteEnabled, store: AppGroup.userDefaults) private var loveOnFavoriteEnabled = false
     @AppStorage(ProSettings.Keys.scrobbleThresholdIndex, store: AppGroup.userDefaults) private var scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
     @AppStorage(ProSettings.Keys.useAlbumArtistForScrobbling, store: AppGroup.userDefaults) private var useAlbumArtistForScrobbling = false
+    @AppStorage(ProSettings.Keys.useFirstArtistOnlyForScrobbling, store: AppGroup.userDefaults) private var useFirstArtistOnlyForScrobbling = false
     @AppStorage(ProSettings.Keys.removeBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromSongTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
@@ -240,6 +241,21 @@ struct SettingsView: View {
                 }
             }
             .disabled(!pro.isPro)
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(isOn: proLockedBoolBinding($useFirstArtistOnlyForScrobbling, unlockedDefault: false)) {
+                    HStack {
+                        Text(localized("Scrobble only the first credited artist"))
+                            .foregroundStyle(pro.isPro ? .primary : .secondary)
+                        Spacer()
+                        ProFeatureBadge()
+                    }
+                }
+                .disabled(!pro.isPro)
+
+                Text(localized("When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -367,6 +383,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.loveOnFavoriteEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.scrobbleThresholdIndex)
         defaults.removeObject(forKey: ProSettings.Keys.useAlbumArtistForScrobbling)
+        defaults.removeObject(forKey: ProSettings.Keys.useFirstArtistOnlyForScrobbling)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromSongTitleKeywords)
@@ -382,6 +399,7 @@ struct SettingsView: View {
         scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
         preventDuplicateScrobblesEnabled = true
         useAlbumArtistForScrobbling = false
+        useFirstArtistOnlyForScrobbling = false
         removeBracketsFromSongTitlesEnabled = false
         removeAllBracketsFromSongTitlesEnabled = false
         removeBracketsFromAlbumTitlesEnabled = false

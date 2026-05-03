@@ -5,9 +5,11 @@
 "75%" = "75%";
 "Account" = "アカウント";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。\n\n注: ここではAppleから再生時刻が提供されないため、FastScrobblerがスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
 "Connected" = "接続済み";
 "Done" = "完了";
+"Dark" = "ダーク";
 "Duration: %@s | Playback: %@s" = "再生時間: %1$@秒 | 再生位置: %2$@秒";
 "Engine: " = "エンジン: ";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobblerが安定して動作するには、いくつかの許可と設定が必要です。";
@@ -17,8 +19,10 @@
 "Import recent plays from your Music app Listening History." = "ミュージックアプリの再生履歴から最近の再生を取り込みます。";
 "Scan Listening History will import plays from the past 36 hours." = "「再生履歴をスキャン」は過去36時間の再生を取り込みます。";
 "Scan Listening History will import plays from the past 7 days." = "「再生履歴をスキャン」は過去7日間の再生を取り込みます。";
+"Scan Listening History will import up to 30 most recently played Apple Music songs." = "「再生履歴をスキャン」はApple Musicで最近再生した曲を最大30曲まで取り込みます。";
 "Last.fm" = "Last.fm";
 "Listening History" = "再生履歴";
+"Light" = "ライト";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "FastScrobblerのライブアクティビティがiOSの設定で無効になっています。";
 "Love Apple Music favourites on Last.fm" = "Apple Musicのお気に入りをLast.fmでもLovedにする";
 "Loved" = "Loved";
@@ -57,6 +61,7 @@
 "Reset Settings?" = "設定をリセットしますか？";
 "Scrobble at %@ of duration" = "%@再生時点でスクロブル";
 "Scrobble Controls" = "スクロブル設定";
+"Scrobble from Apple Music API" = "Apple Music APIからスクロブル";
 "Scrobble Now" = "今すぐスクロブル";
 "Settings" = "設定";
 "Setup" = "セットアップ";
@@ -68,6 +73,8 @@
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "設定を初期値に戻します（Last.fmアカウントは接続されたままです）。";
 "Upgrade to unlock more scrobble controls." = "アップグレードして、さらに多くのスクロブル設定を利用できるようにします。";
 "Replace song artist with album artist when scrobbling" = "スクロブル時に曲アーティストをアルバムアーティストに置き換える";
+"Scrobble only the first credited artist" = "最初にクレジットされたアーティストのみをスクロブルする";
+"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "曲に「&」またはカンマ区切りで複数のアーティストが表示されている場合、最初のアーティストのみをスクロブルします。";
 "Username" = "ユーザー名";
 "You’ll need to sign in again to scrobble." = "スクロブルするには再度サインインする必要があります。";
 "You’re upgraded." = "アップグレード済みです。";
@@ -93,6 +100,7 @@
 "Idle" = "待機中";
 "Imported %lld play(s)." = "%lld件の再生を取り込みました。";
 "Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "ライブラリ内の新しい再生が%lld件見つかりました。\n%lld件のスクロブルを送信しました。\n取り込み済みの再生を%lld件スキップしました。";
+"Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "ライブラリ内の新しい再生が%lld件、Apple Musicの最近再生した曲が%lld件見つかりました。\n%lld件のスクロブルを送信しました。\n取り込み済みの再生を%lld件スキップしました。";
 "Invalid Last.fm base URL." = "Last.fmのベースURLが無効です。";
 "Invalid Last.fm request URL." = "Last.fmのリクエストURLが無効です。";
 "Invalid response from Last.fm." = "Last.fmからの応答が無効です。";
@@ -117,6 +125,8 @@
 "Missing Last.fm API secret." = "Last.fm APIシークレットがありません。";
 "Music control permission is off. Enable it in System Settings → Privacy & Security → Automation." = "ミュージック操作の許可がオフです。システム設定 → プライバシーとセキュリティ → オートメーションで有効にしてください。";
 "No new plays found. Scrobbling from Listening History only works for songs added to your Library." = "新しい再生は見つかりませんでした。再生履歴からのスクロブルはライブラリに追加された曲でのみ機能します。";
+"No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled." = "ライブラリ内の新しい再生は見つかりませんでした。ミュージックへのアクセスが無効なため、Apple Musicの最近再生した曲を確認できませんでした。";
+"No new plays found. Library plays use local Listening History; non-library Apple Music tracks can be recovered from Apple Music Recent Tracks when Apple provides them." = "新しい再生は見つかりませんでした。ライブラリの再生はローカルの再生履歴を使用します。ライブラリ外のApple Musicの曲は、Appleから提供される場合にApple Musicの最近再生した曲から復元できます。";
 "Scrobbling from Listening History only works for songs added to your Library." = "再生履歴からのスクロブルはライブラリに追加された曲でのみ機能します。";
 "No now-playing item found." = "再生中の項目が見つかりません。";
 "No now-playing track." = "再生中の曲がありません。";
@@ -156,10 +166,13 @@
 "Running" = "実行中";
 "Scan Listening History" = "再生履歴をスキャン";
 "Scanning…" = "スキャン中…";
+"Scanned" = "スキャン済み";
 "Scrobbled" = "スクロブル済み";
 "Scrobbled: %@ — %@" = "スクロブルしました: %@ — %@";
 "Scrobbling from Listening History may be affected when AutoMix is on." = "AutoMixがオンの場合、再生履歴からのスクロブルに影響することがあります。";
 "Scrobbling…" = "スクロブル中…";
+"Sending…" = "送信中…";
+"Sent" = "送信済み";
 "Note" = "注";
 "Issues Scrobbling?" = "スクロブルに問題がありますか？";
 "Questions or Bug Reports?" = "質問やバグ報告はありますか？";
@@ -181,6 +194,8 @@
 "Start at login" = "ログイン時に起動";
 "Stopped" = "停止";
 "Support development of the app" = "アプリ開発を支援";
+"System" = "システム";
+"Theme" = "テーマ";
 /* Added manually for missing Setup and Pro localizations. */
 "Background App Refresh" = "バックグラウンド更新";
 "Live Activities" = "ライブアクティビティ";
@@ -219,6 +234,7 @@
 "Previous Versions" = "以前のバージョン";
 "View Previous Versions" = "以前のバージョンを見る";
 "What's New" = "新機能";
+"New" = "新規";
 
 /* Manual Scrobble */
 "Manual Scrobble" = "手動スクロブル";

@@ -8,7 +8,7 @@ enum WhatsNewRelease {
     }
 
     /// Present the current release notes automatically once for users updating to this version.
-    static let version = "4.0"
+    static let version = "5.4"
 
     static func currentAppVersion() -> String? {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -57,7 +57,24 @@ struct WhatsNewView: View {
         let showsProBadge: Bool
     }
 
-    private let currentSections: [VersionSection] = []
+    private let currentSections: [VersionSection] = [
+        VersionSection(
+            id: "5.4",
+            version: "5.4",
+            features: [
+                Feature(
+                    systemImage: "square.and.arrow.down.badge.clock",
+                    title: "\"Scrobble from Apple Music API\" feature",
+                    showsProBadge: false
+                ),
+                Feature(
+                    systemImage: "person.crop.rectangle",
+                    title: "\"Scrobble only the first credited artist\" feature",
+                    showsProBadge: true
+                )
+            ]
+        )
+    ]
 
     private let previousSections: [VersionSection] = [
         VersionSection(

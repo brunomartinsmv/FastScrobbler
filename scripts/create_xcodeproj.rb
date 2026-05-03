@@ -20,6 +20,7 @@ LIVE_ACTIVITY_BUNDLE_ID = "com.kevin.FastScrobbler.liveactivity"
 NOW_PLAYING_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.nowplayingcontrol"
 SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.scrobblecontrol"
 MANUAL_SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.manualscrobblecontrol"
+LISTENING_HISTORY_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.listeninghistorycontrol"
 MAC_APP_BUNDLE_ID = "com.kevin.FastScrobbler"
 
 IGNORED_DIRS = %w[DerivedData build].freeze
@@ -42,7 +43,9 @@ SHARED_CORE_SOURCES = %w[
   FastScrobbler/Pro.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleEngine.swift
+  FastScrobbler/Scrobble/ScrobbleSkipReason.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
+  FastScrobbler/Scrobble/ManualScrobbleError.swift
   FastScrobbler/Scrobble/RelativeScrobbleTimeFormatter.swift
   FastScrobbler/SettingsView.swift
 ].freeze
@@ -50,12 +53,15 @@ SHARED_CORE_SOURCES = %w[
 IOS_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
   FastScrobbler/AppDelegate.swift
   FastScrobbler/BackgroundTaskManager.swift
+  FastScrobbler/Intents/ControlWidgetStatus.swift
   FastScrobbler/Intents/ScrobbleShortcutsIntents.swift
   FastScrobbler/LiveActivity/LiveActivityManager.swift
   FastScrobbler/LiveActivity/ScrobblingActivityAttributes.swift
   FastScrobbler/ManualScrobbleView.swift
   FastScrobbler/NowPlaying/AppleMusicFavorites.swift
   FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift
+  FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift
+  FastScrobbler/NowPlaying/ListeningHistoryScanService.swift
   FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
   FastScrobbler/RemoveBracketsSettingsPage.swift
   FastScrobbler/SceneDelegate.swift
@@ -99,11 +105,16 @@ LIVE_ACTIVITY_SOURCES = %w[
 ].freeze
 
 CONTROL_SHARED_SOURCES = %w[
+  FastScrobbler/Intents/ControlWidgetStatus.swift
   FastScrobbler/Intents/ScrobbleShortcutsIntents.swift
   FastScrobbler/LastFM/LastFMClient.swift
   FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
   FastScrobbler/Models/Track.swift
+  FastScrobbler/NowPlaying/AppleMusicFavorites.swift
+  FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift
+  FastScrobbler/NowPlaying/ListeningHistoryScanService.swift
+  FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
 ].freeze
@@ -118,6 +129,10 @@ SCROBBLE_CONTROL_SOURCES = (CONTROL_SHARED_SOURCES + %w[
 
 MANUAL_SCROBBLE_CONTROL_SOURCES = (CONTROL_SHARED_SOURCES + %w[
   FastScrobblerManualScrobbleControl/ManualScrobbleControlWidget.swift
+]).freeze
+
+LISTENING_HISTORY_CONTROL_SOURCES = (CONTROL_SHARED_SOURCES + %w[
+  FastScrobblerListeningHistoryControl/ScanListeningHistoryControlWidget.swift
 ]).freeze
 
 IOS_APP_RESOURCES = %w[
@@ -144,6 +159,7 @@ ROOT_GROUP_PATHS = %w[
   FastScrobblerNowPlayingControl
   FastScrobblerScrobbleControl
   FastScrobblerManualScrobbleControl
+  FastScrobblerListeningHistoryControl
   FastScrobbler.storekit
 ].freeze
 
@@ -171,6 +187,7 @@ TARGET_DEFINITIONS = [
       AuthenticationServices
       BackgroundTasks
       MediaPlayer
+      MusicKit
       SafariServices
       StoreKit
       WidgetKit
@@ -240,6 +257,7 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
+      MusicKit
       WidgetKit
     ],
   },
@@ -260,6 +278,7 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
+      MusicKit
       WidgetKit
     ],
   },
@@ -280,6 +299,28 @@ TARGET_DEFINITIONS = [
     frameworks: %w[
       AppIntents
       MediaPlayer
+      MusicKit
+      WidgetKit
+    ],
+  },
+  {
+    name: "FastScrobblerListeningHistoryControl",
+    type: :app_extension,
+    platform: :ios,
+    deployment_target: CONTROL_WIDGET_DEPLOYMENT_TARGET,
+    bundle_id: LISTENING_HISTORY_CONTROL_BUNDLE_ID,
+    info_plist: "FastScrobblerListeningHistoryControl/Info.plist",
+    entitlements: "FastScrobblerListeningHistoryControl/FastScrobblerListeningHistoryControl.entitlements",
+    sources: LISTENING_HISTORY_CONTROL_SOURCES,
+    resources: localized_resources("FastScrobblerListeningHistoryControl"),
+    supported_platforms: "iphoneos iphonesimulator",
+    targeted_device_family: "1",
+    skip_install: "YES",
+    application_extension_api_only: "YES",
+    frameworks: %w[
+      AppIntents
+      MediaPlayer
+      MusicKit
       WidgetKit
     ],
   },
@@ -387,6 +428,7 @@ embedded_extensions = [
   targets.fetch("FastScrobblerNowPlayingControl"),
   targets.fetch("FastScrobblerScrobbleControl"),
   targets.fetch("FastScrobblerManualScrobbleControl"),
+  targets.fetch("FastScrobblerListeningHistoryControl"),
 ]
 
 embed_phase = ios_app.new_copy_files_build_phase("Embed Foundation Extensions")

@@ -6,11 +6,7 @@ import UIKit
 
 @MainActor
 final class AppModel {
-    struct ListeningHistoryScanResult {
-        let importedCount: Int
-        let flushedPlaybackHistoryCount: Int
-        let skippedDuplicateCount: Int
-    }
+    typealias ListeningHistoryScanResult = ListeningHistoryScanService.Result
 
     static let shared = AppModel()
 
@@ -18,11 +14,6 @@ final class AppModel {
         static let lastBacklogFlushAt = "FastScrobbler.AppModel.lastBacklogFlushAt"
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
         static let lastEnteredBackgroundAt = "FastScrobbler.AppModel.lastEnteredBackgroundAt"
-    }
-
-    private enum ListeningHistoryScanLimits {
-        static let maxImports = 1000
-        static let maxFlushBatches = 80
     }
 
     private enum LiveBackgroundScrobbling {
@@ -104,8 +95,13 @@ final class AppModel {
                 scrobbleLog: scrobbleLog,
                 maxItems: 200
             )
+            let recentImported = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+                backlog: backlog,
+                scrobbleLog: scrobbleLog,
+                maxItems: 30
+            ).importedCount
             UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
-            await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0)
+            await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0 || recentImported > 0)
             BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
         }
 
@@ -288,6 +284,11 @@ final class AppModel {
         observer.refreshOnceIfAuthorized()
         await purgePlaybackHistoryBacklogIfNeeded()
         _ = await PlaybackHistoryImporter.shared.importIntoBacklog(backlog: backlog, scrobbleLog: scrobbleLog)
+        _ = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+            backlog: backlog,
+            scrobbleLog: scrobbleLog,
+            allowAuthorizationPrompt: false
+        )
         if let sessionKey = auth.sessionKey {
             let result = await backlog.flush(sessionKey: sessionKey)
             for item in result.sentItems {
@@ -307,66 +308,26 @@ final class AppModel {
     /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
     @discardableResult
     func scanListeningHistory(maxItems: Int = 200, allowExtendedLookback: Bool = false) async -> ListeningHistoryScanResult {
-        guard AppSettings.scrobbleListeningHistoryEnabled() else {
-            await purgePlaybackHistoryBacklogIfNeeded()
-            return ListeningHistoryScanResult(importedCount: 0, flushedPlaybackHistoryCount: 0, skippedDuplicateCount: 0)
+        await ListeningHistoryScanService.scan(
+            backlog: backlog,
+            scrobbleLog: scrobbleLog,
+            sessionKey: auth.sessionKey,
+            maxItems: maxItems,
+            allowExtendedLookback: allowExtendedLookback
+        ) {
+            AppReviewManager.shared.recordSuccessfulScrobble()
         }
-
-        let extendedLookback = allowExtendedLookback && AppSettings.extendedListeningHistoryScanEnabled()
-        var totalImported = 0
-        var totalSkippedDuplicates = 0
-        if maxItems > 0 {
-            while totalImported < ListeningHistoryScanLimits.maxImports {
-                if Task.isCancelled { break }
-
-                let batchLimit = min(maxItems, ListeningHistoryScanLimits.maxImports - totalImported)
-                let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
-                    backlog: backlog,
-                    scrobbleLog: scrobbleLog,
-                    maxItems: batchLimit,
-                    mode: .recentBackfill(extendedLookback: extendedLookback)
-                )
-                let imported = importResult.importedCount
-                totalSkippedDuplicates += importResult.skippedDuplicateCount
-
-                guard imported > 0 else { break }
-                totalImported += imported
-            }
-        }
-
-        guard let sessionKey = auth.sessionKey else {
-            return ListeningHistoryScanResult(
-                importedCount: totalImported,
-                flushedPlaybackHistoryCount: 0,
-                skippedDuplicateCount: totalSkippedDuplicates
-            )
-        }
-
-        var totalFlushedPlaybackHistoryCount = 0
-        for _ in 0..<ListeningHistoryScanLimits.maxFlushBatches {
-            if Task.isCancelled { break }
-
-            let flushResult = await flushBacklogIfNeeded(sessionKey: sessionKey, force: true)
-            let flushedPlaybackHistoryCount = flushResult.sentItems.reduce(into: 0) { count, item in
-                if item.origin == .playbackHistory {
-                    count += 1
-                }
-            }
-
-            guard flushedPlaybackHistoryCount > 0 else { break }
-            totalFlushedPlaybackHistoryCount += flushedPlaybackHistoryCount
-        }
-
-        return ListeningHistoryScanResult(
-            importedCount: totalImported,
-            flushedPlaybackHistoryCount: totalFlushedPlaybackHistoryCount,
-            skippedDuplicateCount: totalSkippedDuplicates
-        )
     }
 
     func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
         guard !isEnabled else { return }
         await backlog.removeAll(origin: .playbackHistory)
+    }
+
+    func handleAppleMusicAPIScrobblingChanged(isEnabled: Bool) async {
+        guard !isEnabled else { return }
+        await backlog.removeAll(origin: .recentlyPlayed)
+        AppleMusicRecentTracksImporter.shared.resetState()
     }
 
     func periodicFlush() async {

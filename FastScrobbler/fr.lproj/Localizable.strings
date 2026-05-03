@@ -5,9 +5,11 @@
 "75%" = "75%";
 "Account" = "Compte";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Empêche d’envoyer la même session de lecture à Last.fm plus d’une fois dans un court laps de temps.";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "Fonction expérimentale : scrobble automatiquement jusqu’à 30 morceaux récemment écoutés via l’API Apple Music.\n\nRemarque : Apple ne fournit pas ici les horodatages de lecture, donc FastScrobbler attribue un horodatage estimé au moment de l’envoi du scrobble. Les morceaux sont enregistrés et scrobblés quelle que soit la durée d’écoute.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Fonction bêta : affiche l’état du scrobbling sur l’écran verrouillé et la Dynamic Island.";
 "Connected" = "Connecté";
 "Done" = "Terminé";
+"Dark" = "Sombre";
 "Duration: %@s | Playback: %@s" = "Durée : %1$@ s | Lecture : %2$@ s";
 "Engine: " = "Moteur : ";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobbler a besoin de quelques autorisations et réglages pour fonctionner correctement.";
@@ -17,8 +19,10 @@
 "Import recent plays from your Music app Listening History." = "Importer les lectures récentes depuis l’historique d’écoute de l’app Musique.";
 "Scan Listening History will import plays from the past 36 hours." = "Analyser l’historique d’écoute importera les lectures des 36 dernières heures.";
 "Scan Listening History will import plays from the past 7 days." = "Analyser l’historique d’écoute importera les lectures des 7 derniers jours.";
+"Scan Listening History will import up to 30 most recently played Apple Music songs." = "Analyser l’historique d’écoute importera jusqu’à 30 morceaux récemment écoutés sur Apple Music.";
 "Last.fm" = "Last.fm";
 "Listening History" = "Historique d’écoute";
+"Light" = "Clair";
 "Live Activities are disabled in iOS Settings for FastScrobbler." = "Les Activités en direct sont désactivées dans les réglages iOS pour FastScrobbler.";
 "Love Apple Music favourites on Last.fm" = "Aimer sur Last.fm les morceaux favoris d’Apple Music";
 "Loved" = "Aimé";
@@ -57,6 +61,7 @@
 "Reset Settings?" = "Réinitialiser les réglages ?";
 "Scrobble at %@ of duration" = "Scrobbler à %@ de la durée";
 "Scrobble Controls" = "Contrôles de scrobble";
+"Scrobble from Apple Music API" = "Scrobbler depuis l’API Apple Music";
 "Scrobble Now" = "Scrobbler maintenant";
 "Settings" = "Réglages";
 "Setup" = "Configuration";
@@ -68,6 +73,8 @@
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "Cela réinitialise les réglages à leurs valeurs initiales (votre compte Last.fm reste connecté).";
 "Upgrade to unlock more scrobble controls." = "Passez à la version supérieure pour débloquer plus de contrôles de scrobble.";
 "Replace song artist with album artist when scrobbling" = "Remplacer l’artiste du morceau par l’artiste de l’album lors du scrobble";
+"Scrobble only the first credited artist" = "Scrobbler uniquement le premier artiste crédité";
+"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "Lorsqu’un morceau liste plusieurs artistes séparés par « & » ou des virgules, ne scrobbler que le premier artiste.";
 "Username" = "Nom d’utilisateur";
 "You’ll need to sign in again to scrobble." = "Vous devrez vous reconnecter pour scrobbler.";
 "You’re upgraded." = "Mise à niveau effectuée.";
@@ -93,6 +100,7 @@
 "Idle" = "Inactif";
 "Imported %lld play(s)." = "%lld lectures importées.";
 "Found %lld new library play(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "%lld nouvelles lectures de bibliothèque trouvées.\n%lld scrobbles envoyés.\n%lld lectures déjà importées ignorées.";
+"Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s)." = "%lld nouvelles lectures de bibliothèque et %lld morceaux récents Apple Music trouvés.\n%lld scrobbles envoyés.\n%lld lectures déjà importées ignorées.";
 "Invalid Last.fm base URL." = "URL de base Last.fm invalide.";
 "Invalid Last.fm request URL." = "URL de requête Last.fm invalide.";
 "Invalid response from Last.fm." = "Réponse invalide de Last.fm.";
@@ -117,6 +125,8 @@
 "Missing Last.fm API secret." = "Secret API Last.fm manquant.";
 "Music control permission is off. Enable it in System Settings → Privacy & Security → Automation." = "L’autorisation de contrôle de Musique est désactivée. Activez-la dans Réglages Système → Confidentialité et sécurité → Automatisation.";
 "No new plays found. Scrobbling from Listening History only works for songs added to your Library." = "Aucune nouvelle lecture trouvée. Le scrobbling depuis l’historique d’écoute fonctionne uniquement pour les morceaux ajoutés à votre bibliothèque.";
+"No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled." = "Aucune nouvelle lecture de bibliothèque trouvée. Les morceaux récents Apple Music n’ont pas pu être vérifiés car l’accès à Musique est désactivé.";
+"No new plays found. Library plays use local Listening History; non-library Apple Music tracks can be recovered from Apple Music Recent Tracks when Apple provides them." = "Aucune nouvelle lecture trouvée. Les lectures de bibliothèque utilisent l’historique d’écoute local ; les morceaux Apple Music hors bibliothèque peuvent être récupérés depuis les morceaux récents Apple Music quand Apple les fournit.";
 "Scrobbling from Listening History only works for songs added to your Library." = "Le scrobbling depuis l’historique d’écoute fonctionne uniquement pour les morceaux ajoutés à votre bibliothèque.";
 "No now-playing item found." = "Aucun élément en cours de lecture trouvé.";
 "No now-playing track." = "Aucun morceau en cours de lecture.";
@@ -156,10 +166,13 @@
 "Running" = "En cours";
 "Scan Listening History" = "Analyser l’historique d’écoute";
 "Scanning…" = "Analyse…";
+"Scanned" = "Analysé";
 "Scrobbled" = "Scrobblé";
 "Scrobbled: %@ — %@" = "Scrobblé : %@ — %@";
 "Scrobbling from Listening History may be affected when AutoMix is on." = "Le scrobbling depuis l’historique d’écoute peut être affecté lorsque AutoMix est activé.";
 "Scrobbling…" = "Scrobbling…";
+"Sending…" = "Envoi…";
+"Sent" = "Envoyé";
 "Note" = "Remarque";
 "Issues Scrobbling?" = "Des problèmes de scrobbling ?";
 "Questions or Bug Reports?" = "Des questions ou des bugs à signaler ?";
@@ -182,6 +195,8 @@
 "Start at login" = "Lancer à l’ouverture de session";
 "Stopped" = "Arrêté";
 "Support development of the app" = "Soutenir le développement de l’app";
+"System" = "Système";
+"Theme" = "Thème";
 /* Added manually for missing Setup and Pro localizations. */
 "Background App Refresh" = "Actualisation en arrière-plan";
 "Live Activities" = "Activités en direct";
@@ -221,6 +236,7 @@
 "Previous Versions" = "Versions précédentes";
 "View Previous Versions" = "Voir les versions précédentes";
 "What's New" = "Nouveautés";
+"New" = "Nouveau";
 
 /* Manual Scrobble */
 "Manual Scrobble" = "Scrobble manuel";

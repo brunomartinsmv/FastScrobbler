@@ -5,7 +5,7 @@ import WidgetKit
 @main
 struct SendNowPlayingControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "com.kevin.FastScrobbler.control.sendNowPlaying") {
+        StaticControlConfiguration(kind: ControlWidgetStatusKind.sendNowPlaying.rawValue) {
             ControlWidgetButton(action: SendNowPlayingIntent()) {
                 Label("Send Now Playing", systemImage: "memories")
             }

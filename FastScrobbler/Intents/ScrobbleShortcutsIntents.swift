@@ -203,6 +203,63 @@ struct ScrobbleSongIntent: AppIntent {
     }
 }
 
+struct ScanListeningHistoryIntent: AppIntent {
+    static let title: LocalizedStringResource = "Scan History"
+    static let description = IntentDescription("Scans Listening History for missed scrobbles.")
+    static let openAppWhenRun: Bool = false
+
+    init() {}
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard let sessionKey = LastFMSessionStore.readSessionKey() else {
+            throw ShortcutsIntentError.notConnected
+        }
+
+        ControlWidgetStatusStore.markInProgress(.scanListeningHistory)
+        let result = await ListeningHistoryScanService.scan(
+            backlog: ScrobbleBacklog.shared,
+            scrobbleLog: ScrobbleLogStore.shared,
+            sessionKey: sessionKey,
+            allowExtendedLookback: true
+        )
+        ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 3)
+
+        return .result(dialog: IntentDialog(stringLiteral: Self.dialogMessage(for: result)))
+    }
+
+    private static func dialogMessage(for result: ListeningHistoryScanService.Result) -> String {
+        if result.totalImportedCount > 0 || result.totalFlushedCount > 0 || result.skippedDuplicateCount > 0 {
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
+                Int64(result.importedCount),
+                Int64(result.importedRecentTrackCount),
+                Int64(result.totalFlushedCount),
+                Int64(result.skippedDuplicateCount)
+            )
+        } else if result.recentTracksAuthorizationUnavailable {
+            return NSLocalizedString(
+                "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled.",
+                comment: ""
+            )
+        } else if result.recentTracksStatus == .seeded {
+            return NSLocalizedString(
+                "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays.",
+                comment: ""
+            )
+        } else if result.recentTracksStatus == .fetchFailed {
+            return NSLocalizedString(
+                "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed.",
+                comment: ""
+            )
+        } else {
+            return NSLocalizedString(
+                "No new plays found. Scrobbling from Listening History only works for songs added to your Library.",
+                comment: ""
+            )
+        }
+    }
+}
+
 @available(iOS 16.0, *)
 struct FastScrobblerShortcutsProvider: AppShortcutsProvider {
     static var shortcutTileColor: ShortcutTileColor = .purple
@@ -237,6 +294,16 @@ struct FastScrobblerShortcutsProvider: AppShortcutsProvider {
             ],
             shortTitle: "Manual Scrobble",
             systemImageName: "plus.circle"
+        )
+
+        AppShortcut(
+            intent: ScanListeningHistoryIntent(),
+            phrases: [
+                "Scan listening history in \(.applicationName)",
+                "Scan history in \(.applicationName)",
+            ],
+            shortTitle: "Scan History",
+            systemImageName: "clock.arrow.circlepath"
         )
     }
 }

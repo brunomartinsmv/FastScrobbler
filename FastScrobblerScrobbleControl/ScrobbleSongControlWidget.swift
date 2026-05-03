@@ -5,7 +5,7 @@ import WidgetKit
 @main
 struct ScrobbleSongControlWidget: ControlWidget {
     var body: some ControlWidgetConfiguration {
-        StaticControlConfiguration(kind: "com.kevin.FastScrobbler.control.scrobbleSong") {
+        StaticControlConfiguration(kind: ControlWidgetStatusKind.scrobbleSong.rawValue) {
             ControlWidgetButton(action: ScrobbleSongIntent()) {
                 Label("Scrobble Song", systemImage: "memories.badge.plus")
             }

@@ -59,6 +59,7 @@ struct SetupHelpView: View {
         let badgeLevel: StatusLevel
         let actionTitle: String?
         let action: (() -> Void)?
+        let actionSystemImage: String?
         let actionDisabled: Bool
         let actionProminent: Bool
         let actionTint: Color?
@@ -72,6 +73,7 @@ struct SetupHelpView: View {
             badgeLevel: StatusLevel,
             actionTitle: String?,
             action: (() -> Void)?,
+            actionSystemImage: String? = nil,
             actionDisabled: Bool = false,
             actionProminent: Bool = false,
             actionTint: Color? = nil
@@ -84,6 +86,7 @@ struct SetupHelpView: View {
             self.badgeLevel = badgeLevel
             self.actionTitle = actionTitle
             self.action = action
+            self.actionSystemImage = actionSystemImage
             self.actionDisabled = actionDisabled
             self.actionProminent = actionProminent
             self.actionTint = actionTint
@@ -126,8 +129,14 @@ struct SetupHelpView: View {
                             Button {
                                 action()
                             } label: {
-                                Label(actionTitle, systemImage: "music.note")
-                                    .frame(maxWidth: .infinity)
+                                Group {
+                                    if let actionSystemImage {
+                                        Label(actionTitle, systemImage: actionSystemImage)
+                                    } else {
+                                        Text(actionTitle)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
                             }
                                 .disabled(actionDisabled)
                                 .buttonStyle(GiantPillButtonStyle(tint: actionTint ?? .accentColor))
@@ -337,6 +346,7 @@ struct SetupHelpView: View {
                     }
                 }
             },
+            actionSystemImage: "music.note",
             actionDisabled: isSigningInToLastFM,
             actionProminent: true,
             actionTint: .red
@@ -347,20 +357,35 @@ struct SetupHelpView: View {
         let (badgeText, badgeLevel) = badge(for: mediaStatus)
         let action: (() -> Void)?
         let actionTitle: String?
+        let actionSystemImage: String?
+        let actionProminent: Bool
+        let actionTint: Color?
 
         switch mediaStatus {
         case .authorized:
             action = nil
             actionTitle = nil
+            actionSystemImage = nil
+            actionProminent = false
+            actionTint = nil
         case .notDetermined:
             action = { Task { await requestMediaLibraryPermission() } }
             actionTitle = NSLocalizedString("Enable Media Library", comment: "")
+            actionSystemImage = "music.note.list"
+            actionProminent = true
+            actionTint = .red
         case .denied, .restricted:
             action = openAppSettings
             actionTitle = NSLocalizedString("Open Settings", comment: "")
+            actionSystemImage = "gearshape"
+            actionProminent = true
+            actionTint = .red
         @unknown default:
             action = openAppSettings
             actionTitle = NSLocalizedString("Open Settings", comment: "")
+            actionSystemImage = "gearshape"
+            actionProminent = true
+            actionTint = .red
         }
 
         return SettingRow(
@@ -370,7 +395,10 @@ struct SetupHelpView: View {
             badgeText: badgeText,
             badgeLevel: badgeLevel,
             actionTitle: actionTitle,
-            action: action
+            action: action,
+            actionSystemImage: actionSystemImage,
+            actionProminent: actionProminent,
+            actionTint: actionTint
         )
     }
 

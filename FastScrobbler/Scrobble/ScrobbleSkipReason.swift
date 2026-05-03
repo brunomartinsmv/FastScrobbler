@@ -1,6 +1,6 @@
 import Foundation
 
-enum ScrobbleSkipReason {
+enum ScrobbleSkipReason: Equatable {
     case sessionAlreadyScrobbled
     case foundInBacklog(startTimestamp: Int)
     case foundInLog(startTimestamp: Int)

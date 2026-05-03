@@ -216,7 +216,9 @@ struct SetupHelpView: View {
                     let musicControlActionTitle: String? = {
                         guard !musicControlAllowed else { return nil }
                         switch permissions.automationStatus {
-                        case .notDetermined, .denied, .restricted:
+                        case .notDetermined:
+                            return NSLocalizedString("Allow Music Control", comment: "")
+                        case .denied, .restricted:
                             return NSLocalizedString("Open System Settings", comment: "")
                         case .authorized:
                             return nil
@@ -225,7 +227,9 @@ struct SetupHelpView: View {
                     let musicControlAction: (() -> Void)? = {
                         guard !musicControlAllowed else { return nil }
                         switch permissions.automationStatus {
-                        case .notDetermined, .denied, .restricted:
+                        case .notDetermined:
+                            return requestMusicControlPermission
+                        case .denied, .restricted:
                             return { openPrivacySettings(kind: .automation) }
                         case .authorized:
                             return nil
@@ -278,6 +282,12 @@ struct SetupHelpView: View {
                         icon: "play.circle.fill",
                         title: NSLocalizedString("Start playing music", comment: ""),
                         subtitle: NSLocalizedString("Start playing music! FastScrobbler will show Now Playing and scrobble when eligible.", comment: "")
+                    )
+
+                    HelpRow(
+                        icon: "waveform.path.ecg",
+                        title: NSLocalizedString("Auto-scrobble troubleshooting", comment: ""),
+                        subtitle: NSLocalizedString("If “Scrobble Now” works but auto-scrobble does not, FastScrobbler is usually blocking the play because playback state or duplicate checks do not look trustworthy yet. Check the status card for the exact blocker.", comment: "")
                     )
 
                     HelpRow(
