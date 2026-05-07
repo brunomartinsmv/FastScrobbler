@@ -9,7 +9,7 @@ final class LiveActivityManager {
 
     static let enabledDefaultsKey = "FastScrobbler.LiveActivity.enabled"
     static let backgroundedAtDefaultsKey = "FastScrobbler.LiveActivity.backgroundedAt"
-    static let maxBackgroundSeconds: TimeInterval = 60 * 60
+    static let maxBackgroundSeconds: TimeInterval = 45 * 60
     static let playbackStoppedDismissalDelay: TimeInterval = 5 * 60
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "LiveActivity")
@@ -30,7 +30,7 @@ final class LiveActivityManager {
             return
         }
 
-        logger.debug("app backgrounded >= 60 minutes; ending all Live Activities")
+        logger.debug("app backgrounded >= 45 minutes; ending all Live Activities")
         await endAllActivities(except: nil)
         activity = nil
     }
@@ -165,7 +165,7 @@ final class LiveActivityManager {
         )
 
         if let backgroundedAt = UserDefaults.standard.object(forKey: Self.backgroundedAtDefaultsKey) as? Date {
-            // When the app is no longer open, mark the Live Activity content as stale after 30 minutes.
+            // When the app is no longer open, mark the Live Activity content as stale after 45 minutes.
             // Avoid `end()` here: ended activities can disappear from Dynamic Island immediately.
             let dismissalAt = backgroundedAt.addingTimeInterval(Self.maxBackgroundSeconds)
 
@@ -198,7 +198,7 @@ final class LiveActivityManager {
             return false
         }
 
-        logger.debug("app backgrounded >= 60 minutes; ending all Live Activities")
+        logger.debug("app backgrounded >= 45 minutes; ending all Live Activities")
         await endAllActivities(except: nil)
         activity = nil
         return true

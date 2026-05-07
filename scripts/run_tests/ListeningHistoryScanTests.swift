@@ -210,6 +210,22 @@ func runListeningHistoryScanTests() {
         }
     }
 
+    func pausedScanResult(importedCount: Int, importedRecentTrackCount: Int, skippedDuplicateCount: Int) -> (flushedPlaybackHistory: Int, flushedRecentTracks: Int, skippedDuplicates: Int) {
+        (flushedPlaybackHistory: 0, flushedRecentTracks: 0, skippedDuplicates: skippedDuplicateCount)
+    }
+
+    func pausedExplicitScanResult(
+        importedCount: Int,
+        importedRecentTrackCount: Int,
+        skippedDuplicateCount: Int
+    ) -> (flushedPlaybackHistory: Int, flushedRecentTracks: Int, skippedDuplicates: Int) {
+        (
+            flushedPlaybackHistory: importedCount,
+            flushedRecentTracks: importedRecentTrackCount,
+            skippedDuplicates: skippedDuplicateCount
+        )
+    }
+
     expectEqual(
         "summary reports flushed playback-history plays separately",
         listeningHistorySummary(importedCount: 0, skippedDuplicateCount: 0, flushedOrigins: [.playbackHistory, .playbackHistory]),
@@ -235,6 +251,14 @@ func runListeningHistoryScanTests() {
         listeningHistorySummary(importedCount: 4, skippedDuplicateCount: 1, flushedOrigins: [.live, .playbackHistory, .manual, .playbackHistory]),
         "Found 4; Submitted 2; Skipped 1"
     )
+    let pausedResult = pausedScanResult(importedCount: 3, importedRecentTrackCount: 2, skippedDuplicateCount: 1)
+    expectEqual("paused scan suppresses playback-history flushes", pausedResult.flushedPlaybackHistory, 0)
+    expectEqual("paused scan suppresses recent-track flushes", pausedResult.flushedRecentTracks, 0)
+    expectEqual("paused scan still reports duplicate skips", pausedResult.skippedDuplicates, 1)
+    let pausedExplicitResult = pausedExplicitScanResult(importedCount: 3, importedRecentTrackCount: 2, skippedDuplicateCount: 1)
+    expectEqual("paused explicit scan flushes playback-history items", pausedExplicitResult.flushedPlaybackHistory, 3)
+    expectEqual("paused explicit scan flushes recent-track items", pausedExplicitResult.flushedRecentTracks, 2)
+    expectEqual("paused explicit scan still reports duplicate skips", pausedExplicitResult.skippedDuplicates, 1)
     expectEqual(
         "empty-state auth message remains specific",
         listeningHistoryEmptyStateMessage(recentTracksStatus: .authorizationUnavailable),

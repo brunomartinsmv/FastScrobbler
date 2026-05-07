@@ -11,10 +11,10 @@ func runScrobbleLogStoreTests() {
         let scrobbledAt: Int
     }
 
-    let maxStoredEntries = 200
+    let maxStoredEntries = 100
     let defaultDisplayLimit = 40
     let manualDisplayLimit = 30
-    let maxEntryAgeSeconds = 45 * 24 * 60 * 60
+    let maxEntryAgeSeconds = 21 * 24 * 60 * 60
 
     func mergeIdentity(for entry: FakeLogEntry) -> String {
         "\(entry.source)|\(entry.key)|\(entry.startTimestamp)"
@@ -64,15 +64,15 @@ func runScrobbleLogStoreTests() {
     let now = 2_000_000_000
     let old = FakeLogEntry(id: "old", source: "live", key: "track-old", startTimestamp: now - maxEntryAgeSeconds - 1, scrobbledAt: now - maxEntryAgeSeconds - 1)
     let recent = FakeLogEntry(id: "recent", source: "live", key: "track-recent", startTimestamp: now - 60, scrobbledAt: now - 60)
-    expectEqual("normalization removes entries older than 45 days", normalizedEntries([old, recent], now: now).map(\.id), ["recent"])
+    expectEqual("normalization removes entries older than 21 days", normalizedEntries([old, recent], now: now).map(\.id), ["recent"])
 
-    let oversized = (0..<210).map { index in
+    let oversized = (0..<110).map { index in
         FakeLogEntry(id: "\(index)", source: "live", key: "track-\(index)", startTimestamp: now - index, scrobbledAt: now - index)
     }
     let trimmed = normalizedEntries(oversized, now: now)
-    expectEqual("normalization trims stored log to 200 entries", trimmed.count, maxStoredEntries)
+    expectEqual("normalization trims stored log to 100 entries", trimmed.count, maxStoredEntries)
     expect("normalization preserves newest stored entry", trimmed.contains(where: { $0.id == "0" }))
-    expect("normalization drops oldest excess entry", !trimmed.contains(where: { $0.id == "209" }))
+    expect("normalization drops oldest excess entry", !trimmed.contains(where: { $0.id == "109" }))
 
     let sameSubmitTimeOlderStart = FakeLogEntry(id: "older-start", source: "live", key: "track-a", startTimestamp: now - 500, scrobbledAt: now - 100)
     let newestSubmitTime = FakeLogEntry(id: "newest-submit", source: "live", key: "track-b", startTimestamp: now - 600, scrobbledAt: now - 50)
@@ -126,12 +126,103 @@ func runScrobbleLogStoreTests() {
     section("Scrobble Log · Display timestamp source")
 
     func displayTimestamp(source: String, startTimestamp: Int, scrobbledAt: Int) -> Int {
-        if source == "playbackHistory" {
+        if source == "playbackHistory" || source == "recentlyPlayed" {
             return startTimestamp
         }
         return scrobbledAt
     }
 
     expectEqual("playback-history rows display Apple's played timestamp", displayTimestamp(source: "playbackHistory", startTimestamp: 5_000, scrobbledAt: 6_000), 5_000)
+    expectEqual("recently-played rows display synthesized play timestamp", displayTimestamp(source: "recentlyPlayed", startTimestamp: 5_100, scrobbledAt: 6_000), 5_100)
     expectEqual("live rows display submission time", displayTimestamp(source: "live", startTimestamp: 5_000, scrobbledAt: 6_000), 6_000)
+
+    section("Scrobble Log · Compact persistence migration")
+
+    struct FullTrack: Codable {
+        let artist: String
+        let title: String
+        let album: String?
+        let albumArtist: String?
+        let durationSeconds: Double?
+        let usesFallbackDuration: Bool?
+        let persistentID: UInt64?
+        let playbackStoreID: String?
+        let isCompilation: Bool?
+    }
+
+    struct LegacyEntry: Codable {
+        let id: UUID
+        let track: FullTrack
+        let startTimestamp: Int
+        let scrobbledAt: Int
+        let source: String
+        let lovedOnLastFM: Bool?
+    }
+
+    struct CompactTrack: Codable {
+        let a: String
+        let t: String
+        let al: String?
+        let aa: String?
+        let d: Double?
+        let uf: Bool?
+        let p: UInt64?
+        let ps: String?
+        let ic: Bool?
+    }
+
+    struct CompactEntry: Codable {
+        let i: UUID
+        let t: CompactTrack
+        let s: Int
+        let c: Int
+        let o: String
+        let l: Bool?
+    }
+
+    let legacyEntries = (0..<12).map { index in
+        LegacyEntry(
+            id: UUID(uuidString: "10000000-0000-0000-0000-\(String(format: "%012d", index))") ?? UUID(),
+            track: FullTrack(
+                artist: "Artist \(index)",
+                title: "Song \(index)",
+                album: "Album \(index)",
+                albumArtist: "Album Artist \(index)",
+                durationSeconds: 240,
+                usesFallbackDuration: false,
+                persistentID: UInt64(index + 1),
+                playbackStoreID: "store-\(index)",
+                isCompilation: false
+            ),
+            startTimestamp: 40_000 + index,
+            scrobbledAt: 50_000 + index,
+            source: index.isMultiple(of: 2) ? "live" : "manual",
+            lovedOnLastFM: index.isMultiple(of: 3)
+        )
+    }
+    let compactEntries = legacyEntries.map { entry in
+        CompactEntry(
+            i: entry.id,
+            t: CompactTrack(
+                a: entry.track.artist,
+                t: entry.track.title,
+                al: entry.track.album,
+                aa: entry.track.albumArtist,
+                d: entry.track.durationSeconds,
+                uf: entry.track.usesFallbackDuration,
+                p: entry.track.persistentID,
+                ps: entry.track.playbackStoreID,
+                ic: entry.track.isCompilation
+            ),
+            s: entry.startTimestamp,
+            c: entry.scrobbledAt,
+            o: entry.source,
+            l: entry.lovedOnLastFM
+        )
+    }
+
+    let encoder = JSONEncoder()
+    let legacyData = try! encoder.encode(legacyEntries)
+    let compactData = try! encoder.encode(compactEntries)
+    expect("compact scrobble-log persistence shrinks representative payloads", compactData.count < legacyData.count, detail: "legacy=\(legacyData.count), compact=\(compactData.count)")
 }

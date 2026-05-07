@@ -1,7 +1,5 @@
 import SwiftUI
-#if os(iOS)
 import ActivityKit
-#endif
 
 struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/kevinlim512/FastScrobbler")!
@@ -58,6 +56,7 @@ struct SettingsView: View {
     }
 
     private enum SettingsRoute: Hashable {
+        case appStorage
         case appleMusicAPI
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
@@ -82,6 +81,8 @@ struct SettingsView: View {
             settingsRootContent
                 .navigationDestination(for: SettingsRoute.self) { route in
                     switch route {
+                    case .appStorage:
+                        AppStorageSettingsPage()
                     case .appleMusicAPI:
                         AppleMusicAPISettingsPage()
                     case .removeBracketsFromSongTitles:
@@ -95,12 +96,9 @@ struct SettingsView: View {
                     }
                 }
                 .navigationTitle("Settings")
-#if os(iOS)
                 .navigationBarTitleDisplayMode(.large)
-#endif
                 .toolbar {
                     if !isEmbeddedInTab {
-#if os(iOS)
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 dismiss()
@@ -110,7 +108,6 @@ struct SettingsView: View {
                             .buttonStyle(.plain)
                             .accessibilityLabel("Close")
                         }
-#endif
                     }
                 }
         }
@@ -153,19 +150,11 @@ struct SettingsView: View {
         } message: {
             Text(lastFMLoginErrorText ?? "")
         }
-#if os(iOS)
         .fullScreenCover(isPresented: $isShowingWhatsNew) {
             WhatsNewView {
                 isShowingWhatsNew = false
             }
         }
-#else
-        .sheet(isPresented: $isShowingWhatsNew) {
-            WhatsNewView {
-                isShowingWhatsNew = false
-            }
-        }
-#endif
     }
 
     @ViewBuilder
@@ -191,9 +180,7 @@ struct SettingsView: View {
                         .foregroundStyle(.primary)
                     }
                 }
-#if os(iOS)
                 .listSectionSpacing(.compact)
-#endif
             }
 
             Section("Scrobble Controls") {
@@ -316,7 +303,6 @@ struct SettingsView: View {
                         }
                     }
 
-                #if os(iOS)
                 if #available(iOS 16.1, *) {
                     if !ActivityAuthorizationInfo().areActivitiesEnabled {
                         Text("Live Activities are disabled in iOS Settings for FastScrobbler.")
@@ -324,14 +310,12 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                #endif
 
                 Text("Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
-#if os(iOS)
             Section("Theme") {
                 Picker("Theme", selection: $themeSelectionRawValue) {
                     Text("System").tag(AppTheme.system.rawValue)
@@ -339,7 +323,6 @@ struct SettingsView: View {
                     Text("Dark").tag(AppTheme.dark.rawValue)
                 }
             }
-#endif
 
             Section("Account") {
                 HStack {
@@ -419,6 +402,7 @@ struct SettingsView: View {
             }
 
             Section {
+                appStorageNavigationLink
                 Button(role: .destructive) {
                     activeAlert = .resetConfirmation
                 } label: {
@@ -482,7 +466,11 @@ struct SettingsView: View {
         isScanningListeningHistory = true
         defer { isScanningListeningHistory = false }
 
-        let result = await AppModel.shared.scanListeningHistory(allowExtendedLookback: true)
+        let result = await AppModel.shared.scanListeningHistory(
+            allowExtendedLookback: true,
+            allowSubmissionWhilePaused: true,
+            bypassRecentTrackCooldown: true
+        )
         if result.totalImportedCount > 0 || result.totalFlushedCount > 0 || result.skippedDuplicateCount > 0 {
             activeAlert = .listeningHistoryScanResult(
                 message: String.localizedStringWithFormat(
@@ -649,6 +637,13 @@ struct SettingsView: View {
         }
     }
 
+    private var appStorageNavigationLink: some View {
+        NavigationLink(value: SettingsRoute.appStorage) {
+            Label("App Storage", systemImage: "externaldrive")
+        }
+        .foregroundStyle(.red)
+    }
+
     @ViewBuilder
     private var lockedProInlineBadge: some View {
         if !pro.isPro {
@@ -717,6 +712,90 @@ struct SettingsView: View {
                 storage.wrappedValue = newValue
             }
         )
+    }
+}
+
+private struct AppStorageSettingsPage: View {
+    @State private var isRunningStorageMaintenance = false
+    @State private var storageUsageSnapshot: StorageUsageSnapshot?
+    @State private var storageMaintenanceAlertMessage: String?
+
+    private func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Button {
+                    Task { await runStorageMaintenanceTapped() }
+                } label: {
+                    Label(
+                        isRunningStorageMaintenance ? localized("Cleaning Up…") : localized("Trim Local Storage"),
+                        systemImage: "externaldrive.badge.wifi"
+                    )
+                }
+                .disabled(isRunningStorageMaintenance)
+            }
+
+            Section {
+                storageUsageRow(title: "Backlog items", value: storageUsageSnapshot.map { "\($0.backlogCount)" })
+                storageUsageRow(title: "Backlog storage", value: storageUsageSnapshot.map { byteCountText($0.backlogBytes) })
+                storageUsageRow(title: "Scrobble log entries", value: storageUsageSnapshot.map { "\($0.scrobbleLogCount)" })
+                storageUsageRow(title: "Scrobble log storage", value: storageUsageSnapshot.map { byteCountText($0.scrobbleLogBytes) })
+                storageUsageRow(title: "Listening history state", value: storageUsageSnapshot.map { byteCountText($0.playbackHistoryStateBytes) })
+                storageUsageRow(title: "Recent tracks state", value: storageUsageSnapshot.map { byteCountText($0.recentTracksStateBytes) })
+            } footer: {
+                Text(localized("FastScrobbler stores these data to optimise your scrobbling experience. FastScrobbler does NOT store these for data collection purposes."))
+            }
+        }
+        .navigationTitle(localized("App Storage"))
+        .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await refreshStorageUsageSnapshot()
+        }
+        .alert(localized("Storage Cleanup"), isPresented: Binding(
+            get: { storageMaintenanceAlertMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    storageMaintenanceAlertMessage = nil
+                }
+            }
+        )) {
+            Button(localized("OK"), role: .cancel) {}
+        } message: {
+            Text(storageMaintenanceAlertMessage ?? "")
+        }
+    }
+
+    @MainActor
+    private func runStorageMaintenanceTapped() async {
+        guard !isRunningStorageMaintenance else { return }
+        isRunningStorageMaintenance = true
+        defer { isRunningStorageMaintenance = false }
+
+        await AppModel.shared.runStorageMaintenanceNow()
+        await refreshStorageUsageSnapshot()
+        storageMaintenanceAlertMessage = localized("Local storage cleanup finished.")
+    }
+
+    @MainActor
+    private func refreshStorageUsageSnapshot() async {
+        storageUsageSnapshot = await AppModel.shared.collectStorageUsageSnapshot()
+    }
+
+    private func storageUsageRow(title: String, value: String?) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value ?? localized("Loading…"))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func byteCountText(_ bytes: Int64) -> String {
+        ByteCountFormatter.string(fromByteCount: max(0, bytes), countStyle: .file)
     }
 }
 

@@ -12,8 +12,18 @@ CONTROL_WIDGET_DEPLOYMENT_TARGET = "18.0"
 MACOS_DEPLOYMENT_TARGET = "14.6"
 
 SWIFT_VERSION = "5.0"
-MARKETING_VERSION = "1.0"
-CURRENT_PROJECT_VERSION = "1"
+DEVELOPMENT_TEAM = "6SVRCQ9AH5"
+PROJECT_OBJECT_VERSION = 54
+PROJECT_COMPATIBILITY_VERSION = "Xcode 3.2"
+PROJECT_LAST_SWIFT_UPDATE_CHECK = "1600"
+PROJECT_LAST_UPGRADE_CHECK = "2640"
+SCHEME_LAST_UPGRADE_VERSION = "2640"
+IOS_APP_MARKETING_VERSION = "5.5"
+IOS_APP_CURRENT_PROJECT_VERSION = "5501"
+MAC_APP_MARKETING_VERSION = "5.5"
+MAC_APP_CURRENT_PROJECT_VERSION = "5501"
+EXTENSION_MARKETING_VERSION = "1.0"
+EXTENSION_CURRENT_PROJECT_VERSION = "1"
 
 MAIN_APP_BUNDLE_ID = "com.kevin.FastScrobbler"
 LIVE_ACTIVITY_BUNDLE_ID = "com.kevin.FastScrobbler.liveactivity"
@@ -28,6 +38,121 @@ IGNORED_FILES = [".DS_Store"].freeze
 IGNORED_SUFFIXES = ["_Template.swift", "_template.swift"].freeze
 KNOWN_REGIONS = %w[en Base es fr ja zh-Hans].freeze
 
+PROJECT_BUILD_SETTINGS = {
+  "Debug" => {
+    "ALWAYS_SEARCH_USER_PATHS" => "NO",
+    "CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED" => "YES",
+    "CLANG_ANALYZER_NONNULL" => "YES",
+    "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION" => "YES_AGGRESSIVE",
+    "CLANG_CXX_LANGUAGE_STANDARD" => "gnu++14",
+    "CLANG_CXX_LIBRARY" => "libc++",
+    "CLANG_ENABLE_MODULES" => "YES",
+    "CLANG_ENABLE_OBJC_ARC" => "YES",
+    "CLANG_ENABLE_OBJC_WEAK" => "YES",
+    "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING" => "YES",
+    "CLANG_WARN_BOOL_CONVERSION" => "YES",
+    "CLANG_WARN_COMMA" => "YES",
+    "CLANG_WARN_CONSTANT_CONVERSION" => "YES",
+    "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS" => "YES",
+    "CLANG_WARN_DIRECT_OBJC_ISA_USAGE" => "YES_ERROR",
+    "CLANG_WARN_DOCUMENTATION_COMMENTS" => "YES",
+    "CLANG_WARN_EMPTY_BODY" => "YES",
+    "CLANG_WARN_ENUM_CONVERSION" => "YES",
+    "CLANG_WARN_INFINITE_RECURSION" => "YES",
+    "CLANG_WARN_INT_CONVERSION" => "YES",
+    "CLANG_WARN_NON_LITERAL_NULL_CONVERSION" => "YES",
+    "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF" => "YES",
+    "CLANG_WARN_OBJC_LITERAL_CONVERSION" => "YES",
+    "CLANG_WARN_OBJC_ROOT_CLASS" => "YES_ERROR",
+    "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER" => "YES",
+    "CLANG_WARN_RANGE_LOOP_ANALYSIS" => "YES",
+    "CLANG_WARN_STRICT_PROTOTYPES" => "YES",
+    "CLANG_WARN_SUSPICIOUS_MOVE" => "YES",
+    "CLANG_WARN_UNGUARDED_AVAILABILITY" => "YES_AGGRESSIVE",
+    "CLANG_WARN_UNREACHABLE_CODE" => "YES",
+    "CLANG_WARN__DUPLICATE_METHOD_MATCH" => "YES",
+    "COPY_PHASE_STRIP" => "NO",
+    "DEAD_CODE_STRIPPING" => "YES",
+    "DEBUG_INFORMATION_FORMAT" => "dwarf",
+    "ENABLE_STRICT_OBJC_MSGSEND" => "YES",
+    "ENABLE_TESTABILITY" => "YES",
+    "ENABLE_USER_SCRIPT_SANDBOXING" => "YES",
+    "GCC_C_LANGUAGE_STANDARD" => "gnu11",
+    "GCC_DYNAMIC_NO_PIC" => "NO",
+    "GCC_NO_COMMON_BLOCKS" => "YES",
+    "GCC_OPTIMIZATION_LEVEL" => "0",
+    "GCC_PREPROCESSOR_DEFINITIONS" => ["DEBUG=1", "$(inherited)"],
+    "GCC_WARN_64_TO_32_BIT_CONVERSION" => "YES",
+    "GCC_WARN_ABOUT_RETURN_TYPE" => "YES_ERROR",
+    "GCC_WARN_UNDECLARED_SELECTOR" => "YES",
+    "GCC_WARN_UNINITIALIZED_AUTOS" => "YES_AGGRESSIVE",
+    "GCC_WARN_UNUSED_FUNCTION" => "YES",
+    "GCC_WARN_UNUSED_VARIABLE" => "YES",
+    "MTL_ENABLE_DEBUG_INFO" => "INCLUDE_SOURCE",
+    "MTL_FAST_MATH" => "YES",
+    "ONLY_ACTIVE_ARCH" => "YES",
+    "PRODUCT_NAME" => "$(TARGET_NAME)",
+    "STRING_CATALOG_GENERATE_SYMBOLS" => "YES",
+    "SWIFT_ACTIVE_COMPILATION_CONDITIONS" => "DEBUG",
+    "SWIFT_OPTIMIZATION_LEVEL" => "-Onone",
+    "SWIFT_VERSION" => SWIFT_VERSION,
+  },
+  "Release" => {
+    "ALWAYS_SEARCH_USER_PATHS" => "NO",
+    "CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED" => "YES",
+    "CLANG_ANALYZER_NONNULL" => "YES",
+    "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION" => "YES_AGGRESSIVE",
+    "CLANG_CXX_LANGUAGE_STANDARD" => "gnu++14",
+    "CLANG_CXX_LIBRARY" => "libc++",
+    "CLANG_ENABLE_MODULES" => "YES",
+    "CLANG_ENABLE_OBJC_ARC" => "YES",
+    "CLANG_ENABLE_OBJC_WEAK" => "YES",
+    "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING" => "YES",
+    "CLANG_WARN_BOOL_CONVERSION" => "YES",
+    "CLANG_WARN_COMMA" => "YES",
+    "CLANG_WARN_CONSTANT_CONVERSION" => "YES",
+    "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS" => "YES",
+    "CLANG_WARN_DIRECT_OBJC_ISA_USAGE" => "YES_ERROR",
+    "CLANG_WARN_DOCUMENTATION_COMMENTS" => "YES",
+    "CLANG_WARN_EMPTY_BODY" => "YES",
+    "CLANG_WARN_ENUM_CONVERSION" => "YES",
+    "CLANG_WARN_INFINITE_RECURSION" => "YES",
+    "CLANG_WARN_INT_CONVERSION" => "YES",
+    "CLANG_WARN_NON_LITERAL_NULL_CONVERSION" => "YES",
+    "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF" => "YES",
+    "CLANG_WARN_OBJC_LITERAL_CONVERSION" => "YES",
+    "CLANG_WARN_OBJC_ROOT_CLASS" => "YES_ERROR",
+    "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER" => "YES",
+    "CLANG_WARN_RANGE_LOOP_ANALYSIS" => "YES",
+    "CLANG_WARN_STRICT_PROTOTYPES" => "YES",
+    "CLANG_WARN_SUSPICIOUS_MOVE" => "YES",
+    "CLANG_WARN_UNGUARDED_AVAILABILITY" => "YES_AGGRESSIVE",
+    "CLANG_WARN_UNREACHABLE_CODE" => "YES",
+    "CLANG_WARN__DUPLICATE_METHOD_MATCH" => "YES",
+    "COPY_PHASE_STRIP" => "NO",
+    "DEAD_CODE_STRIPPING" => "YES",
+    "DEBUG_INFORMATION_FORMAT" => "dwarf-with-dsym",
+    "ENABLE_NS_ASSERTIONS" => "NO",
+    "ENABLE_STRICT_OBJC_MSGSEND" => "YES",
+    "ENABLE_USER_SCRIPT_SANDBOXING" => "YES",
+    "GCC_C_LANGUAGE_STANDARD" => "gnu11",
+    "GCC_NO_COMMON_BLOCKS" => "YES",
+    "GCC_WARN_64_TO_32_BIT_CONVERSION" => "YES",
+    "GCC_WARN_ABOUT_RETURN_TYPE" => "YES_ERROR",
+    "GCC_WARN_UNDECLARED_SELECTOR" => "YES",
+    "GCC_WARN_UNINITIALIZED_AUTOS" => "YES_AGGRESSIVE",
+    "GCC_WARN_UNUSED_FUNCTION" => "YES",
+    "GCC_WARN_UNUSED_VARIABLE" => "YES",
+    "MTL_ENABLE_DEBUG_INFO" => "NO",
+    "MTL_FAST_MATH" => "YES",
+    "PRODUCT_NAME" => "$(TARGET_NAME)",
+    "STRING_CATALOG_GENERATE_SYMBOLS" => "YES",
+    "SWIFT_COMPILATION_MODE" => "wholemodule",
+    "SWIFT_OPTIMIZATION_LEVEL" => "-O",
+    "SWIFT_VERSION" => SWIFT_VERSION,
+  },
+}.freeze
+
 def localized_resources(root_path)
   Dir.glob("#{root_path}/*.lproj").sort
 end
@@ -40,18 +165,20 @@ SHARED_CORE_SOURCES = %w[
   FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
   FastScrobbler/Models/Track.swift
-  FastScrobbler/Pro.swift
+  FastScrobbler/ProPurchaseManager.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleEngine.swift
+  FastScrobbler/Scrobble/ManualScrobbleError.swift
   FastScrobbler/Scrobble/ScrobbleSkipReason.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
-  FastScrobbler/Scrobble/ManualScrobbleError.swift
   FastScrobbler/Scrobble/RelativeScrobbleTimeFormatter.swift
   FastScrobbler/SettingsView.swift
+  FastScrobbler/WhatsNewRelease.swift
 ].freeze
 
 IOS_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
   FastScrobbler/AppDelegate.swift
+  FastScrobbler/AppleMusicAPISettingsPage.swift
   FastScrobbler/BackgroundTaskManager.swift
   FastScrobbler/Intents/ControlWidgetStatus.swift
   FastScrobbler/Intents/ScrobbleShortcutsIntents.swift
@@ -63,6 +190,7 @@ IOS_APP_SOURCES = (SHARED_CORE_SOURCES + %w[
   FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift
   FastScrobbler/NowPlaying/ListeningHistoryScanService.swift
   FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
+  FastScrobbler/Pro.swift
   FastScrobbler/RemoveBracketsSettingsPage.swift
   FastScrobbler/SceneDelegate.swift
   FastScrobbler/SetupHelpView.swift
@@ -75,22 +203,24 @@ MAC_APP_SOURCES = %w[
   FastScrobbler/LastFM/LastFMClient.swift
   FastScrobbler/LastFM/LastFMSessionStore.swift
   FastScrobbler/LastFMSecrets.swift
-  FastScrobbler/ManualScrobbleView.swift
   FastScrobbler/Models/Track.swift
-  FastScrobbler/Pro.swift
+  FastScrobbler/ProPurchaseManager.swift
   FastScrobbler/RemoveBracketsSettingsPage.swift
   FastScrobbler/Scrobble/ScrobbleBacklog.swift
   FastScrobbler/Scrobble/ScrobbleEngine.swift
+  FastScrobbler/Scrobble/ManualScrobbleError.swift
+  FastScrobbler/Scrobble/ScrobbleSkipReason.swift
   FastScrobbler/Scrobble/ScrobbleLogStore.swift
   FastScrobbler/Scrobble/RelativeScrobbleTimeFormatter.swift
   FastScrobbler/TextReplacementSettingsPage.swift
-  FastScrobbler/WhatsNewView.swift
+  FastScrobbler/WhatsNewRelease.swift
   FastScrobblerMac/AppModel.swift
   FastScrobblerMac/AppleMusicNowPlayingObserver.swift
   FastScrobblerMac/BackgroundTaskManager.swift
   FastScrobblerMac/ContentView.swift
   FastScrobblerMac/FastScrobblerMacApp.swift
   FastScrobblerMac/LiveActivityManager.swift
+  FastScrobblerMac/ManualScrobbleView.swift
   FastScrobblerMac/MenuBarController.swift
   FastScrobblerMac/MediaPlayerShims.swift
   FastScrobblerMac/PlaybackHistoryImporter.swift
@@ -181,6 +311,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "NO",
     application_extension_api_only: "NO",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: IOS_APP_MARKETING_VERSION,
+    current_project_version: IOS_APP_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    ld_runpath_search_paths: ["$(inherited)", "@executable_path/Frameworks"],
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       ActivityKit
       AppIntents
@@ -211,6 +347,14 @@ TARGET_DEFINITIONS = [
     supported_platforms: "macosx",
     skip_install: "NO",
     application_extension_api_only: "NO",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: MAC_APP_MARKETING_VERSION,
+    current_project_version: MAC_APP_CURRENT_PROJECT_VERSION,
+    sdkroot: "macosx",
+    ld_runpath_search_paths: ["$(inherited)", "@executable_path/../Frameworks"],
+    combine_hidpi_images: "YES",
+    dead_code_stripping: "YES",
+    register_app_groups: "YES",
     frameworks: %w[
       AppKit
       AuthenticationServices
@@ -234,6 +378,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "YES",
     application_extension_api_only: "YES",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: EXTENSION_MARKETING_VERSION,
+    current_project_version: EXTENSION_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    validate_product: "YES",
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       ActivityKit
       SwiftUI
@@ -254,6 +404,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "YES",
     application_extension_api_only: "YES",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: EXTENSION_MARKETING_VERSION,
+    current_project_version: EXTENSION_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    validate_product: "YES",
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       AppIntents
       MediaPlayer
@@ -275,6 +431,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "YES",
     application_extension_api_only: "YES",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: EXTENSION_MARKETING_VERSION,
+    current_project_version: EXTENSION_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    validate_product: "YES",
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       AppIntents
       MediaPlayer
@@ -296,6 +458,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "YES",
     application_extension_api_only: "YES",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: EXTENSION_MARKETING_VERSION,
+    current_project_version: EXTENSION_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    validate_product: "YES",
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       AppIntents
       MediaPlayer
@@ -317,6 +485,12 @@ TARGET_DEFINITIONS = [
     targeted_device_family: "1",
     skip_install: "YES",
     application_extension_api_only: "YES",
+    development_team: DEVELOPMENT_TEAM,
+    marketing_version: EXTENSION_MARKETING_VERSION,
+    current_project_version: EXTENSION_CURRENT_PROJECT_VERSION,
+    sdkroot: "iphoneos",
+    validate_product: "YES",
+    clang_enable_objc_weak: "NO",
     frameworks: %w[
       AppIntents
       MediaPlayer
@@ -365,36 +539,66 @@ end
 def apply_common_build_settings(target, definition)
   target.build_configurations.each do |config|
     settings = config.build_settings
+    settings.merge!(PROJECT_BUILD_SETTINGS.fetch(config.name))
     settings["PRODUCT_BUNDLE_IDENTIFIER"] = definition[:bundle_id]
     settings["PRODUCT_NAME"] = definition.fetch(:product_name, definition[:name])
     settings["PRODUCT_MODULE_NAME"] = definition[:product_module_name] if definition[:product_module_name]
     settings["INFOPLIST_FILE"] = definition[:info_plist]
     settings["GENERATE_INFOPLIST_FILE"] = "NO"
     settings["SWIFT_VERSION"] = SWIFT_VERSION
-    settings["MARKETING_VERSION"] = MARKETING_VERSION
-    settings["CURRENT_PROJECT_VERSION"] = CURRENT_PROJECT_VERSION
+    settings["MARKETING_VERSION"] = definition[:marketing_version]
+    settings["CURRENT_PROJECT_VERSION"] = definition[:current_project_version]
     settings["CODE_SIGN_STYLE"] = "Automatic"
     settings["CODE_SIGN_ENTITLEMENTS"] = definition[:entitlements] if definition[:entitlements]
+    settings["DEVELOPMENT_TEAM"] = definition[:development_team] if definition[:development_team]
+    settings["SDKROOT"] = definition[:sdkroot] if definition[:sdkroot]
+    settings["LD_RUNPATH_SEARCH_PATHS"] = definition[:ld_runpath_search_paths] if definition[:ld_runpath_search_paths]
     settings["SUPPORTED_PLATFORMS"] = definition[:supported_platforms] if definition[:supported_platforms]
     settings["TARGETED_DEVICE_FAMILY"] = definition[:targeted_device_family] if definition[:targeted_device_family]
     settings["APPLICATION_EXTENSION_API_ONLY"] = definition[:application_extension_api_only]
     settings["SKIP_INSTALL"] = definition[:skip_install]
+    if definition[:validate_product] && config.name == "Release"
+      settings["VALIDATE_PRODUCT"] = definition[:validate_product]
+    end
+    settings["CLANG_ENABLE_OBJC_WEAK"] = definition[:clang_enable_objc_weak] if definition[:clang_enable_objc_weak]
+    settings["COMBINE_HIDPI_IMAGES"] = definition[:combine_hidpi_images] if definition[:combine_hidpi_images]
+    settings["DEAD_CODE_STRIPPING"] = definition[:dead_code_stripping] if definition[:dead_code_stripping]
+    settings["REGISTER_APP_GROUPS"] = definition[:register_app_groups] if definition[:register_app_groups]
     settings["ASSETCATALOG_COMPILER_APPICON_NAME"] = definition[:app_icon] if definition[:app_icon]
     settings["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME"] = definition[:accent_color] if definition[:accent_color]
     settings["ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS"] = definition[:include_all_app_icon_assets] if definition[:include_all_app_icon_assets]
   end
 end
 
+def apply_project_settings(project)
+  project.root_object.compatibility_version = PROJECT_COMPATIBILITY_VERSION
+  project.root_object.attributes["BuildIndependentTargetsInParallel"] = "YES"
+  project.root_object.attributes["LastSwiftUpdateCheck"] = PROJECT_LAST_SWIFT_UPDATE_CHECK
+  project.root_object.attributes["LastUpgradeCheck"] = PROJECT_LAST_UPGRADE_CHECK
+
+  project.build_configurations.each do |config|
+    config.build_settings.merge!(PROJECT_BUILD_SETTINGS.fetch(config.name))
+  end
+end
+
+def add_storekit_configuration(scheme)
+  element = scheme.launch_action.xml_element.add_element("StoreKitConfigurationFileReference")
+  element.add_attribute("identifier", "../../FastScrobbler.storekit/Configuration.storekit")
+end
+
 def create_shared_scheme(project_path, target)
   scheme = Xcodeproj::XCScheme.new
   scheme.configure_with_targets(target, nil, launch_target: target.product_type == "com.apple.product-type.application")
+  scheme.doc.elements["Scheme"].attributes["LastUpgradeVersion"] = SCHEME_LAST_UPGRADE_VERSION
+  add_storekit_configuration(scheme) if target.name == "FastScrobbler"
   scheme.save_as(project_path, target.name, true)
 end
 
 FileUtils.rm_rf(PROJECT_PATH)
 
-project = Xcodeproj::Project.new(PROJECT_PATH)
+project = Xcodeproj::Project.new(PROJECT_PATH, false, PROJECT_OBJECT_VERSION)
 project.root_object.known_regions = KNOWN_REGIONS
+apply_project_settings(project)
 
 refs_by_path = {}
 ROOT_FILE_PATHS.each do |root_path|

@@ -34,6 +34,7 @@ final class AppModel {
         static let lastBacklogFlushAt = "FastScrobbler.AppModel.lastBacklogFlushAt"
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
         static let lastEnteredBackgroundAt = "FastScrobbler.AppModel.lastEnteredBackgroundAt"
+        static let storageMigrationVersion = "FastScrobbler.StorageMaintenance.migrationVersion"
     }
 
     let auth: LastFMAuthManager
@@ -67,6 +68,7 @@ final class AppModel {
     }
 
     private func performStart() async {
+        await runStorageMaintenanceIfNeeded()
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
         do {
@@ -148,6 +150,22 @@ final class AppModel {
         await flushBacklogIfNeeded(sessionKey: sessionKey)
     }
 
+    func runStorageMaintenanceNow() async {
+        await backlog.cleanupNow()
+        scrobbleLog.cleanupNow()
+    }
+
+    func collectStorageUsageSnapshot() async -> StorageUsageSnapshot {
+        StorageUsageSnapshot(
+            backlogCount: await backlog.pendingCount(),
+            backlogBytes: await backlog.storageSizeBytes(),
+            scrobbleLogCount: scrobbleLog.entries.count,
+            scrobbleLogBytes: scrobbleLog.storageSizeBytes(),
+            playbackHistoryStateBytes: 0,
+            recentTracksStateBytes: 0
+        )
+    }
+
     @discardableResult
     private func flushBacklogIfNeeded(sessionKey: String, force: Bool = false) async -> ScrobbleBacklog.FlushResult {
         let pending = await backlog.pendingCount()
@@ -186,6 +204,14 @@ final class AppModel {
     private func purgePlaybackHistoryBacklogIfNeeded() async {
         guard !AppSettings.scrobbleListeningHistoryEnabled() else { return }
         await backlog.removeAll(origin: .playbackHistory)
+    }
+
+    private func runStorageMaintenanceIfNeeded() async {
+        let currentMigrationVersion = 1
+        let storedVersion = AppGroup.userDefaults.integer(forKey: Keys.storageMigrationVersion)
+        guard storedVersion < currentMigrationVersion else { return }
+        await runStorageMaintenanceNow()
+        AppGroup.userDefaults.set(currentMigrationVersion, forKey: Keys.storageMigrationVersion)
     }
 
     private func scrobbleLogSource(for origin: ScrobbleBacklog.Origin?) -> ScrobbleLogStore.Source {

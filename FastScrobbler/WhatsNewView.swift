@@ -1,48 +1,5 @@
 import SwiftUI
 
-// MARK: - WhatsNewRelease
-
-enum WhatsNewRelease {
-    private enum Keys {
-        static let lastSeenVersion = "FastScrobbler.WhatsNew.lastSeenVersion"
-    }
-
-    /// Present the current release notes automatically once for users updating to this version.
-    static let version = "5.4"
-
-    static func currentAppVersion() -> String? {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-    }
-
-    static func shouldPresent() -> Bool {
-        let defaults = UserDefaults.standard
-        guard let currentVersion = currentAppVersion(), !currentVersion.isEmpty else {
-            return false
-        }
-
-        guard let lastSeenVersion = defaults.string(forKey: Keys.lastSeenVersion) else {
-            defaults.set(currentVersion, forKey: Keys.lastSeenVersion)
-            return false
-        }
-
-        guard currentVersion == version else {
-            if lastSeenVersion != currentVersion {
-                defaults.set(currentVersion, forKey: Keys.lastSeenVersion)
-            }
-            return false
-        }
-
-        return lastSeenVersion != currentVersion
-    }
-
-    static func markSeen() {
-        guard let currentVersion = currentAppVersion(), !currentVersion.isEmpty else { return }
-        UserDefaults.standard.set(currentVersion, forKey: Keys.lastSeenVersion)
-    }
-}
-
-// MARK: - WhatsNewView
-
 struct WhatsNewView: View {
     struct VersionSection: Identifiable {
         let id: String
@@ -186,13 +143,8 @@ struct WhatsNewView: View {
                 .padding(.top, 8)
                 .padding(.bottom, 24)
             }
-#if os(iOS)
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-#else
-            .background(Color(nsColor: .windowBackgroundColor))
-#endif
             .navigationTitle("")
-#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -204,11 +156,7 @@ struct WhatsNewView: View {
                     .accessibilityLabel("Close")
                 }
             }
-#endif
         }
-#if os(macOS)
-        .frame(width: 560, height: 620)
-#endif
     }
 
     private var header: some View {
@@ -249,8 +197,6 @@ struct WhatsNewView: View {
     }
 }
 
-// MARK: - WhatsNewPreviousVersionsView
-
 private struct WhatsNewPreviousVersionsView: View {
     let sections: [WhatsNewView.VersionSection]
 
@@ -260,17 +206,11 @@ private struct WhatsNewPreviousVersionsView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 24)
         }
-#if os(iOS)
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
-#else
-        .background(Color(nsColor: .windowBackgroundColor))
-#endif
         .navigationTitle(NSLocalizedString("Previous Versions", comment: ""))
     }
 }
-
-// MARK: - WhatsNewFeatureCard
 
 private struct WhatsNewFeatureCard: View {
     let systemImage: String
@@ -283,11 +223,7 @@ private struct WhatsNewFeatureCard: View {
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 40, height: 40)
-#if os(iOS)
                 .background(Color(.tertiarySystemGroupedBackground))
-#else
-                .background(.thinMaterial)
-#endif
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             Text(title)
@@ -308,15 +244,7 @@ private struct WhatsNewFeatureCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-#if os(iOS)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-#else
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.primary.opacity(0.10), lineWidth: 0.5)
-        }
-#endif
     }
 }

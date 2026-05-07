@@ -24,6 +24,7 @@ struct RunTestsMain {
         runSettingsDefaultsTests()
         runBacklogTimestampPreservationTests()
         runBacklogCleanupTests()
+        runStorageMaintenanceTests()
         runListeningHistoryScanTests()
         finishTests()
     }

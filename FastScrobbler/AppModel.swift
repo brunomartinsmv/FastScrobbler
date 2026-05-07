@@ -14,6 +14,7 @@ final class AppModel {
         static let lastBacklogFlushAt = "FastScrobbler.AppModel.lastBacklogFlushAt"
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
         static let lastEnteredBackgroundAt = "FastScrobbler.AppModel.lastEnteredBackgroundAt"
+        static let storageMigrationVersion = "FastScrobbler.StorageMaintenance.migrationVersion"
     }
 
     private enum LiveBackgroundScrobbling {
@@ -25,6 +26,10 @@ final class AppModel {
         static let inactivePlaybackToleranceSeconds: TimeInterval = 8
     }
 
+    private enum ForegroundRecovery {
+        static let extendedScanThresholdSeconds: TimeInterval = 15 * 60
+    }
+
     let auth: LastFMAuthManager
     let observer: AppleMusicNowPlayingObserver
     let engine: ScrobbleEngine
@@ -33,6 +38,7 @@ final class AppModel {
 
     private var startTask: Task<Void, Never>?
     private var liveBackgroundScrobbleTask: Task<Void, Never>?
+    private var isStartInFlight = false
 
     private init() {
         let auth = LastFMAuthManager()
@@ -47,13 +53,19 @@ final class AppModel {
     }
 
     func startIfNeeded() {
-        startTask?.cancel()
+        guard !isStartInFlight else { return }
+        isStartInFlight = true
         startTask = Task { @MainActor in
+            defer {
+                self.isStartInFlight = false
+                self.startTask = nil
+            }
             await self.performStart()
         }
     }
 
     private func performStart() async {
+        await runStorageMaintenanceIfNeeded()
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
         if #available(iOS 16.2, *) {
@@ -90,16 +102,39 @@ final class AppModel {
 
         if let sessionKey = auth.sessionKey {
             await auth.refreshUserInfoIfNeeded()
-            let imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
-                backlog: backlog,
-                scrobbleLog: scrobbleLog,
-                maxItems: 200
-            )
-            let recentImported = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
-                backlog: backlog,
-                scrobbleLog: scrobbleLog,
-                maxItems: 30
-            ).importedCount
+
+            let backgroundedAt = UserDefaults.standard.object(forKey: Keys.lastEnteredBackgroundAt) as? Date
+            let shouldRunForegroundRecoveryScan =
+                !engine.isUserPaused &&
+                backgroundedAt.map { Date().timeIntervalSince($0) >= ForegroundRecovery.extendedScanThresholdSeconds } == true
+
+            let imported: Int
+            let recentImported: Int
+            if shouldRunForegroundRecoveryScan {
+                let scanResult = await scanListeningHistory(
+                    allowExtendedLookback: false,
+                    allowSubmissionWhilePaused: false,
+                    bypassRecentTrackCooldown: true
+                )
+                imported = scanResult.importedCount
+                recentImported = scanResult.importedRecentTrackCount
+            } else {
+                imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
+                    backlog: backlog,
+                    scrobbleLog: scrobbleLog,
+                    maxItems: 200
+                )
+                if engine.isUserPaused {
+                    recentImported = 0
+                } else {
+                    recentImported = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+                        backlog: backlog,
+                        scrobbleLog: scrobbleLog,
+                        maxItems: 30,
+                        bypassCooldown: true
+                    ).importedCount
+                }
+            }
             UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
             await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0 || recentImported > 0)
             BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
@@ -124,7 +159,6 @@ final class AppModel {
         stopLiveBackgroundScrobbleLoop()
         BackgroundTaskManager.shared.endLiveScrobbleGracePeriod()
         observer.resumePolling()
-        UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
         if #available(iOS 16.2, *) {
             LiveActivityManager.shared.clearEnteredBackground()
         }
@@ -284,22 +318,24 @@ final class AppModel {
         observer.refreshOnceIfAuthorized()
         await purgePlaybackHistoryBacklogIfNeeded()
         _ = await PlaybackHistoryImporter.shared.importIntoBacklog(backlog: backlog, scrobbleLog: scrobbleLog)
-        _ = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
-            backlog: backlog,
-            scrobbleLog: scrobbleLog,
-            allowAuthorizationPrompt: false
-        )
-        if let sessionKey = auth.sessionKey {
-            let result = await backlog.flush(sessionKey: sessionKey)
-            for item in result.sentItems {
-                scrobbleLog.record(
-                    track: item.track,
-                    startTimestamp: item.startTimestamp,
-                    scrobbledAt: item.scrobbledAt,
-                    source: scrobbleLogSource(for: item.origin),
-                    lovedOnLastFM: item.lovedOnLastFM
-                )
-                AppReviewManager.shared.recordSuccessfulScrobble()
+        if !engine.isUserPaused {
+            _ = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+                backlog: backlog,
+                scrobbleLog: scrobbleLog,
+                allowAuthorizationPrompt: false
+            )
+            if let sessionKey = auth.sessionKey {
+                let result = await backlog.flush(sessionKey: sessionKey)
+                for item in result.sentItems {
+                    scrobbleLog.record(
+                        track: item.track,
+                        startTimestamp: item.startTimestamp,
+                        scrobbledAt: item.scrobbledAt,
+                        source: scrobbleLogSource(for: item.origin),
+                        lovedOnLastFM: item.lovedOnLastFM
+                    )
+                    AppReviewManager.shared.recordSuccessfulScrobble()
+                }
             }
         }
         await engine.tickAsync()
@@ -307,13 +343,21 @@ final class AppModel {
 
     /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
     @discardableResult
-    func scanListeningHistory(maxItems: Int = 200, allowExtendedLookback: Bool = false) async -> ListeningHistoryScanResult {
+    func scanListeningHistory(
+        maxItems: Int = 200,
+        allowExtendedLookback: Bool = false,
+        allowSubmissionWhilePaused: Bool = false,
+        bypassRecentTrackCooldown: Bool = false
+    ) async -> ListeningHistoryScanResult {
         await ListeningHistoryScanService.scan(
             backlog: backlog,
             scrobbleLog: scrobbleLog,
             sessionKey: auth.sessionKey,
             maxItems: maxItems,
-            allowExtendedLookback: allowExtendedLookback
+            allowExtendedLookback: allowExtendedLookback,
+            bypassRecentTrackCooldown: bypassRecentTrackCooldown,
+            isUserPaused: engine.isUserPaused,
+            pauseBehavior: allowSubmissionWhilePaused ? .allowSubmissionWhilePaused : .respectPause
         ) {
             AppReviewManager.shared.recordSuccessfulScrobble()
         }
@@ -335,8 +379,36 @@ final class AppModel {
         await flushBacklogIfNeeded(sessionKey: sessionKey)
     }
 
+    func runStorageMaintenanceNow() async {
+        await backlog.cleanupNow()
+        scrobbleLog.cleanupNow()
+        PlaybackHistoryImporter.shared.prunePersistedStateNow()
+        AppleMusicRecentTracksImporter.shared.prunePersistedStateNow()
+    }
+
+    func collectStorageUsageSnapshot() async -> StorageUsageSnapshot {
+        StorageUsageSnapshot(
+            backlogCount: await backlog.pendingCount(),
+            backlogBytes: await backlog.storageSizeBytes(),
+            scrobbleLogCount: scrobbleLog.entries.count,
+            scrobbleLogBytes: scrobbleLog.storageSizeBytes(),
+            playbackHistoryStateBytes: PlaybackHistoryImporter.shared.storageSizeBytes(),
+            recentTracksStateBytes: AppleMusicRecentTracksImporter.shared.storageSizeBytes()
+        )
+    }
+
     @discardableResult
     private func flushBacklogIfNeeded(sessionKey: String, force: Bool = false) async -> ScrobbleBacklog.FlushResult {
+        guard !engine.isUserPaused else {
+            let pending = await backlog.pendingCount()
+            return ScrobbleBacklog.FlushResult(
+                sentCount: 0,
+                skippedCount: 0,
+                remainingCount: pending,
+                sentItems: []
+            )
+        }
+
         let pending = await backlog.pendingCount()
         guard pending > 0 else {
             return ScrobbleBacklog.FlushResult(sentCount: 0, skippedCount: 0, remainingCount: 0, sentItems: [])
@@ -374,6 +446,14 @@ final class AppModel {
     private func purgePlaybackHistoryBacklogIfNeeded() async {
         guard !AppSettings.scrobbleListeningHistoryEnabled() else { return }
         await backlog.removeAll(origin: .playbackHistory)
+    }
+
+    private func runStorageMaintenanceIfNeeded() async {
+        let currentMigrationVersion = 1
+        let storedVersion = AppGroup.userDefaults.integer(forKey: Keys.storageMigrationVersion)
+        guard storedVersion < currentMigrationVersion else { return }
+        await runStorageMaintenanceNow()
+        AppGroup.userDefaults.set(currentMigrationVersion, forKey: Keys.storageMigrationVersion)
     }
 
     private func scrobbleLogSource(for origin: ScrobbleBacklog.Origin?) -> ScrobbleLogStore.Source {

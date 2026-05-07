@@ -27,7 +27,7 @@
 "Not connected" = "Non connecté";
 "Now Playing" = "Lecture en cours";
 "OK" = "OK";
-"One-time purchase. Not a subscription." = "Achat unique. Pas d’abonnement.";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Achat unique, débloque toutes les fonctionnalités Pro à vie. Pas d’abonnement.";
 "Pro" = "Pro";
 "Recent Scrobbles" = "Scrobbles récents";
 /* Remove brackets screen */
@@ -139,6 +139,7 @@
 "Purchased" = "Acheté";
 "Rate FastScrobbler" = "Noter FastScrobbler";
 "Ask a Question or Report a Bug" = "Poser une question ou signaler un bug";
+"Cleaning Up…" = "Nettoyage…";
 "Recently Played" = "Écouté récemment";
 "Request Access" = "Demander l’accès";
 "Request Media Library Access" = "Demander l’accès à la bibliothèque multimédia";
@@ -235,3 +236,7 @@
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "Scrobble à nouveau le même morceau lorsqu'il boucle ou redémarre. Activez cette option si vous rejouez des morceaux et souhaitez que chaque écoute soit comptabilisée.";
 "View Pro features" = "Voir les fonctionnalités Pro";
 "Upgrade to Pro" = "Passer à Pro";
+"Auto-scrobble is waiting before retrying." = "Le scrobble automatique attend avant de réessayer.";
+"Auto-scrobble is blocked because Music did not provide a duration." = "Le scrobble automatique est bloqué car Musique n’a pas fourni de durée.";
+"Ready to scrobble when playback resumes." = "Prêt à scrobbler lorsque la lecture reprendra.";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "Impossible de récupérer la durée du morceau depuis l’app Musique ; utilisation d’une durée de secours de 3 minutes.";

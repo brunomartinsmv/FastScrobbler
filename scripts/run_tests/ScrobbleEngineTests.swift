@@ -3,13 +3,13 @@ import Foundation
 func runScrobbleEngineTests() {
     // ─── Scrobble threshold ───────────────────────────────────────────────────────
     // Replicates maybeScrobble threshold logic from ScrobbleEngine.swift.
-    // Threshold options: [0.10, 0.25, 0.50, 0.75]. Default index: 2 (50%).
+    // Threshold options: iOS [0.10, 0.25, 0.50, 0.75], macOS adds 0.90. Default index: 2 (50%).
     // Normally tracks must be >= 30s, but repeat-enabled mode allows shorter looped tracks too.
     // Scrobble when accumulatedPlaySeconds >= duration * fraction.
 
     section("Engine · Scrobble threshold calculation")
 
-    let thresholdOptions: [Double] = [0.10, 0.25, 0.50, 0.75]
+    let thresholdOptions: [Double] = [0.10, 0.25, 0.50, 0.75, 0.90]
 
     func shouldScrobble(played: Double, duration: Double, thresholdIndex: Int, allowRepeatScrobbles: Bool = false) -> Bool {
         guard duration >= 30 || allowRepeatScrobbles else { return false }
@@ -134,6 +134,35 @@ func runScrobbleEngineTests() {
         return current + min(playbackDelta, wallDelta)
     }
 
+    func accumulateFallbackPlaySeconds(
+        current: Double,
+        previousPlaybackTime: Double,
+        playbackTime: Double,
+        wallDelta: Double,
+        usesFallbackDuration: Bool,
+        isPlaying: Bool,
+        duration: Double
+    ) -> Double {
+        guard wallDelta > 0 else { return current }
+        let playbackDelta = playbackTime - previousPlaybackTime
+        var played = current
+        if playbackDelta > 0 {
+            played += min(playbackDelta, wallDelta)
+        } else if usesFallbackDuration && isPlaying && playbackDelta <= 0 {
+            played += wallDelta
+        }
+        if duration > 0 {
+            played = min(played, duration)
+        }
+        return played
+    }
+
+    func displayPlayedSeconds(accumulated: Double, rawPlaybackTime: Double, duration: Double) -> Double {
+        let effective = max(accumulated, max(0, rawPlaybackTime))
+        guard duration > 0 else { return effective }
+        return min(effective, duration)
+    }
+
     func renderInactiveStatus(artist: String, title: String, playbackState: SimPlaybackState, played: Double = 0, duration: Double = 0, thresholdIndex: Int = 2, hasSentNowPlaying: Bool = false, hasScrobbled: Bool = false, hasLoved: Bool = false, failureMessage: String? = nil) -> String {
         var bits = ["\(artist) - \(title)"]
         bits.append(playbackState == .paused ? "paused" : "Idle")
@@ -148,8 +177,44 @@ func runScrobbleEngineTests() {
         return bits.joined(separator: " | ")
     }
 
-    func autoStartTimestampIsReliable(hasObservedPlaybackProgress: Bool, pendingColdStartDedupeCheck: Bool) -> Bool {
-        !pendingColdStartDedupeCheck && hasObservedPlaybackProgress
+    func fallbackDurationStatusText(usesFallbackDuration: Bool) -> String? {
+        guard usesFallbackDuration else { return nil }
+        return "Could not retrieve track duration from Music app; using fallback duration of 3 minutes."
+    }
+
+    func autoStartTimestampIsReliable(
+        hasObservedPlaybackProgress: Bool,
+        hasObservedFallbackPlaybackProgress: Bool = false,
+        pendingColdStartDedupeCheck: Bool,
+        usesFallbackDuration: Bool = false
+    ) -> Bool {
+        if pendingColdStartDedupeCheck {
+            return usesFallbackDuration && hasObservedFallbackPlaybackProgress
+        }
+        return hasObservedPlaybackProgress || (usesFallbackDuration && hasObservedFallbackPlaybackProgress)
+    }
+
+    func shouldBlockAutoScrobbleForUntrustedTimestamp(
+        isMacOS: Bool,
+        hasObservedPlaybackProgress: Bool,
+        hasObservedFallbackPlaybackProgress: Bool = false,
+        pendingColdStartDedupeCheck: Bool,
+        usesFallbackDuration: Bool = false
+    ) -> Bool {
+        if isMacOS {
+            return false
+        }
+        return !autoStartTimestampIsReliable(
+            hasObservedPlaybackProgress: hasObservedPlaybackProgress,
+            hasObservedFallbackPlaybackProgress: hasObservedFallbackPlaybackProgress,
+            pendingColdStartDedupeCheck: pendingColdStartDedupeCheck,
+            usesFallbackDuration: usesFallbackDuration
+        )
+    }
+
+    func shouldApplyThrottle(lastAttemptSecondsAgo: Double?) -> Bool {
+        guard let lastAttemptSecondsAgo else { return false }
+        return lastAttemptSecondsAgo < 15
     }
 
     func shouldDeferColdStartDedupe(playbackTime: Double, gapSeconds: Double?) -> Bool {
@@ -182,6 +247,16 @@ func runScrobbleEngineTests() {
     expect("75% threshold: 45s of 60s triggers", shouldScrobble(played: 45, duration: 60, thresholdIndex: 3))
     expect("75% threshold: 44s of 60s blocked",  !shouldScrobble(played: 44, duration: 60, thresholdIndex: 3))
 
+    // 90% threshold (index 4 on macOS): 60s song -> need 54s
+    expect("90% threshold: 54s of 60s triggers", shouldScrobble(played: 54, duration: 60, thresholdIndex: 4))
+    expect("90% threshold: 53s of 60s blocked",  !shouldScrobble(played: 53, duration: 60, thresholdIndex: 4))
+
+    // Fallback duration: 180s
+    expect("fallback 180s at 10% threshold triggers at 18s", shouldScrobble(played: 18, duration: 180, thresholdIndex: 0))
+    expect("fallback 180s at default 50% threshold triggers at 90s", shouldScrobble(played: 90, duration: 180, thresholdIndex: 2))
+    expect("fallback 180s at 75% threshold triggers at 135s", shouldScrobble(played: 135, duration: 180, thresholdIndex: 3))
+    expect("fallback 180s at 90% threshold triggers at 162s", shouldScrobble(played: 162, duration: 180, thresholdIndex: 4))
+
     // Short tracks (<30s) never scrobble
     expect("29s track never scrobbles",          !shouldScrobble(played: 29, duration: 29, thresholdIndex: 0))
     expect("30s track can scrobble",             shouldScrobble(played: 3, duration: 30, thresholdIndex: 0))
@@ -189,7 +264,7 @@ func runScrobbleEngineTests() {
 
     // Index clamping
     expect("index -1 clamped to 0 (10%)",        shouldScrobble(played: 6, duration: 60, thresholdIndex: -1))
-    expect("index 99 clamped to 3 (75%)",        !shouldScrobble(played: 44, duration: 60, thresholdIndex: 99))
+    expect("index 99 clamped to 4 (90%)",        !shouldScrobble(played: 53, duration: 60, thresholdIndex: 99))
 
     section("Engine · Raw playback-time threshold fallback")
 
@@ -246,6 +321,79 @@ func runScrobbleEngineTests() {
            seekedAccumulated == 5,
            detail: "got \(seekedAccumulated)")
 
+    section("Engine · Fallback self-counted played time")
+
+    let fallbackSelfCounted = accumulateFallbackPlaySeconds(
+        current: 0,
+        previousPlaybackTime: 0,
+        playbackTime: 0,
+        wallDelta: 5,
+        usesFallbackDuration: true,
+        isPlaying: true,
+        duration: 180
+    )
+    expect("fallback session self-counts wall time when playback time is stuck at zero",
+           fallbackSelfCounted == 5,
+           detail: "got \(fallbackSelfCounted)")
+    expect("fallback self-counted time can satisfy the 10% threshold",
+           shouldScrobble(played: 18, duration: 180, thresholdIndex: 0))
+    expect("fallback self-counted time can satisfy the 25% threshold",
+           shouldScrobble(played: 45, duration: 180, thresholdIndex: 1))
+    expect("fallback self-counted time can satisfy the 50% threshold",
+           shouldScrobble(played: 90, duration: 180, thresholdIndex: 2))
+    expect("fallback self-counted time can satisfy the 75% threshold",
+           shouldScrobble(played: 135, duration: 180, thresholdIndex: 3))
+    expect("fallback self-counted time can satisfy the 90% threshold",
+           shouldScrobble(played: 162, duration: 180, thresholdIndex: 4))
+
+    let fallbackPaused = accumulateFallbackPlaySeconds(
+        current: 5,
+        previousPlaybackTime: 0,
+        playbackTime: 0,
+        wallDelta: 5,
+        usesFallbackDuration: true,
+        isPlaying: false,
+        duration: 180
+    )
+    expect("paused fallback session does not self-count wall time",
+           fallbackPaused == 5,
+           detail: "got \(fallbackPaused)")
+
+    let fallbackResumed = accumulateFallbackPlaySeconds(
+        current: fallbackPaused,
+        previousPlaybackTime: 0,
+        playbackTime: 0,
+        wallDelta: 5,
+        usesFallbackDuration: true,
+        isPlaying: true,
+        duration: 180
+    )
+    expect("resumed fallback session resumes self-counting wall time",
+           fallbackResumed == 10,
+           detail: "got \(fallbackResumed)")
+
+    let fallbackClamped = accumulateFallbackPlaySeconds(
+        current: 178,
+        previousPlaybackTime: 0,
+        playbackTime: 0,
+        wallDelta: 5,
+        usesFallbackDuration: true,
+        isPlaying: true,
+        duration: 180
+    )
+    expect("fallback self-counting is clamped to the fallback duration",
+           fallbackClamped == 180,
+           detail: "got \(fallbackClamped)")
+
+    expectEqual("displayed played time prefers accumulated fallback time over raw zero",
+                displayPlayedSeconds(accumulated: 42, rawPlaybackTime: 0, duration: 180),
+                42)
+    expectEqual("displayed played time uses the greater of accumulated and raw playback",
+                displayPlayedSeconds(accumulated: 42, rawPlaybackTime: 50, duration: 180),
+                50)
+    expect("fallback session below threshold is not scrobble-eligible early",
+           !shouldScrobble(played: 17, duration: 180, thresholdIndex: 0))
+
     section("Engine · Paused playback suspends auto-scrobble checks")
 
     expect("paused track above threshold does not auto-scrobble", !shouldAutoScrobble(playbackState: .paused, played: 30, duration: 60, thresholdIndex: 2))
@@ -253,6 +401,19 @@ func runScrobbleEngineTests() {
     expectEqual("paused track above threshold reports inactive attempt outcome",
                 autoScrobbleAttemptOutcome(playbackState: .paused, played: 30, duration: 60, thresholdIndex: 2),
                 .inactivePlayback)
+
+    section("Engine · Fallback duration status")
+
+    expectEqual(
+        "fallback duration shows informational status message",
+        fallbackDurationStatusText(usesFallbackDuration: true),
+        "Could not retrieve track duration from Music app; using fallback duration of 3 minutes."
+    )
+    expectEqual(
+        "real duration does not show fallback status message",
+        fallbackDurationStatusText(usesFallbackDuration: false),
+        nil
+    )
 
     let pausedAccumulated = accumulatePlaySeconds(current: 25, previousPlaybackTime: 25, playbackTime: 25, wallDelta: 5)
     expect("paused tick preserves accumulated play time", pausedAccumulated == 25, detail: "got \(pausedAccumulated)")
@@ -293,8 +454,41 @@ func runScrobbleEngineTests() {
 
     expect("auto timestamp is not trusted before playback progression is observed",
            !autoStartTimestampIsReliable(hasObservedPlaybackProgress: false, pendingColdStartDedupeCheck: true))
+    expect("iOS blocks auto-scrobble when timestamp trust has not been established",
+           shouldBlockAutoScrobbleForUntrustedTimestamp(
+                isMacOS: false,
+                hasObservedPlaybackProgress: false,
+                pendingColdStartDedupeCheck: true
+           ))
+    expect("macOS bypasses the final timestamp-trust auto-scrobble guard",
+           !shouldBlockAutoScrobbleForUntrustedTimestamp(
+                isMacOS: true,
+                hasObservedPlaybackProgress: false,
+                pendingColdStartDedupeCheck: true
+           ))
+    expect("fallback session becomes timestamp-reliable after fallback wall-clock progress",
+           autoStartTimestampIsReliable(
+                hasObservedPlaybackProgress: false,
+                hasObservedFallbackPlaybackProgress: true,
+                pendingColdStartDedupeCheck: true,
+                usesFallbackDuration: true
+           ))
+    expect("paused fallback session without fallback progress is not timestamp-reliable",
+           !autoStartTimestampIsReliable(
+                hasObservedPlaybackProgress: false,
+                hasObservedFallbackPlaybackProgress: false,
+                pendingColdStartDedupeCheck: true,
+                usesFallbackDuration: true
+           ))
     expect("auto timestamp becomes trusted after playback progression clears the cold-start guard",
            autoStartTimestampIsReliable(hasObservedPlaybackProgress: true, pendingColdStartDedupeCheck: false))
+    expect("fallback session remains timestamp-reliable after cold-start guard clears",
+           autoStartTimestampIsReliable(
+                hasObservedPlaybackProgress: false,
+                hasObservedFallbackPlaybackProgress: true,
+                pendingColdStartDedupeCheck: false,
+                usesFallbackDuration: true
+           ))
 
     expectEqual("mac stale paused state is normalized to playing when position clearly advances",
                 normalizedAutoPlaybackState(rawPlaybackState: .paused, previousPlaybackTime: 12, playbackTime: 13.2, wallDelta: 1.0),
@@ -320,6 +514,14 @@ func runScrobbleEngineTests() {
     expectEqual("duplicate match reports duplicate outcome",
                 autoScrobbleAttemptOutcome(playbackState: .playing, played: 30, duration: 60, thresholdIndex: 2, isDuplicate: true),
                 .duplicate)
+    expect("local timestamp-validation preflight does not trigger throttle when no real attempt was recorded",
+           !shouldApplyThrottle(lastAttemptSecondsAgo: nil))
+    expect("real outbound attempt triggers throttle inside 15 seconds",
+           shouldApplyThrottle(lastAttemptSecondsAgo: 5))
+    expect("retryable failure still uses the same attempt throttle window",
+           shouldApplyThrottle(lastAttemptSecondsAgo: 5))
+    expect("throttle window expires after 15 seconds",
+           !shouldApplyThrottle(lastAttemptSecondsAgo: 15))
 
     let nonRetryableStatus = renderInactiveStatus(
         artist: "Depeche Mode",

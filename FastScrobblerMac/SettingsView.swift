@@ -456,13 +456,12 @@ struct SettingsView: View {
                 .disabled(!pro.isPro)
                 .frame(maxWidth: .infinity)
             HStack {
-                Text(localized("10%"))
-                Spacer()
-                Text(localized("25%"))
-                Spacer()
-                Text(localized("50%"))
-                Spacer()
-                Text(localized("75%"))
+                ForEach(Array(ProSettings.scrobbleThresholdOptions.enumerated()), id: \.offset) { index, _ in
+                    if index > 0 {
+                        Spacer()
+                    }
+                    Text(ProSettings.scrobbleThresholdPercentText(index: index))
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)

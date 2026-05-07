@@ -49,9 +49,105 @@ actor ScrobbleBacklog {
     static let shared = ScrobbleBacklog()
 
     private enum CleanupLimits {
-        static let maxPendingItems = 5_000
-        static let maxItemAge: TimeInterval = 30 * 24 * 60 * 60
+        static let maxPendingItems = 1_000
+        static let maxItemAge: TimeInterval = 14 * 24 * 60 * 60
         static let maxAttemptCount = 10
+    }
+
+    private struct PersistedTrack: Codable {
+        var artist: String
+        var title: String
+        var album: String?
+        var albumArtist: String?
+        var durationSeconds: TimeInterval?
+        var usesFallbackDuration: Bool?
+        var persistentID: UInt64?
+        var playbackStoreID: String?
+        var isCompilation: Bool?
+
+        private enum CodingKeys: String, CodingKey {
+            case artist = "a"
+            case title = "t"
+            case album = "al"
+            case albumArtist = "aa"
+            case durationSeconds = "d"
+            case usesFallbackDuration = "uf"
+            case persistentID = "p"
+            case playbackStoreID = "ps"
+            case isCompilation = "ic"
+        }
+
+        init(track: Track) {
+            artist = track.artist
+            title = track.title
+            album = track.album
+            albumArtist = track.albumArtist
+            durationSeconds = track.durationSeconds
+            usesFallbackDuration = track.usesFallbackDuration
+            persistentID = track.persistentID
+            playbackStoreID = track.playbackStoreID
+            isCompilation = track.isCompilation
+        }
+
+        var track: Track {
+            Track(
+                artist: artist,
+                title: title,
+                album: album,
+                albumArtist: albumArtist,
+                durationSeconds: durationSeconds,
+                usesFallbackDuration: usesFallbackDuration,
+                persistentID: persistentID,
+                playbackStoreID: playbackStoreID,
+                isCompilation: isCompilation
+            )
+        }
+    }
+
+    private struct PersistedItem: Codable {
+        var id: UUID
+        var track: PersistedTrack
+        var startTimestamp: Int
+        var origin: Origin?
+        var wasAppleMusicFavorite: Bool?
+        var queuedAt: Date
+        var attemptCount: Int
+        var lastAttemptAt: Date?
+
+        private enum CodingKeys: String, CodingKey {
+            case id = "i"
+            case track = "t"
+            case startTimestamp = "s"
+            case origin = "o"
+            case wasAppleMusicFavorite = "f"
+            case queuedAt = "q"
+            case attemptCount = "a"
+            case lastAttemptAt = "l"
+        }
+
+        init(item: Item) {
+            id = item.id
+            track = PersistedTrack(track: item.track)
+            startTimestamp = item.startTimestamp
+            origin = item.origin
+            wasAppleMusicFavorite = item.wasAppleMusicFavorite
+            queuedAt = item.queuedAt
+            attemptCount = item.attemptCount
+            lastAttemptAt = item.lastAttemptAt
+        }
+
+        var item: Item {
+            Item(
+                id: id,
+                track: track.track,
+                startTimestamp: startTimestamp,
+                origin: origin,
+                wasAppleMusicFavorite: wasAppleMusicFavorite,
+                queuedAt: queuedAt,
+                attemptCount: attemptCount,
+                lastAttemptAt: lastAttemptAt
+            )
+        }
     }
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "ScrobbleBacklog")
@@ -89,8 +185,8 @@ actor ScrobbleBacklog {
         let result = pruneItems(now: Date())
         if result.removedCount > 0 {
             logCleanup(result)
-            await save(pruneBeforeWrite: false)
         }
+        await save(pruneBeforeWrite: false)
         return result
     }
 
@@ -130,6 +226,7 @@ actor ScrobbleBacklog {
         allowExactDuplicates: Bool
     ) async {
         await loadIfNeeded()
+        _ = pruneItems(now: Date())
 
         let allowsOriginExactDuplicates = origin == .playbackHistory
 
@@ -376,7 +473,7 @@ actor ScrobbleBacklog {
         let url = fileURL()
         do {
             let data = try Data(contentsOf: url)
-            items = try JSONDecoder().decode([Item].self, from: data)
+            items = try decodeItems(from: data)
         } catch {
             items = []
         }
@@ -397,13 +494,14 @@ actor ScrobbleBacklog {
                     logCleanup(result)
                 }
             }
-            let data = try JSONEncoder().encode(items)
+            let data = try JSONEncoder().encode(items.map(PersistedItem.init))
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(),
                 withIntermediateDirectories: true,
                 attributes: nil
             )
             try data.write(to: url, options: [.atomic])
+            deleteLegacyFileIfRedundant()
         } catch {
             logger.warning("failed to persist backlog: \(error.localizedDescription, privacy: .public)")
         }
@@ -516,5 +614,21 @@ actor ScrobbleBacklog {
         }()
         let bundleID = Bundle.main.bundleIdentifier ?? "FastScrobbler"
         return base.appendingPathComponent(bundleID, isDirectory: true).appendingPathComponent("scrobble_backlog.json")
+    }
+
+    private func decodeItems(from data: Data) throws -> [Item] {
+        if let persisted = try? JSONDecoder().decode([PersistedItem].self, from: data) {
+            return persisted.map(\.item)
+        }
+        return try JSONDecoder().decode([Item].self, from: data)
+    }
+
+    private func deleteLegacyFileIfRedundant() {
+        guard let sharedURL = sharedFileURL() else { return }
+        let legacyURL = legacyFileURL()
+        guard sharedURL.path != legacyURL.path else { return }
+        guard FileManager.default.fileExists(atPath: sharedURL.path) else { return }
+        guard FileManager.default.fileExists(atPath: legacyURL.path) else { return }
+        try? FileManager.default.removeItem(at: legacyURL)
     }
 }

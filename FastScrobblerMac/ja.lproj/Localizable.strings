@@ -27,7 +27,7 @@
 "Not connected" = "未接続";
 "Now Playing" = "再生中";
 "OK" = "OK";
-"One-time purchase. Not a subscription." = "一度限りの購入です。サブスクリプションではありません。";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "一度限りの購入で、すべてのPro機能を永久に利用できます。サブスクリプションではありません。";
 "Pro" = "Pro";
 "Recent Scrobbles" = "最近のスクロブル";
 /* Remove brackets screen */
@@ -139,6 +139,7 @@
 "Purchased" = "購入済み";
 "Rate FastScrobbler" = "FastScrobblerを評価";
 "Ask a Question or Report a Bug" = "質問するかバグを報告";
+"Cleaning Up…" = "クリーンアップ中…";
 "Recently Played" = "最近再生した曲";
 "Request Access" = "アクセスを許可";
 "Request Media Library Access" = "メディアライブラリへのアクセスを要求";
@@ -235,3 +236,7 @@
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "曲がループまたは再スタートしたときに再度スクロブルします。曲を繰り返し聴いて各回をカウントしたい場合はオンにしてください。";
 "View Pro features" = "Pro機能を見る";
 "Upgrade to Pro" = "Proにアップグレード";
+"Auto-scrobble is waiting before retrying." = "自動スクロブルは再試行前に待機しています。";
+"Auto-scrobble is blocked because Music did not provide a duration." = "Music が再生時間を提供しなかったため、自動スクロブルはブロックされています。";
+"Ready to scrobble when playback resumes." = "再生が再開されるとスクロブルできる状態です。";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "Music アプリから曲の長さを取得できなかったため、代替の 3 分を使用します。";

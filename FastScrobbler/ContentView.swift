@@ -30,8 +30,8 @@ struct ContentView: View {
             dark: UIColor(red: 1.00, green: 0.16, blue: 0.34, alpha: 1.0)
         )
         static let openMusicFill = dynamicColor(
-            light: UIColor(red: 0.94, green: 0.52, blue: 0.57, alpha: 0.14),
-            dark: UIColor(red: 0.90, green: 0.56, blue: 0.62, alpha: 0.20)
+            light: UIColor(red: 1, green: 0.52, blue: 0.57, alpha: 0.08),
+            dark: UIColor(red: 1, green: 0.56, blue: 0.62, alpha: 0.12)
         )
         static let resume = dynamicColor(
             light: UIColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 1.0),
@@ -46,8 +46,8 @@ struct ContentView: View {
             dark: UIColor(red: 0.00, green: 0.84, blue: 0.31, alpha: 1.0)
         )
         static let resumeFill = dynamicColor(
-            light: UIColor(red: 0.46, green: 0.78, blue: 0.56, alpha: 0.15),
-            dark: UIColor(red: 0.42, green: 0.73, blue: 0.50, alpha: 0.20)
+            light: UIColor(red: 0.46, green: 0.78, blue: 0.56, alpha: 0.09),
+            dark: UIColor(red: 0.42, green: 0.73, blue: 0.50, alpha: 0.12)
         )
         static let scrobbleNow = dynamicColor(
             light: UIColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 1.0),
@@ -62,8 +62,8 @@ struct ContentView: View {
             dark: UIColor(red: 0.76, green: 0.10, blue: 1.00, alpha: 1.0)
         )
         static let scrobbleNowFill = dynamicColor(
-            light: UIColor(red: 0.80, green: 0.50, blue: 0.90, alpha: 0.14),
-            dark: UIColor(red: 0.72, green: 0.50, blue: 0.82, alpha: 0.20)
+            light: UIColor(red: 0.80, green: 0.50, blue: 0.90, alpha: 0.08),
+            dark: UIColor(red: 0.72, green: 0.50, blue: 0.82, alpha: 0.12)
         )
         static let account = dynamicColor(
             light: UIColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 1.0),
@@ -78,20 +78,20 @@ struct ContentView: View {
             dark: UIColor(red: 0.00, green: 0.59, blue: 1.00, alpha: 1.0)
         )
         static let accountFill = dynamicColor(
-            light: UIColor(red: 0.42, green: 0.70, blue: 0.92, alpha: 0.13),
-            dark: UIColor(red: 0.40, green: 0.65, blue: 0.84, alpha: 0.19)
+            light: UIColor(red: 0.42, green: 0.70, blue: 0.92, alpha: 0.08),
+            dark: UIColor(red: 0.40, green: 0.65, blue: 0.84, alpha: 0.11)
         )
         static let manualForeground = dynamicColor(
             light: UIColor(white: 0.12, alpha: 1.0),
             dark: UIColor(white: 0.82, alpha: 1.0)
         )
         static let manualFill = dynamicColor(
-            light: UIColor(white: 0.0, alpha: 0.06),
-            dark: UIColor(white: 1.0, alpha: 0.10)
+            light: UIColor(white: 0.0, alpha: 0),
+            dark: UIColor(white: 1.0, alpha: 0)
         )
         static let disabledFill = dynamicColor(
-            light: UIColor(white: 0.0, alpha: 0.05),
-            dark: UIColor(white: 1.0, alpha: 0.08)
+            light: UIColor(white: 0.0, alpha: 0.03),
+            dark: UIColor(white: 1.0, alpha: 0.05)
         )
 
         private static func dynamicColor(light: UIColor, dark: UIColor) -> Color {
@@ -314,7 +314,8 @@ struct ContentView: View {
                     Text(album)
                 }
                 if let d = t.durationSeconds, d > 0 {
-                    let progress = min(observer.playbackTimeSeconds / d, 1.0)
+                    let playedSeconds = min(max(0, engine.effectivePlayedSeconds), d)
+                    let progress = min(playedSeconds / d, 1.0)
                     VStack(spacing: 6) {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
@@ -333,7 +334,7 @@ struct ContentView: View {
                         }
                         .frame(height: 6)
                         HStack {
-                            Text(formatTime(observer.playbackTimeSeconds))
+                            Text(formatTime(playedSeconds))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -553,7 +554,7 @@ struct ContentView: View {
 
     @MainActor
     private func refreshHome() async {
-        await AppModel.shared.scanListeningHistory()
+        await AppModel.shared.scanListeningHistory(bypassRecentTrackCooldown: true)
         scrobbleLog.reload()
         currentDate = .now
         lastScrobbleLogRefreshDate = currentDate
@@ -818,7 +819,7 @@ private struct ScrobbleLogRowView: View {
     }
 
     private func displayDate(for entry: ScrobbleLogStore.Entry) -> Date {
-        if entry.source == .playbackHistory {
+        if entry.source == .playbackHistory || entry.source == .recentlyPlayed {
             return Date(timeIntervalSince1970: TimeInterval(entry.startTimestamp))
         }
         return entry.scrobbledAt
@@ -909,9 +910,9 @@ extension View {
     func buttonGlow(_ color: Color) -> some View {
         self.overlay {
             Capsule(style: .continuous)
-                .strokeBorder(.clear, lineWidth: 2.0)
-                .shadow(color: color.opacity(0.12), radius: 5, x: 0, y: 0)
-                .shadow(color: color.opacity(0.16), radius: 2.5, x: 0, y: 0)
+                .strokeBorder(.clear, lineWidth: 1.5)
+                // .shadow(color: color.opacity(0.44), radius: 8, x: 0, y: 0)
+                // .shadow(color: color.opacity(0.48), radius: 4, x: 0, y: 0)
         }
     }
 
@@ -925,9 +926,9 @@ extension View {
     func brightButtonBorder(_ color: Color) -> some View {
         self.overlay {
             Capsule(style: .continuous)
-                .strokeBorder(color.opacity(0.95), lineWidth: 2.0)
-                .shadow(color: color.opacity(0.12), radius: 3, x: 0, y: 0)
-                .shadow(color: color.opacity(0.16), radius: 2, x: 0, y: 0)
+                .strokeBorder(color.opacity(0.95), lineWidth: 1.5)
+                .shadow(color: color.opacity(0.4), radius: 6, x: 0, y: 0)
+                .shadow(color: color.opacity(0.4), radius: 3, x: 0, y: 0)
         }
     }
 }

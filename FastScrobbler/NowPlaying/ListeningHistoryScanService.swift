@@ -2,6 +2,11 @@ import Foundation
 
 @MainActor
 enum ListeningHistoryScanService {
+    enum PauseBehavior {
+        case respectPause
+        case allowSubmissionWhilePaused
+    }
+
     struct Result {
         let importedCount: Int
         let importedRecentTrackCount: Int
@@ -36,6 +41,9 @@ enum ListeningHistoryScanService {
         sessionKey: String?,
         maxItems: Int = 200,
         allowExtendedLookback: Bool = false,
+        bypassRecentTrackCooldown: Bool = false,
+        isUserPaused: Bool = false,
+        pauseBehavior: PauseBehavior = .respectPause,
         recordSuccessfulScrobble: (() -> Void)? = nil
     ) async -> Result {
         if !AppSettings.scrobbleListeningHistoryEnabled() {
@@ -67,11 +75,13 @@ enum ListeningHistoryScanService {
         let recentImportResult = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
             backlog: backlog,
             scrobbleLog: scrobbleLog,
-            maxItems: maxItems > 0 ? min(maxItems, 30) : 0
+            maxItems: maxItems > 0 ? min(maxItems, 30) : 0,
+            bypassCooldown: bypassRecentTrackCooldown
         )
         totalSkippedDuplicates += recentImportResult.skippedDuplicateCount
 
-        guard let sessionKey else {
+        let shouldSuppressFlushWhilePaused = isUserPaused && pauseBehavior == .respectPause
+        guard let sessionKey, !shouldSuppressFlushWhilePaused else {
             return Result(
                 importedCount: totalImported,
                 importedRecentTrackCount: recentImportResult.importedCount,

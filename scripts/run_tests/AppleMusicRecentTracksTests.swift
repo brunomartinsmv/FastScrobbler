@@ -11,6 +11,43 @@ func runAppleMusicRecentTracksImporterTests() {
         let durationMillis: Int?
     }
 
+    enum RecentImportStatus: String {
+        case idle
+        case disabled
+        case authorizationUnavailable
+        case cooldownDeferred
+        case fetchFailed
+        case seeded
+        case noRecentTracks
+        case noNewTracks
+        case imported
+        case skippedDuplicatesOnly
+        case timestampConfidenceTooLow
+    }
+
+    struct TrackRecord: Equatable {
+        var id: String
+        var firstSeenAt: Int?
+        var lastSeenAt: Int?
+        var lastImportedSyntheticStart: Int?
+        var lastImportedSyntheticEnd: Int?
+        var lastImportedAt: Int?
+        var lastSkippedReason: RecentImportStatus?
+    }
+
+    struct RecentImportState: Equatable {
+        var hasSeeded = false
+        var recentTracks: [TrackRecord] = []
+        var lastFetchCount = 0
+        var lastImportedCount = 0
+        var lastSkippedDuplicateCount = 0
+        var lastStatus: RecentImportStatus = .idle
+        var nextEligibleAttemptAt: Int?
+        var consecutiveFetchFailureCount = 0
+        var consecutiveNoNewTrackCount = 0
+        var consecutiveLowConfidenceCandidateCount = 0
+    }
+
     struct RecentTrackCandidate: Equatable {
         let id: String
         let artist: String
@@ -19,44 +56,13 @@ func runAppleMusicRecentTracksImporterTests() {
         let durationSeconds: Double
         let startTimestamp: Int
         let playedAtTimestamp: Int
-    }
-
-    enum RecentImportStatus: String {
-        case idle
-        case disabled
-        case authorizationUnavailable
-        case fetchFailed
-        case seeded
-        case noRecentTracks
-        case noNewTracks
-        case imported
-        case skippedDuplicatesOnly
-    }
-
-    struct RecentImportState: Equatable {
-        var hasSeeded = false
-        var recentTrackIDs: [String] = []
-        var lastFetchCount = 0
-        var lastImportedCount = 0
-        var lastSkippedDuplicateCount = 0
-        var lastStatus: RecentImportStatus = .idle
+        let withinLookbackWindow: Bool
     }
 
     func unseenPrefix(fetchedIDs: [String], knownIDs: [String], hasSeeded: Bool) -> [String] {
         guard hasSeeded else { return [] }
         let known = Set(knownIDs)
         return Array(fetchedIDs.prefix { !known.contains($0) })
-    }
-
-    func mergeRecentIDs(newIDs: [String], existingIDs: [String], limit: Int = 120) -> [String] {
-        var seen = Set<String>()
-        var merged: [String] = []
-        for id in newIDs + existingIDs {
-            guard !id.isEmpty, seen.insert(id).inserted else { continue }
-            merged.append(id)
-            if merged.count >= limit { break }
-        }
-        return merged
     }
 
     func normalized(_ value: String?) -> String? {
@@ -66,21 +72,28 @@ func runAppleMusicRecentTracksImporterTests() {
         return trimmed
     }
 
-    func synthesizedCandidates(from tracks: [RecentTrackFixture], scanStartedAt: Int) -> [RecentTrackCandidate] {
+    func synthesizedCandidates(
+        from tracks: [RecentTrackFixture],
+        scanStartedAt: Int,
+        fallbackDurationSeconds: Double = 180,
+        maxLookbackSeconds: Int = 36 * 60 * 60
+    ) -> [RecentTrackCandidate] {
         var estimatedEndAt = Double(scanStartedAt)
         var newestToOldest: [RecentTrackCandidate] = []
 
         for track in tracks {
             guard let artist = normalized(track.artist),
-                  let title = normalized(track.title),
-                  let durationMillis = track.durationMillis,
-                  durationMillis > 0
+                  let title = normalized(track.title)
             else {
                 continue
             }
 
-            let durationSeconds = Double(durationMillis) / 1000
+            let usesFallbackDuration = (track.durationMillis ?? 0) <= 0
+
+            let durationSeconds = usesFallbackDuration ? fallbackDurationSeconds : Double(track.durationMillis!) / 1000
             let startedAt = estimatedEndAt - durationSeconds
+            let lookback = scanStartedAt - Int(floor(startedAt))
+
             newestToOldest.append(
                 RecentTrackCandidate(
                     id: track.id,
@@ -89,7 +102,8 @@ func runAppleMusicRecentTracksImporterTests() {
                     album: normalized(track.album),
                     durationSeconds: durationSeconds,
                     startTimestamp: max(1, Int(floor(startedAt))),
-                    playedAtTimestamp: Int(floor(estimatedEndAt))
+                    playedAtTimestamp: Int(floor(estimatedEndAt)),
+                    withinLookbackWindow: lookback <= maxLookbackSeconds
                 )
             )
             estimatedEndAt = startedAt
@@ -98,61 +112,95 @@ func runAppleMusicRecentTracksImporterTests() {
         return newestToOldest.reversed()
     }
 
-    func shouldImportCandidate(
-        existingMatchCount: Int,
-        hasSameTrackDuplicate: Bool = false,
-        startTimestamp: Int,
-        scanStartedAt: Int,
-        maxAgeSeconds: Int = 14 * 24 * 60 * 60
-    ) -> Bool {
-        guard startTimestamp >= scanStartedAt - maxAgeSeconds else { return false }
-        guard !hasSameTrackDuplicate else { return false }
-        return existingMatchCount == 0
+    func pruneTrackRecords(_ records: [TrackRecord], limit: Int = 60) -> [TrackRecord] {
+        var seen = Set<String>()
+        return records
+            .filter { !$0.id.isEmpty }
+            .sorted { lhs, rhs in
+                let lhsDate = lhs.lastSeenAt ?? lhs.firstSeenAt ?? Int.min
+                let rhsDate = rhs.lastSeenAt ?? rhs.firstSeenAt ?? Int.min
+                if lhsDate == rhsDate {
+                    return lhs.id < rhs.id
+                }
+                return lhsDate > rhsDate
+            }
+            .compactMap { record in
+                guard seen.insert(record.id).inserted else { return nil }
+                return record
+            }
+            .prefix(limit)
+            .map { $0 }
     }
 
-    func shouldRunAppleMusicAPIImporter(isEnabled: Bool) -> Bool {
-        isEnabled
+    func migrateLegacyState(
+        hasSeeded: Bool,
+        recentTrackIDs: [String],
+        lastFetchCount: Int,
+        lastImportedCount: Int,
+        lastSkippedDuplicateCount: Int,
+        lastStatus: RecentImportStatus
+    ) -> RecentImportState {
+        RecentImportState(
+            hasSeeded: hasSeeded,
+            recentTracks: recentTrackIDs.map { TrackRecord(id: $0) },
+            lastFetchCount: lastFetchCount,
+            lastImportedCount: lastImportedCount,
+            lastSkippedDuplicateCount: lastSkippedDuplicateCount,
+            lastStatus: lastStatus
+        )
     }
 
-    func apiDuplicateToleranceSeconds(durationSeconds: Double?) -> Int {
-        max(10 * 60, Int((durationSeconds ?? 0).rounded(.up)) + 4 * 60)
-    }
-
-    func hasSameTrackDuplicate(
+    func wasPreviouslyImported(
         candidateStart: Int,
-        candidateDuration: Double?,
-        existingStart: Int?,
-        sameTrack: Bool
+        candidateEnd: Int,
+        record: TrackRecord?,
+        toleranceSeconds: Int = 90
     ) -> Bool {
-        guard sameTrack, let existingStart else { return false }
-        return abs(existingStart - candidateStart) <= apiDuplicateToleranceSeconds(durationSeconds: candidateDuration)
+        guard let record,
+              let priorStart = record.lastImportedSyntheticStart,
+              let priorEnd = record.lastImportedSyntheticEnd else {
+            return false
+        }
+        return abs(priorStart - candidateStart) <= toleranceSeconds &&
+            abs(priorEnd - candidateEnd) <= toleranceSeconds
     }
 
-    func resetRecentImportState() -> RecentImportState {
-        RecentImportState()
-    }
-
-    func statusAfterImport(resourcesCount: Int, importedCount: Int, skippedDuplicateCount: Int, hadCandidates: Bool) -> RecentImportStatus {
+    func statusAfterImport(
+        resourcesCount: Int,
+        importedCount: Int,
+        skippedDuplicateCount: Int,
+        skippedLowConfidenceCount: Int,
+        hadCandidates: Bool
+    ) -> RecentImportStatus {
         if resourcesCount == 0 { return .noRecentTracks }
         if importedCount > 0 { return .imported }
+        if skippedLowConfidenceCount > 0 && skippedDuplicateCount == 0 { return .timestampConfidenceTooLow }
         if skippedDuplicateCount > 0 && hadCandidates { return .skippedDuplicatesOnly }
         return .noNewTracks
     }
 
-    func shouldMarkFavorite(playbackStoreID: String?, favoriteStoreIDs: Set<String>) -> Bool {
-        guard let playbackStoreID, !playbackStoreID.isEmpty else { return false }
-        return favoriteStoreIDs.contains(playbackStoreID)
+    func applyCooldownAfterNoOp(_ state: inout RecentImportState, now: Int, cooldownSeconds: Int = 60) {
+        state.consecutiveNoNewTrackCount += 1
+        state.nextEligibleAttemptAt = now + cooldownSeconds
     }
 
-    struct SimScanResult {
-        let importedCount: Int
-        let importedRecentTrackCount: Int
-        let flushedPlaybackHistoryCount: Int
-        let flushedRecentTrackCount: Int
-        let skippedDuplicateCount: Int
+    func applyCooldownAfterFailure(_ state: inout RecentImportState, now: Int, cooldownSeconds: Int = 60) {
+        state.consecutiveFetchFailureCount += 1
+        state.consecutiveNoNewTrackCount = 0
+        state.nextEligibleAttemptAt = now + cooldownSeconds
+        state.lastStatus = .fetchFailed
+    }
 
-        var totalImportedCount: Int { importedCount + importedRecentTrackCount }
-        var totalFlushedCount: Int { flushedPlaybackHistoryCount + flushedRecentTrackCount }
+    func clearCooldownAfterImport(_ state: inout RecentImportState) {
+        state.nextEligibleAttemptAt = nil
+        state.consecutiveFetchFailureCount = 0
+        state.consecutiveNoNewTrackCount = 0
+    }
+
+    func shouldDeferForCooldown(now: Int, nextEligibleAttemptAt: Int?, bypassCooldown: Bool = false) -> Bool {
+        guard !bypassCooldown else { return false }
+        guard let nextEligibleAttemptAt else { return false }
+        return now < nextEligibleAttemptAt
     }
 
     expect(
@@ -166,17 +214,24 @@ func runAppleMusicRecentTracksImporterTests() {
         ["newest", "newer"]
     )
 
-    expectEqual(
-        "scan with no overlap imports all returned recent tracks",
-        unseenPrefix(fetchedIDs: ["a", "b"], knownIDs: ["x", "y"], hasSeeded: true),
-        ["a", "b"]
+    let migrated = migrateLegacyState(
+        hasSeeded: true,
+        recentTrackIDs: ["legacy-a", "legacy-b"],
+        lastFetchCount: 2,
+        lastImportedCount: 0,
+        lastSkippedDuplicateCount: 0,
+        lastStatus: .seeded
     )
+    expect("legacy migration preserves seeded state", migrated.hasSeeded)
+    expectEqual("legacy migration stores track records for prior IDs", migrated.recentTracks.map(\.id), ["legacy-a", "legacy-b"])
+    expectEqual("legacy migration does not fabricate imported timestamps", migrated.recentTracks.first?.lastImportedSyntheticStart, nil)
 
-    expectEqual(
-        "merged state keeps newest IDs first and removes duplicates",
-        mergeRecentIDs(newIDs: ["n1", "n2", "old"], existingIDs: ["old", "older"]),
-        ["n1", "n2", "old", "older"]
-    )
+    let pruned = pruneTrackRecords([
+        TrackRecord(id: "older", firstSeenAt: 10, lastSeenAt: 20),
+        TrackRecord(id: "newer", firstSeenAt: 30, lastSeenAt: 40),
+        TrackRecord(id: "older", firstSeenAt: 5, lastSeenAt: 6),
+    ])
+    expectEqual("track record pruning keeps most recently seen unique IDs first", pruned.map(\.id), ["newer", "older"])
 
     section("Apple Music Recent Tracks · timestamp synthesis")
 
@@ -192,60 +247,116 @@ func runAppleMusicRecentTracksImporterTests() {
     expectEqual("synthesized candidates are queued oldest-to-newest", synthesized.map(\.id), ["oldest", "middle", "newest"])
     expectEqual("oldest start timestamp subtracts all newer durations", synthesized.first?.startTimestamp, 820)
     expectEqual("newest track ends at scan time", synthesized.last?.playedAtTimestamp, 1_000)
-    expectEqual("middle track preserves synthesized end time", synthesized[1].playedAtTimestamp, 970)
+
+    let fallbackLimited = synthesizedCandidates(
+        from: [
+            RecentTrackFixture(id: "newest", artist: "Artist C", title: "Song C", album: nil, durationMillis: nil),
+            RecentTrackFixture(id: "middle", artist: "Artist B", title: "Song B", album: nil, durationMillis: 60_000),
+            RecentTrackFixture(id: "oldest", artist: "Artist A", title: "Song A", album: nil, durationMillis: nil),
+        ],
+        scanStartedAt: 1_000
+    )
+    expectEqual("fallback-duration candidates are still synthesized oldest-to-newest", fallbackLimited.map(\.id), ["oldest", "middle", "newest"])
+    expect("fallback-duration candidates remain eligible when within lookback", fallbackLimited.allSatisfy(\.withinLookbackWindow))
+
+    let farLookback = synthesizedCandidates(
+        from: [
+            RecentTrackFixture(id: "newest", artist: "Artist 1", title: "Song 1", album: nil, durationMillis: 43_201_000),
+            RecentTrackFixture(id: "middle", artist: "Artist 2", title: "Song 2", album: nil, durationMillis: 43_201_000),
+            RecentTrackFixture(id: "oldest", artist: "Artist 3", title: "Song 3", album: nil, durationMillis: 43_201_000),
+        ],
+        scanStartedAt: 200_000
+    )
+    expect("candidates beyond 36 hours synthesized lookback are rejected", !farLookback.first!.withinLookbackWindow)
+    expect("newer candidates inside 36 hours remain eligible", farLookback.last!.withinLookbackWindow)
 
     let filtered = synthesizedCandidates(
         from: [
             RecentTrackFixture(id: "blankArtist", artist: " ", title: "Song", album: nil, durationMillis: 10_000),
             RecentTrackFixture(id: "blankTitle", artist: "Artist", title: nil, album: nil, durationMillis: 10_000),
             RecentTrackFixture(id: "missingDuration", artist: "Artist", title: "Song", album: nil, durationMillis: nil),
-            RecentTrackFixture(id: "zeroDuration", artist: "Artist", title: "Song", album: nil, durationMillis: 0),
             RecentTrackFixture(id: "valid", artist: " Artist ", title: " Song ", album: " Album ", durationMillis: 10_000),
         ],
         scanStartedAt: 500
     )
-    expectEqual("invalid recent track metadata is skipped", filtered.map(\.id), ["valid"])
+    expectEqual("only metadata-invalid recent tracks are skipped", filtered.map(\.id), ["valid", "missingDuration"])
+    expectEqual("missing duration falls back to three minutes", Int(filtered[1].durationSeconds), 180)
     expectEqual("valid recent track metadata is trimmed", [filtered[0].artist, filtered[0].title, filtered[0].album ?? ""], ["Artist", "Song", "Album"])
 
     section("Apple Music Recent Tracks · duplicate and result accounting")
 
-    expect("candidate without existing backlog/log match is importable", shouldImportCandidate(existingMatchCount: 0, startTimestamp: 10_000, scanStartedAt: 10_100))
-    expect("candidate with existing backlog/log match is skipped", !shouldImportCandidate(existingMatchCount: 1, startTimestamp: 10_000, scanStartedAt: 10_100))
-    expect("candidate older than Last.fm's two-week window is skipped", !shouldImportCandidate(existingMatchCount: 0, startTimestamp: 1, scanStartedAt: 14 * 24 * 60 * 60 + 2))
-    expect("Apple Music API importer does not run when setting is off", !shouldRunAppleMusicAPIImporter(isEnabled: false))
-    expect("Apple Music API importer runs when setting is on", shouldRunAppleMusicAPIImporter(isEnabled: true))
-    expectEqual("API duplicate tolerance is at least ten minutes", apiDuplicateToleranceSeconds(durationSeconds: 180), 600)
-    expectEqual("API duplicate tolerance expands for long tracks", apiDuplicateToleranceSeconds(durationSeconds: 900), 1_140)
-    expect("same-track live/log/backlog entry inside API window suppresses import",
-           hasSameTrackDuplicate(candidateStart: 10_000, candidateDuration: 180, existingStart: 10_550, sameTrack: true))
-    expect("same-track entry outside API window does not suppress import",
-           !hasSameTrackDuplicate(candidateStart: 10_000, candidateDuration: 180, existingStart: 10_601, sameTrack: true))
-    expect("different track inside API window does not suppress import",
-           !hasSameTrackDuplicate(candidateStart: 10_000, candidateDuration: 180, existingStart: 10_300, sameTrack: false))
-    expect("candidate with same-track API duplicate is skipped",
-           !shouldImportCandidate(existingMatchCount: 0, hasSameTrackDuplicate: true, startTimestamp: 10_000, scanStartedAt: 10_100))
+    let priorImport = TrackRecord(
+        id: "song-a",
+        firstSeenAt: 100,
+        lastSeenAt: 200,
+        lastImportedSyntheticStart: 10_000,
+        lastImportedSyntheticEnd: 10_180,
+        lastImportedAt: 200,
+        lastSkippedReason: nil
+    )
+    expect("same ID within prior synthetic start/end tolerance is skipped",
+           wasPreviouslyImported(candidateStart: 10_060, candidateEnd: 10_220, record: priorImport))
+    expect("same ID outside prior synthetic tolerance is not considered exact prior import reuse",
+           !wasPreviouslyImported(candidateStart: 10_091, candidateEnd: 10_271, record: priorImport))
 
-    section("Apple Music Recent Tracks · state lifecycle and diagnostics")
+    expectEqual(
+        "lookback-rejected pass reports timestampConfidenceTooLow",
+        statusAfterImport(resourcesCount: 2, importedCount: 0, skippedDuplicateCount: 0, skippedLowConfidenceCount: 2, hadCandidates: true),
+        .timestampConfidenceTooLow
+    )
+    expectEqual(
+        "duplicate-only pass is reported",
+        statusAfterImport(resourcesCount: 5, importedCount: 0, skippedDuplicateCount: 3, skippedLowConfidenceCount: 0, hadCandidates: true),
+        .skippedDuplicatesOnly
+    )
+    expectEqual(
+        "successful import status is reported",
+        statusAfterImport(resourcesCount: 5, importedCount: 2, skippedDuplicateCount: 1, skippedLowConfidenceCount: 1, hadCandidates: true),
+        .imported
+    )
 
-    let resetState = resetRecentImportState()
-    expect("reset clears seeded state", !resetState.hasSeeded)
-    expectEqual("reset clears remembered recent track IDs", resetState.recentTrackIDs, [])
-    expectEqual("reset clears last fetch count", resetState.lastFetchCount, 0)
-    expectEqual("reset clears last imported count", resetState.lastImportedCount, 0)
-    expectEqual("reset clears last skipped duplicate count", resetState.lastSkippedDuplicateCount, 0)
-    expectEqual("reset restores idle importer status", resetState.lastStatus, .idle)
-    expectEqual("successful import status is reported", statusAfterImport(resourcesCount: 5, importedCount: 2, skippedDuplicateCount: 1, hadCandidates: true), .imported)
-    expectEqual("duplicate-only pass is reported", statusAfterImport(resourcesCount: 5, importedCount: 0, skippedDuplicateCount: 3, hadCandidates: true), .skippedDuplicatesOnly)
-    expectEqual("empty API response is reported separately", statusAfterImport(resourcesCount: 0, importedCount: 0, skippedDuplicateCount: 0, hadCandidates: false), .noRecentTracks)
-    expectEqual("known-only response is reported as no new tracks", statusAfterImport(resourcesCount: 5, importedCount: 0, skippedDuplicateCount: 0, hadCandidates: false), .noNewTracks)
+    section("Apple Music Recent Tracks · cooldowns and diagnostics")
+
+    var failureState = RecentImportState()
+    applyCooldownAfterFailure(&failureState, now: 1_000)
+    expectEqual("fetch failure sets 1-minute cooldown", failureState.nextEligibleAttemptAt, 1_060)
+    expectEqual("fetch failure increments failure count", failureState.consecutiveFetchFailureCount, 1)
+    expectEqual("fetch failure status remains fetchFailed", failureState.lastStatus, .fetchFailed)
+
+    var noOpState = RecentImportState()
+    applyCooldownAfterNoOp(&noOpState, now: 2_000)
+    expectEqual("no-op success sets 1-minute cooldown", noOpState.nextEligibleAttemptAt, 2_060)
+    expectEqual("no-op success increments no-new counter", noOpState.consecutiveNoNewTrackCount, 1)
+
+    expect("cooldown gate defers attempts before next eligible time",
+           shouldDeferForCooldown(now: 2_050, nextEligibleAttemptAt: noOpState.nextEligibleAttemptAt))
+    expect("cooldown gate allows attempts at or after next eligible time",
+           !shouldDeferForCooldown(now: 2_060, nextEligibleAttemptAt: noOpState.nextEligibleAttemptAt))
+    expect("manual scans can bypass the recent-track cooldown gate",
+           !shouldDeferForCooldown(now: 2_050, nextEligibleAttemptAt: noOpState.nextEligibleAttemptAt, bypassCooldown: true))
+
+    noOpState.consecutiveFetchFailureCount = 2
+    clearCooldownAfterImport(&noOpState)
+    expectEqual("successful import clears cooldown", noOpState.nextEligibleAttemptAt, nil)
+    expectEqual("successful import resets no-new counter", noOpState.consecutiveNoNewTrackCount, 0)
+    expectEqual("successful import resets failure counter", noOpState.consecutiveFetchFailureCount, 0)
+
+    var diagnosticState = RecentImportState()
+    diagnosticState.consecutiveLowConfidenceCandidateCount = 3
+    expectEqual("diagnostics track consecutive low-confidence candidate count", diagnosticState.consecutiveLowConfidenceCandidateCount, 3)
 
     section("Apple Music Recent Tracks · favorite parity")
+
+    func shouldMarkFavorite(playbackStoreID: String?, favoriteStoreIDs: Set<String>) -> Bool {
+        guard let playbackStoreID, !playbackStoreID.isEmpty else { return false }
+        return favoriteStoreIDs.contains(playbackStoreID)
+    }
 
     expect("favorite parity uses playback store ID matches", shouldMarkFavorite(playbackStoreID: "track-123", favoriteStoreIDs: ["track-123"]))
     expect("favorite parity ignores missing playback store IDs", !shouldMarkFavorite(playbackStoreID: nil, favoriteStoreIDs: ["track-123"]))
     expect("favorite parity does not mark unrelated tracks", !shouldMarkFavorite(playbackStoreID: "track-999", favoriteStoreIDs: ["track-123"]))
 
-    let manualResult = SimScanResult(
+    let manualResult = ListeningHistoryScanServiceResult(
         importedCount: 2,
         importedRecentTrackCount: 3,
         flushedPlaybackHistoryCount: 1,
@@ -255,4 +366,15 @@ func runAppleMusicRecentTracksImporterTests() {
     expectEqual("manual scan result totals include library and recent imports", manualResult.totalImportedCount, 5)
     expectEqual("manual scan result totals include library and recent flushes", manualResult.totalFlushedCount, 3)
     expectEqual("manual scan result keeps duplicate skip count", manualResult.skippedDuplicateCount, 4)
+}
+
+private struct ListeningHistoryScanServiceResult {
+    let importedCount: Int
+    let importedRecentTrackCount: Int
+    let flushedPlaybackHistoryCount: Int
+    let flushedRecentTrackCount: Int
+    let skippedDuplicateCount: Int
+
+    var totalImportedCount: Int { importedCount + importedRecentTrackCount }
+    var totalFlushedCount: Int { flushedPlaybackHistoryCount + flushedRecentTrackCount }
 }

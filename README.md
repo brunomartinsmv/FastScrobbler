@@ -85,6 +85,16 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - macOS target:
   - Menu bar app: macOS 14+
 
+## Source availability
+
+This repository does **not** include the full production implementation. In particular, these files are intentionally omitted from the published source:
+
+- `FastScrobbler/Scrobble/ScrobbleEngine.swift`
+- `FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift`
+- `FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift`
+
+As a result, the repository is not a complete drop-in build of the App Store app without providing your own replacements for those files.
+
 ## Permissions / OS prompts
 
 - **iOS**: Media Library / Apple Music permission is used to read now-playing metadata and (optionally) Listening History and favorites status.
@@ -171,3 +181,5 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 ## License
 
 You may view and modify the code for personal use. Redistribution or publishing this software or derivatives on the Apple App Store or any commercial marketplace is prohibited without explicit permission.
+
+© 2026 Kevin Lim

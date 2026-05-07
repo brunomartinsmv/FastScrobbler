@@ -265,6 +265,57 @@ func runListeningHistoryRecoveryTests() {
     expect("cursor does not advance when the batch ends mid-timeline",
            !shouldAdvancePlaybackHistoryCursor(candidateCount: 4, importedBeforeTrack: 0, maxItems: 3))
 
+    section("Listening History · Import state pruning")
+
+    func pruneState(
+        lastSeenByTrackID: [String: Int],
+        playCountByTrackID: [String: Int],
+        now: Int,
+        retentionDays: Int = 14,
+        maxEntries: Int = 2_500
+    ) -> ([String: Int], [String: Int]) {
+        let cutoff = now - retentionDays * 24 * 60 * 60
+        var filteredLastSeen = lastSeenByTrackID.filter { $0.value >= cutoff }
+        let allowedIDs = Set(filteredLastSeen.keys)
+        var filteredPlayCount = playCountByTrackID.filter { allowedIDs.contains($0.key) }
+
+        if filteredLastSeen.count > maxEntries {
+            let newest = filteredLastSeen.sorted(by: { $0.value > $1.value }).prefix(maxEntries)
+            let keepIDs = Set(newest.map(\.key))
+            filteredLastSeen = filteredLastSeen.filter { keepIDs.contains($0.key) }
+            filteredPlayCount = filteredPlayCount.filter { keepIDs.contains($0.key) }
+        }
+
+        return (filteredLastSeen, filteredPlayCount)
+    }
+
+    let pruneNow = 2_000_000_000
+    let staleState = pruneState(
+        lastSeenByTrackID: [
+            "fresh": pruneNow - 60,
+            "stale": pruneNow - (15 * 24 * 60 * 60)
+        ],
+        playCountByTrackID: [
+            "fresh": 3,
+            "stale": 8
+        ],
+        now: pruneNow
+    )
+    expectEqual("state pruning removes track cursors older than 14 days", Array(staleState.0.keys).sorted(), ["fresh"])
+    expectEqual("state pruning drops play counts for removed cursors", Array(staleState.1.keys).sorted(), ["fresh"])
+
+    let oversizedLastSeen = Dictionary(uniqueKeysWithValues: (0..<2_510).map { index in
+        ("track-\(index)", pruneNow - index)
+    })
+    let oversizedPlayCounts = Dictionary(uniqueKeysWithValues: (0..<2_510).map { index in
+        ("track-\(index)", index)
+    })
+    let oversizedState = pruneState(lastSeenByTrackID: oversizedLastSeen, playCountByTrackID: oversizedPlayCounts, now: pruneNow)
+    expectEqual("state pruning trims tracked IDs to 2500", oversizedState.0.count, 2_500)
+    expectEqual("state pruning trims play-count map to the same 2500 IDs", oversizedState.1.count, 2_500)
+    expect("state pruning preserves the newest tracked ID", oversizedState.0.keys.contains("track-0"))
+    expect("state pruning drops the oldest tracked ID", !oversizedState.0.keys.contains("track-2509"))
+
     func shouldProcessPlaybackHistoryCandidate(
         playedAt: Int,
         playCutoff: Int,

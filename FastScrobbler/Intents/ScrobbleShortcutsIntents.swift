@@ -7,6 +7,10 @@ extension Notification.Name {
     static let openManualScrobble = Notification.Name("FastScrobbler.openManualScrobble")
 }
 
+private enum ShortcutsActivityKeys {
+    static let userPaused = "FastScrobbler.ScrobbleEngine.userPaused"
+}
+
 enum ShortcutsIntentError: Error, LocalizedError {
     case notConnected
     case mediaLibraryDenied
@@ -220,9 +224,12 @@ struct ScanListeningHistoryIntent: AppIntent {
             backlog: ScrobbleBacklog.shared,
             scrobbleLog: ScrobbleLogStore.shared,
             sessionKey: sessionKey,
-            allowExtendedLookback: true
+            allowExtendedLookback: true,
+            bypassRecentTrackCooldown: true,
+            isUserPaused: UserDefaults.standard.bool(forKey: ShortcutsActivityKeys.userPaused),
+            pauseBehavior: .allowSubmissionWhilePaused
         )
-        ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 3)
+        ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 1.5)
 
         return .result(dialog: IntentDialog(stringLiteral: Self.dialogMessage(for: result)))
     }

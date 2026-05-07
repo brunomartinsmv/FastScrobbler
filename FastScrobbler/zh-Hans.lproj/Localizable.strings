@@ -5,13 +5,14 @@
 "75%" = "75%";
 "Account" = "账户";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一播放会话。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。\n\n注意：这里的播放时间戳并非由 Apple 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。即使 FastScrobbler 在后台运行，歌曲也会被记录。\n\n注意：这里的播放时间戳并非由 Apple 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
 "Connected" = "已连接";
 "Done" = "完成";
 "Dark" = "深色";
 "Duration: %@s | Playback: %@s" = "时长：%1$@ 秒 | 播放：%2$@ 秒";
 "Engine: " = "引擎：";
+"FastScrobbler stores these data to optimise your scrobbling experience. FastScrobbler does NOT store these for data collection purposes." = "FastScrobbler 存储这些数据是为了优化你的 scrobbling 体验。FastScrobbler 绝不会出于数据收集目的存储这些数据。";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobbler 需要一些权限和设置才能稳定运行。";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "通用";
@@ -32,7 +33,7 @@
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "注意：运行快捷指令或使用控制中心按钮后，实时活动不会立即更新。";
 "Now Playing" = "正在播放";
 "OK" = "好";
-"One-time purchase. Not a subscription." = "一次性购买，不是订阅。";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "一次性购买，永久解锁所有 Pro 功能。不是订阅。";
 "Pro" = "Pro";
 "Recent Scrobbles" = "最近的 Scrobble";
 /* Remove brackets screen */
@@ -153,12 +154,16 @@
 "Email FastScrobbler" = "给 FastScrobbler 发邮件";
 "Rate FastScrobbler" = "给 FastScrobbler 评分";
 "Ask a Question or Report a Bug" = "提问或报告错误";
+"App Storage" = "App 存储";
+"Cleaning Up…" = "清理中…";
 "Recently Played" = "最近播放";
 "Request Access" = "请求访问";
 "Request Media Library Access" = "请求媒体资料库访问权限";
 "Required" = "必需";
 "Requires approval in System Settings → Login Items." = "需要在系统设置 → 登录项中批准。";
 "Reset Settings" = "重置设置";
+"Storage Cleanup" = "存储清理";
+"Trim Local Storage" = "精简本地存储";
 "Restore Purchase" = "恢复购买";
 "Restoring…" = "恢复中…";
 "Resume" = "继续";
@@ -181,6 +186,7 @@
 "Submit a post to r/FastScrobbler, and FastScrobbler will respond to your post." = "在 r/FastScrobbler 发帖，FastScrobbler 会回复你的帖子。";
 ", and FastScrobbler will respond to your post." = "，FastScrobbler 会回复你的帖子。";
 "Try signing out of Last.fm and signing in again." = "请先退出 Last.fm 账号，然后重新登录。";
+"Local storage cleanup finished." = "本地存储清理已完成。";
 "Search" = "搜索";
 "Send Now Playing" = "发送\"正在播放\"";
 "Send the current track to Last.fm as now playing." = "将当前歌曲作为\"正在播放\"发送到 Last.fm。";
@@ -286,6 +292,10 @@
 "Skipped — same track was most recently scrobbled." = "已跳过——上一首 scrobble 的也是这首曲目。";
 "Track changed" = "曲目已更换";
 "Track restarted" = "曲目已重新开始";
+"Auto-scrobble is waiting before retrying." = "自动 scrobble 正在等待后再重试。";
+"Auto-scrobble is blocked because Music did not provide a duration." = "自动 scrobble 已被阻止，因为 Music 没有提供时长。";
+"Ready to scrobble when playback resumes." = "播放恢复后即可 scrobble。";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "无法从 Music app 获取曲目时长；正在使用 3 分钟的后备时长。";
 "error scrobbling" = "scrobble 出错";
 "just now" = "刚刚";
 "no duration" = "无时长";

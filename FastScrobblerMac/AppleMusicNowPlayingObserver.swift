@@ -5,6 +5,8 @@ import CoreServices
 
 @MainActor
 final class AppleMusicNowPlayingObserver: ObservableObject {
+    nonisolated private static let fallbackTrackDurationSeconds: TimeInterval = 180
+
     enum ObserverError: Error, LocalizedError {
         case musicAutomationDenied
         case noNowPlayingItem
@@ -107,8 +109,10 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             authorizationStatus = .authorized
             playbackState = snapshot.playbackState
             playbackTimeSeconds = snapshot.playbackTimeSeconds
-            if let t = snapshot.track, t.durationSeconds == nil {
-                logger.debug("Snapshot missing duration for \(t.artist, privacy: .public) - \(t.title, privacy: .public); auto-scrobble will be blocked until duration is available")
+            if let t = snapshot.track, t.usesFallbackDuration == true {
+                logger.debug(
+                    "Snapshot missing duration for \(t.artist, privacy: .public) - \(t.title, privacy: .public); using fallback duration of \(Self.fallbackTrackDurationSeconds, privacy: .public)s"
+                )
             }
             track = snapshot.track
             isNowPlayingLovedInAppleMusic = snapshot.isTrackFavorited
@@ -279,6 +283,9 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             }
         }
 
+        let resolvedDuration = duration > 0 ? duration : Self.fallbackTrackDurationSeconds
+        let usesFallbackDuration = duration <= 0
+
         let track: Track?
         if resolvedArtist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
             resolvedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -289,7 +296,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
                 title: resolvedTitle,
                 album: resolvedAlbum.isEmpty ? nil : resolvedAlbum,
                 albumArtist: albumArtist.isEmpty ? nil : albumArtist,
-                durationSeconds: duration > 0 ? duration : nil,
+                durationSeconds: resolvedDuration,
+                usesFallbackDuration: usesFallbackDuration,
                 persistentID: persistentID,
                 playbackStoreID: nil,
                 isCompilation: isCompilation

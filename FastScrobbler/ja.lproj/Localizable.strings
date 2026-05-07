@@ -5,13 +5,14 @@
 "75%" = "75%";
 "Account" = "アカウント";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。\n\n注: ここではAppleから再生時刻が提供されないため、FastScrobblerがスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。FastScrobblerがバックグラウンドにある間も曲は記録されます。\n\n注: ここではAppleから再生時刻が提供されないため、FastScrobblerがスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
 "Connected" = "接続済み";
 "Done" = "完了";
 "Dark" = "ダーク";
 "Duration: %@s | Playback: %@s" = "再生時間: %1$@秒 | 再生位置: %2$@秒";
 "Engine: " = "エンジン: ";
+"FastScrobbler stores these data to optimise your scrobbling experience. FastScrobbler does NOT store these for data collection purposes." = "FastScrobblerはスクロブル体験を最適化するためにこれらのデータを保存します。FastScrobblerがこれらをデータ収集目的で保存することはありません。";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobblerが安定して動作するには、いくつかの許可と設定が必要です。";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "一般";
@@ -32,7 +33,7 @@
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "注: ショートカットの実行やコントロールセンターボタンの使用後、ライブアクティビティはすぐには更新されません。";
 "Now Playing" = "再生中";
 "OK" = "OK";
-"One-time purchase. Not a subscription." = "一度限りの購入です。サブスクリプションではありません。";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "一度限りの購入で、すべてのPro機能を永久に利用できます。サブスクリプションではありません。";
 "Pro" = "Pro";
 "Recent Scrobbles" = "最近のスクロブル";
 /* Remove brackets screen */
@@ -153,12 +154,16 @@
 "Email FastScrobbler" = "FastScrobblerにメールする";
 "Rate FastScrobbler" = "FastScrobblerを評価";
 "Ask a Question or Report a Bug" = "質問するかバグを報告";
+"App Storage" = "アプリのストレージ";
+"Cleaning Up…" = "クリーンアップ中…";
 "Recently Played" = "最近再生した曲";
 "Request Access" = "アクセスを許可";
 "Request Media Library Access" = "メディアライブラリへのアクセスを要求";
 "Required" = "必須";
 "Requires approval in System Settings → Login Items." = "システム設定 → ログイン項目で承認が必要です。";
 "Reset Settings" = "設定をリセット";
+"Storage Cleanup" = "ストレージのクリーンアップ";
+"Trim Local Storage" = "ローカルストレージを整理";
 "Restore Purchase" = "購入を復元";
 "Restoring…" = "復元中…";
 "Resume" = "再開";
@@ -180,6 +185,7 @@
 "Submit a post to r/FastScrobbler, and FastScrobbler will respond to your post." = "r/FastScrobbler に投稿すると、FastScrobbler がその投稿に返信します。";
 ", and FastScrobbler will respond to your post." = "すると、FastScrobbler がその投稿に返信します。";
 "Try signing out of Last.fm and signing in again." = "Last.fm から一度サインアウトして、再度サインインしてみてください。";
+"Local storage cleanup finished." = "ローカルストレージのクリーンアップが完了しました。";
 "Send Now Playing" = "再生中を送信";
 "Send the current track to Last.fm as now playing." = "現在の曲をLast.fmに再生中として送信します。";
 "Sent now playing: %@ — %@" = "再生中を送信しました: %@ — %@";
@@ -284,6 +290,10 @@
 "Skipped — same track was most recently scrobbled." = "スキップ — この曲は直前にスクロブルされています。";
 "Track changed" = "曲が変わりました";
 "Track restarted" = "曲が再スタートしました";
+"Auto-scrobble is waiting before retrying." = "自動スクロブルは再試行前に待機しています。";
+"Auto-scrobble is blocked because Music did not provide a duration." = "Music が再生時間を提供しなかったため、自動スクロブルはブロックされています。";
+"Ready to scrobble when playback resumes." = "再生が再開されるとスクロブルできる状態です。";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "Music アプリから曲の長さを取得できなかったため、代替の 3 分を使用します。";
 "error scrobbling" = "スクロブルエラー";
 "just now" = "たった今";
 "no duration" = "時間不明";

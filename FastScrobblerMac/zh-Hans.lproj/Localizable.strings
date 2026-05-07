@@ -27,7 +27,7 @@
 "Not connected" = "未连接";
 "Now Playing" = "正在播放";
 "OK" = "好";
-"One-time purchase. Not a subscription." = "一次性购买，不是订阅。";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "一次性购买，永久解锁所有 Pro 功能。不是订阅。";
 "Pro" = "Pro";
 "Recent Scrobbles" = "最近的 Scrobble";
 /* Remove brackets screen */
@@ -139,6 +139,7 @@
 "Purchased" = "已购买";
 "Rate FastScrobbler" = "给 FastScrobbler 评分";
 "Ask a Question or Report a Bug" = "提问或报告错误";
+"Cleaning Up…" = "清理中…";
 "Recently Played" = "最近播放";
 "Request Access" = "请求访问";
 "Request Media Library Access" = "请求媒体资料库访问权限";
@@ -238,3 +239,7 @@
 "Scrobbles the same track again when it loops or restarts. Enable this if you replay songs and want each listen counted." = "当曲目循环或重新开始时再次 scrobble。如果你会重播歌曲并希望每次收听都被计算，请开启此功能。";
 "View Pro features" = "查看 Pro 功能";
 "Upgrade to Pro" = "升级到 Pro";
+"Auto-scrobble is waiting before retrying." = "自动 scrobble 正在等待后再重试。";
+"Auto-scrobble is blocked because Music did not provide a duration." = "自动 scrobble 已被阻止，因为 Music 没有提供时长。";
+"Ready to scrobble when playback resumes." = "播放恢复后即可 scrobble。";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "无法从 Music app 获取曲目时长；正在使用 3 分钟的后备时长。";

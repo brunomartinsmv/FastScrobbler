@@ -5,13 +5,14 @@
 "75%" = "75%";
 "Account" = "Cuenta";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Evita enviar la misma sesión de reproducción a Last.fm más de una vez dentro de un corto intervalo de tiempo.";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "Función experimental: hace scrobble automáticamente de hasta 30 canciones reproducidas recientemente mediante la API de Apple Music.\n\nNota: Apple no proporciona aquí las marcas de tiempo de reproducción, así que FastScrobbler asigna una marca de tiempo estimada cuando envía el scrobble. Las canciones se registran y se envían como scrobble independientemente de la duración de reproducción.";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "Función experimental: hace scrobble automáticamente de hasta 30 canciones reproducidas recientemente mediante la API de Apple Music. Las canciones se registran incluso cuando FastScrobbler está en segundo plano.\n\nNota: Apple no proporciona aquí las marcas de tiempo de reproducción, así que FastScrobbler asigna una marca de tiempo estimada cuando envía el scrobble. Las canciones se registran y se envían como scrobble independientemente de la duración de reproducción.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Función beta: muestra el estado del scrobbling en la pantalla de bloqueo y en Dynamic Island.";
 "Connected" = "Conectado";
 "Done" = "Listo";
 "Dark" = "Oscuro";
 "Duration: %@s | Playback: %@s" = "Duración: %1$@ s | Reproducción: %2$@ s";
 "Engine: " = "Motor: ";
+"FastScrobbler stores these data to optimise your scrobbling experience. FastScrobbler does NOT store these for data collection purposes." = "FastScrobbler almacena estos datos para optimizar tu experiencia de scrobbling. FastScrobbler NO los almacena con fines de recopilación de datos.";
 "FastScrobbler needs a few permissions and settings to work reliably." = "FastScrobbler necesita algunos permisos y ajustes para funcionar de forma fiable.";
 "FastScrobbler Pro" = "FastScrobbler Pro";
 "General" = "General";
@@ -32,7 +33,7 @@
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "Nota: la Actividad en Vivo no se actualizará inmediatamente después de ejecutar un atajo o usar un botón del Centro de control.";
 "Now Playing" = "En reproducción";
 "OK" = "OK";
-"One-time purchase. Not a subscription." = "Compra única. No es una suscripción.";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Compra única, desbloquea todas las funciones Pro para siempre. No es una suscripción.";
 "Pro" = "Pro";
 "Recent Scrobbles" = "Scrobbles recientes";
 /* Remove brackets screen */
@@ -153,12 +154,16 @@
 "Email FastScrobbler" = "Enviar correo a FastScrobbler";
 "Rate FastScrobbler" = "Valorar FastScrobbler";
 "Ask a Question or Report a Bug" = "Hacer una pregunta o informar de un error";
+"App Storage" = "Almacenamiento de la app";
+"Cleaning Up…" = "Limpiando…";
 "Recently Played" = "Reproducido recientemente";
 "Request Access" = "Solicitar acceso";
 "Request Media Library Access" = "Solicitar acceso a la fototeca musical";
 "Required" = "Obligatorio";
 "Requires approval in System Settings → Login Items." = "Requiere aprobación en Ajustes del Sistema → Ítems de inicio de sesión.";
 "Reset Settings" = "Restablecer ajustes";
+"Storage Cleanup" = "Limpieza de almacenamiento";
+"Trim Local Storage" = "Reducir almacenamiento local";
 "Restore Purchase" = "Restaurar compra";
 "Restoring…" = "Restaurando…";
 "Resume" = "Reanudar";
@@ -180,6 +185,7 @@
 "Submit a post to r/FastScrobbler, and FastScrobbler will respond to your post." = "Publica una entrada en r/FastScrobbler y FastScrobbler responderá a tu publicación.";
 ", and FastScrobbler will respond to your post." = " y FastScrobbler responderá a tu publicación.";
 "Try signing out of Last.fm and signing in again." = "Prueba a cerrar sesión en Last.fm y volver a iniciarla.";
+"Local storage cleanup finished." = "La limpieza del almacenamiento local ha finalizado.";
 "Search" = "Buscar";
 "Send Now Playing" = "Enviar En reproducción";
 "Send the current track to Last.fm as now playing." = "Enviar la pista actual a Last.fm como en reproducción.";
@@ -285,6 +291,10 @@
 "Skipped — same track was most recently scrobbled." = "Omitido — esta canción fue la última en hacer scrobble.";
 "Track changed" = "Canción cambiada";
 "Track restarted" = "Canción reiniciada";
+"Auto-scrobble is waiting before retrying." = "El scrobble automático está esperando antes de reintentar.";
+"Auto-scrobble is blocked because Music did not provide a duration." = "El scrobble automático está bloqueado porque Music no proporcionó una duración.";
+"Ready to scrobble when playback resumes." = "Listo para hacer scrobble cuando la reproducción se reanude.";
+"Could not retrieve track duration from Music app; using fallback duration of 3 minutes." = "No se pudo obtener la duración de la pista desde la app Música; se usará una duración alternativa de 3 minutos.";
 "error scrobbling" = "error al hacer scrobble";
 "just now" = "ahora mismo";
 "no duration" = "sin duración";

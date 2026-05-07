@@ -20,6 +20,10 @@ struct ManualScrobbleView: View {
 
     private static let twoWeeksAgo: Date = Calendar.current.date(byAdding: .day, value: -14, to: Date()) ?? Date()
 
+    private func localized(_ key: String) -> String {
+        NSLocalizedString(key, comment: "")
+    }
+
     private func truncated(_ text: String) -> String {
         if text.count > 500 {
             return String(text.prefix(500))
@@ -44,110 +48,118 @@ struct ManualScrobbleView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Artist").font(.footnote).foregroundStyle(.secondary)
-                        TextField("Artist", text: $artist)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Song title").font(.footnote).foregroundStyle(.secondary)
-                        TextField("Song title", text: $title)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Album").font(.footnote).foregroundStyle(.secondary)
-                        TextField("Album", text: $album)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Album artist").font(.footnote).foregroundStyle(.secondary)
-                        TextField("Album artist", text: $albumArtist)
-                    }
-                }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(localized("Manual Scrobble"))
+                    .font(.title.bold())
+                    .padding(.top, MacFloatingBarLayout.contentTopPadding)
 
-                Section("Timestamp") {
-                    Picker("Timestamp", selection: $useCustomTimestamp) {
-                        Text("Now").tag(false)
-                        Text("Custom…").tag(true)
+                macField(localized("Artist"), text: $artist)
+                macField(localized("Song title"), text: $title)
+                macField(localized("Album"), text: $album)
+                macField(localized("Album artist"), text: $albumArtist)
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(localized("Timestamp"))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+
+                    Picker(localized("Timestamp"), selection: $useCustomTimestamp) {
+                        Text(localized("Now")).tag(false)
+                        Text(localized("Custom…")).tag(true)
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .font(.headline)
-                    .frame(height: 44)
+                    .frame(height: 64)
 
                     if useCustomTimestamp {
                         DatePicker(
-                            "Date & Time",
+                            localized("Date & Time"),
                             selection: $customDate,
                             in: Self.twoWeeksAgo...Date(),
                             displayedComponents: [.date, .hourAndMinute]
                         )
-                        Text("Last.fm will reject scrobbles older than two weeks.")
+                        Text(localized("Last.fm will reject scrobbles older than two weeks."))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .padding(.top, 6)
                     }
-                }
-
-                Section {
-                    Button(action: submit) {
-                        HStack(spacing: 8) {
-                            Spacer()
-                            if isSubmitting {
-                                ProgressView().controlSize(.small).tint(.white)
-                            } else if isSubmitted {
-                                Image(systemName: "checkmark.circle.fill")
-                                Text("Submitted")
-                            } else {
-                                Text("Submit Scrobble")
-                            }
-                            Spacer()
-                        }
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .animation(.easeOut(duration: 0.25), value: isSubmitted)
-                    }
-                    .listRowBackground(isSubmitted ? Color.green : Color.accentColor)
-                    .opacity(canSubmit ? 1 : 0.4)
-                    .disabled(!canSubmit)
                 }
 
                 if let errorText {
-                    Section {
-                        Text(errorText)
-                            .foregroundStyle(.red)
-                            .font(.footnote)
-                    }
+                    Text(errorText)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
                 }
 
+                Button(action: submit) {
+                    HStack(spacing: 8) {
+                        Spacer()
+                        if isSubmitting {
+                            ProgressView().controlSize(.small).tint(.white)
+                        } else if isSubmitted {
+                            Image(systemName: "checkmark.circle.fill")
+                            Text(localized("Submitted"))
+                        } else {
+                            Text(localized("Submit Scrobble"))
+                        }
+                        Spacer()
+                    }
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 6)
+                    .animation(.easeOut(duration: 0.25), value: isSubmitted)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(isSubmitted ? .green : .accentColor)
+                .disabled(!canSubmit)
+                .frame(maxWidth: .infinity)
+
                 if !manualLogEntries.isEmpty {
-                    Section("Manual Scrobble Log") {
+                    Divider()
+
+                    Text(localized("Manual Scrobble Log"))
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
+
+                    VStack(alignment: .leading, spacing: 10) {
                         ForEach(manualLogEntries) { entry in
                             logEntryRow(entry, now: now)
+                            if entry.id != manualLogEntries.last?.id {
+                                Divider()
+                            }
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .background(.thinMaterial)
+                    .cornerRadius(12)
+                    .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
                 }
             }
-            .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { date in
-                now = date
-            }
-            .onValueChange(of: artist) { artist = truncated($0) }
-            .onValueChange(of: title) { title = truncated($0) }
-            .onValueChange(of: album) { album = truncated($0) }
-            .onValueChange(of: albumArtist) { albumArtist = truncated($0) }
-            .navigationTitle("Manual Scrobble")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        IOSCloseButtonLabel(style: .plain)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Close")
-                }
-            }
+            .padding()
         }
+        .onValueChange(of: artist) { artist = truncated($0) }
+        .onValueChange(of: title) { title = truncated($0) }
+        .onValueChange(of: album) { album = truncated($0) }
+        .onValueChange(of: albumArtist) { albumArtist = truncated($0) }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .topLeading) {
+            MacFloatingCircleButton(
+                systemImage: "chevron.left",
+                help: localized("Back"),
+                accessibilityLabel: localized("Back"),
+                action: { if let onBack { onBack() } else { dismiss() } }
+            )
+            .padding(.top, 10)
+            .padding(.leading, 10)
+        }
+        .frame(maxWidth: .infinity, minHeight: 300)
     }
 
     @ViewBuilder
@@ -200,6 +212,16 @@ struct ManualScrobbleView: View {
             return Date(timeIntervalSince1970: TimeInterval(entry.startTimestamp))
         }
         return entry.scrobbledAt
+    }
+
+    private func macField(_ label: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            TextField(label, text: text)
+                .textFieldStyle(.roundedBorder)
+        }
     }
 
     private func submit() {

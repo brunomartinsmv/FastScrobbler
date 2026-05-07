@@ -4,10 +4,10 @@ import OSLog
 @MainActor
 final class ScrobbleLogStore: ObservableObject {
     enum Limits {
-        static let maxStoredEntries = 200
+        static let maxStoredEntries = 100
         static let defaultDisplayLimit = 40
         static let manualDisplayLimit = 30
-        static let maxEntryAge: TimeInterval = 45 * 24 * 60 * 60
+        static let maxEntryAge: TimeInterval = 21 * 24 * 60 * 60
     }
 
     enum Source: String, Codable, Sendable {
@@ -25,6 +25,94 @@ final class ScrobbleLogStore: ObservableObject {
         var scrobbledAt: Date
         var source: Source
         var lovedOnLastFM: Bool?
+    }
+
+    private struct PersistedTrack: Codable {
+        var artist: String
+        var title: String
+        var album: String?
+        var albumArtist: String?
+        var durationSeconds: TimeInterval?
+        var usesFallbackDuration: Bool?
+        var persistentID: UInt64?
+        var playbackStoreID: String?
+        var isCompilation: Bool?
+
+        private enum CodingKeys: String, CodingKey {
+            case artist = "a"
+            case title = "t"
+            case album = "al"
+            case albumArtist = "aa"
+            case durationSeconds = "d"
+            case usesFallbackDuration = "uf"
+            case persistentID = "p"
+            case playbackStoreID = "ps"
+            case isCompilation = "ic"
+        }
+
+        init(track: Track) {
+            artist = track.artist
+            title = track.title
+            album = track.album
+            albumArtist = track.albumArtist
+            durationSeconds = track.durationSeconds
+            usesFallbackDuration = track.usesFallbackDuration
+            persistentID = track.persistentID
+            playbackStoreID = track.playbackStoreID
+            isCompilation = track.isCompilation
+        }
+
+        var track: Track {
+            Track(
+                artist: artist,
+                title: title,
+                album: album,
+                albumArtist: albumArtist,
+                durationSeconds: durationSeconds,
+                usesFallbackDuration: usesFallbackDuration,
+                persistentID: persistentID,
+                playbackStoreID: playbackStoreID,
+                isCompilation: isCompilation
+            )
+        }
+    }
+
+    private struct PersistedEntry: Codable {
+        var id: UUID
+        var track: PersistedTrack
+        var startTimestamp: Int
+        var scrobbledAt: Date
+        var source: Source
+        var lovedOnLastFM: Bool?
+
+        private enum CodingKeys: String, CodingKey {
+            case id = "i"
+            case track = "t"
+            case startTimestamp = "s"
+            case scrobbledAt = "c"
+            case source = "o"
+            case lovedOnLastFM = "l"
+        }
+
+        init(entry: Entry) {
+            id = entry.id
+            track = PersistedTrack(track: entry.track)
+            startTimestamp = entry.startTimestamp
+            scrobbledAt = entry.scrobbledAt
+            source = entry.source
+            lovedOnLastFM = entry.lovedOnLastFM
+        }
+
+        var entry: Entry {
+            Entry(
+                id: id,
+                track: track.track,
+                startTimestamp: startTimestamp,
+                scrobbledAt: scrobbledAt,
+                source: source,
+                lovedOnLastFM: lovedOnLastFM
+            )
+        }
     }
 
     static let shared = ScrobbleLogStore()
@@ -77,8 +165,30 @@ final class ScrobbleLogStore: ObservableObject {
         save()
     }
 
+    func cleanupNow() {
+        normalizeEntries(now: Date())
+        save()
+    }
+
     func reload() {
         load()
+    }
+
+    func storageSizeBytes() -> Int64 {
+        let urls = [sharedFileURL(), legacyFileURL()].compactMap { $0 }
+        var seenPaths = Set<String>()
+        var total: Int64 = 0
+
+        for url in urls {
+            guard seenPaths.insert(url.path).inserted else { continue }
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+                  let size = attributes[.size] as? NSNumber else {
+                continue
+            }
+            total += size.int64Value
+        }
+
+        return total
     }
 
     func isMostRecentScrobble(dedupeKey: String) -> Bool {
@@ -158,7 +268,7 @@ final class ScrobbleLogStore: ObservableObject {
         func readEntries(from url: URL) -> [Entry] {
             do {
                 let data = try Data(contentsOf: url)
-                return try JSONDecoder().decode([Entry].self, from: data)
+                return try decodeEntries(from: data)
             } catch {
                 return []
             }
@@ -293,11 +403,12 @@ final class ScrobbleLogStore: ObservableObject {
     }
 
     private func persist(_ entries: [Entry], preferredURL: URL?, fallbackURL: URL) throws {
-        let data = try JSONEncoder().encode(entries)
+        let data = try JSONEncoder().encode(entries.map(PersistedEntry.init))
 
         if let preferredURL {
             do {
                 try write(data, to: preferredURL)
+                deleteLegacyFileIfRedundant(sharedURL: preferredURL, legacyURL: fallbackURL)
                 return
             } catch {
                 logger.warning("shared scrobble log write failed; falling back to Application Support: \(error.localizedDescription, privacy: .public)")
@@ -314,5 +425,19 @@ final class ScrobbleLogStore: ObservableObject {
             attributes: nil
         )
         try data.write(to: url, options: [.atomic])
+    }
+
+    private func decodeEntries(from data: Data) throws -> [Entry] {
+        if let persisted = try? JSONDecoder().decode([PersistedEntry].self, from: data) {
+            return persisted.map(\.entry)
+        }
+        return try JSONDecoder().decode([Entry].self, from: data)
+    }
+
+    private func deleteLegacyFileIfRedundant(sharedURL: URL, legacyURL: URL) {
+        guard sharedURL.path != legacyURL.path else { return }
+        guard FileManager.default.fileExists(atPath: sharedURL.path) else { return }
+        guard FileManager.default.fileExists(atPath: legacyURL.path) else { return }
+        try? FileManager.default.removeItem(at: legacyURL)
     }
 }

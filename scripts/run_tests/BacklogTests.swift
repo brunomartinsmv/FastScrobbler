@@ -139,8 +139,8 @@ func runBacklogCleanupTests() {
     func cleanup(
         _ entries: [CleanupBacklogEntry],
         nowTimestamp: Int,
-        maxAgeSeconds: Int = 30 * 24 * 60 * 60,
-        maxPendingItems: Int = 5_000,
+        maxAgeSeconds: Int = 14 * 24 * 60 * 60,
+        maxPendingItems: Int = 1_000,
         maxAttemptCount: Int = 10
     ) -> CleanupResult {
         var working = entries
@@ -175,14 +175,14 @@ func runBacklogCleanupTests() {
     }
 
     let now = 2_000_000_000
-    let oldTimestamp = now - (31 * 24 * 60 * 60)
+    let oldTimestamp = now - (15 * 24 * 60 * 60)
     let recentTimestamp = now - 60
 
     let ageResult = cleanup([
         CleanupBacklogEntry(id: 1, startTimestamp: oldTimestamp, queuedAt: oldTimestamp, attemptCount: 0),
         CleanupBacklogEntry(id: 2, startTimestamp: recentTimestamp, queuedAt: recentTimestamp, attemptCount: 0),
     ], nowTimestamp: now)
-    expectEqual("cleanup removes entries older than 30 days", ageResult.removedTooOldCount, 1)
+    expectEqual("cleanup removes entries older than 14 days", ageResult.removedTooOldCount, 1)
     expectEqual("cleanup keeps recent entries", ageResult.entries.map(\.id), [2])
 
     let failedResult = cleanup([
@@ -192,7 +192,7 @@ func runBacklogCleanupTests() {
     expectEqual("cleanup removes entries with 10 failed attempts", failedResult.removedTooManyFailedAttemptsCount, 1)
     expectEqual("cleanup keeps entries below failed-attempt cap", failedResult.entries.map(\.id), [1])
 
-    let oversizedEntries = (0..<5_010).map { index in
+    let oversizedEntries = (0..<1_010).map { index in
         CleanupBacklogEntry(
             id: index,
             startTimestamp: recentTimestamp + index,
@@ -201,9 +201,9 @@ func runBacklogCleanupTests() {
         )
     }
     let oversizedResult = cleanup(oversizedEntries, nowTimestamp: now)
-    expectEqual("cleanup trims oversized backlog to 5000 entries", oversizedResult.entries.count, 5_000)
+    expectEqual("cleanup trims oversized backlog to 1000 entries", oversizedResult.entries.count, 1_000)
     expectEqual("cleanup reports excess trimmed count", oversizedResult.removedTooManyItemsCount, 10)
-    expect("cleanup preserves newest timestamp when trimming", oversizedResult.entries.contains(where: { $0.id == 5_009 }))
+    expect("cleanup preserves newest timestamp when trimming", oversizedResult.entries.contains(where: { $0.id == 1_009 }))
     expect("cleanup drops oldest timestamp when trimming", !oversizedResult.entries.contains(where: { $0.id == 0 }))
 
     let sameTimestampResult = cleanup([
@@ -215,4 +215,102 @@ func runBacklogCleanupTests() {
 
     let clearResult = cleanup([], nowTimestamp: now)
     expectEqual("clear-all equivalent leaves no pending entries", clearResult.entries.count, 0)
+
+    section("Backlog · Compact persistence migration")
+
+    struct FullTrack: Codable {
+        let artist: String
+        let title: String
+        let album: String?
+        let albumArtist: String?
+        let durationSeconds: Double?
+        let usesFallbackDuration: Bool?
+        let persistentID: UInt64?
+        let playbackStoreID: String?
+        let isCompilation: Bool?
+    }
+
+    struct LegacyItem: Codable {
+        let id: UUID
+        let track: FullTrack
+        let startTimestamp: Int
+        let origin: String?
+        let wasAppleMusicFavorite: Bool?
+        let queuedAt: Int
+        let attemptCount: Int
+        let lastAttemptAt: Int?
+    }
+
+    struct CompactTrack: Codable {
+        let a: String
+        let t: String
+        let al: String?
+        let aa: String?
+        let d: Double?
+        let uf: Bool?
+        let p: UInt64?
+        let ps: String?
+        let ic: Bool?
+    }
+
+    struct CompactItem: Codable {
+        let i: UUID
+        let t: CompactTrack
+        let s: Int
+        let o: String?
+        let f: Bool?
+        let q: Int
+        let a: Int
+        let l: Int?
+    }
+
+    let legacyItems = (0..<10).map { index in
+        LegacyItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", index))") ?? UUID(),
+            track: FullTrack(
+                artist: "Artist \(index)",
+                title: "Song \(index)",
+                album: "Album \(index)",
+                albumArtist: "Album Artist \(index)",
+                durationSeconds: 180,
+                usesFallbackDuration: false,
+                persistentID: UInt64(index + 1),
+                playbackStoreID: "store-\(index)",
+                isCompilation: false
+            ),
+            startTimestamp: 10_000 + index,
+            origin: "live",
+            wasAppleMusicFavorite: index.isMultiple(of: 2),
+            queuedAt: 20_000 + index,
+            attemptCount: index % 3,
+            lastAttemptAt: 30_000 + index
+        )
+    }
+    let compactItems = legacyItems.map { item in
+        CompactItem(
+            i: item.id,
+            t: CompactTrack(
+                a: item.track.artist,
+                t: item.track.title,
+                al: item.track.album,
+                aa: item.track.albumArtist,
+                d: item.track.durationSeconds,
+                uf: item.track.usesFallbackDuration,
+                p: item.track.persistentID,
+                ps: item.track.playbackStoreID,
+                ic: item.track.isCompilation
+            ),
+            s: item.startTimestamp,
+            o: item.origin,
+            f: item.wasAppleMusicFavorite,
+            q: item.queuedAt,
+            a: item.attemptCount,
+            l: item.lastAttemptAt
+        )
+    }
+
+    let encoder = JSONEncoder()
+    let legacyData = try! encoder.encode(legacyItems)
+    let compactData = try! encoder.encode(compactItems)
+    expect("compact backlog persistence shrinks representative payloads", compactData.count < legacyData.count, detail: "legacy=\(legacyData.count), compact=\(compactData.count)")
 }

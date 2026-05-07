@@ -75,8 +75,8 @@ struct ContentView: View {
             dark: NSColor(white: 0.82, alpha: 1.0)
         )
         static let manualFill = dynamicColor(
-            light: NSColor(white: 0.0, alpha: 0.06),
-            dark: NSColor(white: 1.0, alpha: 0.10)
+            light: NSColor(white: 0.0, alpha: 0),
+            dark: NSColor(white: 1.0, alpha: 0)
         )
         static let disabledFill = dynamicColor(
             light: NSColor(white: 0.0, alpha: 0.05),
@@ -262,7 +262,8 @@ struct ContentView: View {
                     Text(album)
                 }
                 if let d = t.durationSeconds, d > 0 {
-                    let progress = min(observer.playbackTimeSeconds / d, 1.0)
+                    let playedSeconds = min(max(0, engine.effectivePlayedSeconds), d)
+                    let progress = min(playedSeconds / d, 1.0)
                     VStack(spacing: 6) {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
@@ -281,7 +282,7 @@ struct ContentView: View {
                         }
                         .frame(height: 6)
                         HStack {
-                            Text(formatTime(observer.playbackTimeSeconds))
+                            Text(formatTime(playedSeconds))
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                             Spacer()
@@ -331,7 +332,6 @@ struct ContentView: View {
                 .tint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
                 .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill)
                 .brightButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder)
-                .buttonGlow(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
                 .disabled(auth.sessionKey == nil)
 
                 if auth.sessionKey == nil {
@@ -348,7 +348,6 @@ struct ContentView: View {
                     .tint(ActionButtonPalette.account)
                     .prominentButtonBackground(ActionButtonPalette.accountFill)
                     .brightButtonBorder(ActionButtonPalette.accountBorder)
-                    .buttonGlow(ActionButtonPalette.account)
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
@@ -370,7 +369,6 @@ struct ContentView: View {
                     .tint(ActionButtonPalette.scrobbleNow)
                     .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.disabledFill : ActionButtonPalette.scrobbleNowFill)
                     .brightButtonBorder(engine.isUserPaused ? .secondary.opacity(0.35) : ActionButtonPalette.scrobbleNowBorder)
-                    .buttonGlow(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNow)
                     .disabled(engine.isUserPaused)
                 }
             }
@@ -391,7 +389,6 @@ struct ContentView: View {
                 .tint(ActionButtonPalette.account)
                 .prominentButtonBackground(ActionButtonPalette.accountFill)
                 .brightButtonBorder(ActionButtonPalette.accountBorder)
-                .buttonGlow(ActionButtonPalette.account)
                 .disabled(auth.profileURL == nil)
 
                 Button {
@@ -793,15 +790,6 @@ extension View {
         }
     }
 
-    func buttonGlow(_ color: Color) -> some View {
-        self.overlay {
-            Capsule(style: .continuous)
-                .strokeBorder(.clear, lineWidth: 1.5)
-                .shadow(color: color.opacity(0.10), radius: 4, x: 0, y: 0)
-                .shadow(color: color.opacity(0.12), radius: 2, x: 0, y: 0)
-        }
-    }
-
     func prominentButtonBackground(_ color: Color) -> some View {
         self.background {
             Capsule(style: .continuous)
@@ -812,8 +800,9 @@ extension View {
     func brightButtonBorder(_ color: Color) -> some View {
         self.overlay {
             Capsule(style: .continuous)
-                .strokeBorder(color.opacity(0.95), lineWidth: 1.5)
-                .shadow(color: color.opacity(0.12), radius: 2.5, x: 0, y: 0)
+                .strokeBorder(color.opacity(0.95), lineWidth: 1)
+                .shadow(color: color.opacity(0.4), radius: 5, x: 0, y: 0)
+                .shadow(color: color.opacity(0.5), radius: 2.5, x: 0, y: 0)
         }
     }
 }

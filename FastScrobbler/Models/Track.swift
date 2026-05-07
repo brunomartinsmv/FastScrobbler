@@ -97,7 +97,13 @@ enum ProSettings {
         static let textReplacementRules = "FastScrobbler.Pro.textReplacementRules"
     }
 
-    static let scrobbleThresholdOptions: [Double] = [0.10, 0.25, 0.50, 0.75]
+    static let scrobbleThresholdOptions: [Double] = {
+#if os(macOS)
+        [0.10, 0.25, 0.50, 0.75, 0.90]
+#else
+        [0.10, 0.25, 0.50, 0.75]
+#endif
+    }()
     static let defaultScrobbleThresholdIndex: Int = 2
     static let defaultRemoveBracketsKeywords: [String] = [
         "feat. ",
@@ -283,6 +289,15 @@ enum TextReplacementScope: String, Codable, CaseIterable, Sendable {
     }
 }
 
+struct StorageUsageSnapshot: Sendable {
+    var backlogCount: Int
+    var backlogBytes: Int64
+    var scrobbleLogCount: Int
+    var scrobbleLogBytes: Int64
+    var playbackHistoryStateBytes: Int64
+    var recentTracksStateBytes: Int64
+}
+
 struct TextReplacementRule: Codable, Identifiable, Sendable {
     var id: UUID
     var find: String
@@ -305,6 +320,7 @@ struct Track: Codable, Equatable, Hashable, Sendable {
     var album: String?
     var albumArtist: String? = nil
     var durationSeconds: TimeInterval?
+    var usesFallbackDuration: Bool? = nil
     var persistentID: UInt64?
     var playbackStoreID: String? = nil
     var isCompilation: Bool? = nil
