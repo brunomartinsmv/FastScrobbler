@@ -28,10 +28,7 @@ func runListeningHistoryRecoveryTests() {
             return max(delta, 1)
         }()
 
-        let synthesizedPlayCount =
-            previousSeenPlayedAt == playedAt
-                ? max(playCount, 1)
-                : playsToImport
+        let synthesizedPlayCount = playsToImport
 
         if let durationSeconds, durationSeconds > 0 {
             return (0..<synthesizedPlayCount).map { index in
@@ -90,7 +87,18 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: false,
         scrobbleLoopedTracks: false
     )
-    expect("same playedAt growth regenerates the full synthesized timeline", samePlayedAtGrowthStarts == [400, 600, 800, 1000], detail: "got \(samePlayedAtGrowthStarts)")
+    expect("same playedAt growth imports only the new delta play", samePlayedAtGrowthStarts == [1_000], detail: "got \(samePlayedAtGrowthStarts)")
+
+    let samePlayedAtMultiGrowthStarts = recoveredPlaybackHistoryStartTimestamps(
+        playCount: 5,
+        previousPlayCount: 3,
+        playedAt: 1_200,
+        durationSeconds: 200,
+        previousSeenPlayedAt: 1_200,
+        preventDuplicates: false,
+        scrobbleLoopedTracks: false
+    )
+    expect("same playedAt multi-growth imports only the delta timeline", samePlayedAtMultiGrowthStarts == [800, 1_000], detail: "got \(samePlayedAtMultiGrowthStarts)")
 
     let unknownDurationStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 1,
@@ -334,6 +342,66 @@ func runListeningHistoryRecoveryTests() {
     expect("same-minute candidate is skipped when playCount is unchanged",
            !shouldProcessPlaybackHistoryCandidate(playedAt: 2_000, playCutoff: 2_000, previousSeenPlayedAt: 2_000, playCount: 7, previousPlayCount: 7))
 
+    section("Listening History · Same-timestamp delta protection")
+
+    func importedPlaybackHistoryStartsForSameTimestampGrowth(
+        playedAt: Int,
+        playCount: Int,
+        previousPlayCount: Int?,
+        durationSeconds: Int?,
+        existingStarts: [Int]
+    ) -> [Int] {
+        let candidateStarts = recoveredPlaybackHistoryStartTimestamps(
+            playCount: playCount,
+            previousPlayCount: previousPlayCount,
+            playedAt: playedAt,
+            durationSeconds: durationSeconds,
+            previousSeenPlayedAt: playedAt,
+            preventDuplicates: true,
+            scrobbleLoopedTracks: false
+        )
+
+        return candidateStarts.filter { candidate in
+            !existingStarts.contains(where: { abs($0 - candidate) <= 3 })
+        }
+    }
+
+    let sameTimestampDeltaOnlyStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
+        playedAt: 1_200,
+        playCount: 4,
+        previousPlayCount: 3,
+        durationSeconds: 200,
+        existingStarts: [400, 600, 800]
+    )
+    expectEqual("same-timestamp growth only surfaces one new start", sameTimestampDeltaOnlyStarts, [1_000])
+
+    let sameTimestampRescanStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
+        playedAt: 1_200,
+        playCount: 4,
+        previousPlayCount: 4,
+        durationSeconds: 200,
+        existingStarts: [400, 600, 800, 1_000]
+    )
+    expectEqual("same-timestamp rescan imports nothing after state catches up", sameTimestampRescanStarts, [])
+
+    let sameTimestampTwoPlayDeltaStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
+        playedAt: 1_200,
+        playCount: 5,
+        previousPlayCount: 3,
+        durationSeconds: 200,
+        existingStarts: [400, 600]
+    )
+    expectEqual("same-timestamp two-play growth yields only two new starts", sameTimestampTwoPlayDeltaStarts, [800, 1_000])
+
+    let sameTimestampLiveOverlapStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
+        playedAt: 1_200,
+        playCount: 4,
+        previousPlayCount: 3,
+        durationSeconds: 200,
+        existingStarts: [1_000]
+    )
+    expectEqual("same-timestamp growth is fully suppressed when the new play already exists", sameTimestampLiveOverlapStarts, [])
+
     section("Listening History · Match counting against stored timestamps")
 
     struct FakeHistoryMatch {
@@ -397,6 +465,22 @@ func runListeningHistoryRecoveryTests() {
     )
     expectEqual("live scrobble overlap counts as exactly one existing match", existingCrossSourceMatches, 1)
     expectEqual("cross-source overlap suppresses only one recovered play", max(0, desiredImports - existingCrossSourceMatches), 2)
+
+    let sameTimestampLiveDeltaMatches = [
+        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "live")
+    ]
+    let sameTimestampLiveDeltaCandidates = [1_000]
+    let survivingSameTimestampLiveDeltaCandidates = sameTimestampLiveDeltaCandidates.filter { candidateStart in
+        playbackHistoryImportMatchCount(
+            items: sameTimestampLiveDeltaMatches,
+            key: "track-a",
+            startTimestamp: candidateStart,
+            playedAt: 1_200,
+            exactTolerance: 3,
+            playedTolerance: 0
+        ) == 0
+    }
+    expectEqual("same-timestamp delta recovery is blocked by an existing live scrobble for that play", survivingSameTimestampLiveDeltaCandidates, [])
 
     let alreadyImported = [
         FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 2_400, durationSeconds: nil, style: "history"),

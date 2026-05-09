@@ -66,6 +66,7 @@ final class AppModel {
 
     private func performStart() async {
         await runStorageMaintenanceIfNeeded()
+        await ICloudSyncCoordinator.shared.startIfNeeded()
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
         if #available(iOS 16.2, *) {
@@ -102,6 +103,14 @@ final class AppModel {
 
         if let sessionKey = auth.sessionKey {
             await auth.refreshUserInfoIfNeeded()
+
+            let shouldPrimeLiveSessionBeforeForegroundImports = !engine.isUserPaused
+            if shouldPrimeLiveSessionBeforeForegroundImports {
+                // Build the active playback session before any foreground recovery import runs so
+                // the recent-tracks importer can suppress the current live play.
+                engine.start()
+                await engine.tickAsync()
+            }
 
             let backgroundedAt = UserDefaults.standard.object(forKey: Keys.lastEnteredBackgroundAt) as? Date
             let shouldRunForegroundRecoveryScan =
@@ -141,10 +150,12 @@ final class AppModel {
         }
 
         // Foreground transitions can leave Timers paused or invalidated.
-        engine.start()
+        if !engine.isUserPaused {
+            engine.start()
 
-        // Ensure the app immediately re-sync state on foreground transitions (Timers pause while backgrounded).
-        await engine.tickAsync()
+            // Ensure the app immediately re-sync state on foreground transitions (Timers pause while backgrounded).
+            await engine.tickAsync()
+        }
     }
 
     func handleSceneDidBecomeActive() async {

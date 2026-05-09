@@ -63,6 +63,8 @@
 "Scrobble at %@ of duration" = "%@再生時点でスクロブル";
 "Scrobble Controls" = "スクロブル設定";
 "Scrobble from Apple Music API" = "Apple Music APIからスクロブル";
+"Only scrobble non-library songs" = "ライブラリ外の曲のみスクロブルする";
+"Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled." = "ベストエフォートのフィルター: FastScrobblerはApple Music APIの最近再生した曲をローカルライブラリと照合し、すでにライブラリ内にあるように見える曲をスキップします。一致を確認できない場合でも、その曲はスクロブルされます。";
 "Scrobble Now" = "今すぐスクロブル";
 "Settings" = "設定";
 "Setup" = "セットアップ";
@@ -71,6 +73,7 @@
 "State: %@" = "状態: %@";
 "Thank you!" = "ありがとうございます！";
 "Thank you! ^_^" = "ありがとうございます！ ^_^";
+"Unlock Pro features" = "Pro機能をアンロック";
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "設定を初期値に戻します（Last.fmアカウントは接続されたままです）。";
 "Upgrade to unlock more scrobble controls." = "アップグレードして、さらに多くのスクロブル設定を利用できるようにします。";
 "Replace song artist with album artist when scrobbling" = "スクロブル時に曲アーティストをアルバムアーティストに置き換える";
@@ -297,3 +300,17 @@
 "error scrobbling" = "スクロブルエラー";
 "just now" = "たった今";
 "no duration" = "時間不明";
+"Back up your FastScrobbler data to iCloud and keep it synced across your devices." = "FastScrobbler のデータを iCloud にバックアップし、デバイス間で同期を保ちます。";
+"Backlog items" = "保留中の項目";
+"Backlog storage" = "保留中のストレージ";
+"Delete iCloud Data" = "iCloud データを削除";
+"Delete iCloud Data?" = "iCloud データを削除しますか？";
+"iCloud Sync" = "iCloud 同期";
+"iCloud is currently unavailable on this device." = "このデバイスでは現在 iCloud を利用できません。";
+"Listening history state" = "再生履歴の状態";
+"Recent tracks state" = "最近の曲の状態";
+"Scrobble log entries" = "スクロブルログの件数";
+"Scrobble log storage" = "スクロブルログのストレージ";
+"Sync with iCloud" = "iCloud と同期";
+"This removes only the iCloud copy of your synced FastScrobbler data. Local data on this iPhone stays intact, and iCloud sync will be turned off here." = "削除されるのは、同期された FastScrobbler データの iCloud 上のコピーのみです。この iPhone 上のローカルデータはそのまま残り、ここでの iCloud 同期はオフになります。";
+"Working…" = "処理中…";

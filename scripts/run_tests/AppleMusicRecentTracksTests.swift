@@ -352,9 +352,39 @@ func runAppleMusicRecentTracksImporterTests() {
         return favoriteStoreIDs.contains(playbackStoreID)
     }
 
+    func libraryIndexContains(playbackStoreID: String?, libraryStoreIDs: Set<String>) -> Bool {
+        guard let playbackStoreID else { return false }
+        let trimmed = playbackStoreID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return libraryStoreIDs.contains(trimmed)
+    }
+
+    func shouldImportRecentTrack(
+        toggleEnabled: Bool,
+        playbackStoreID: String?,
+        libraryStoreIDs: Set<String>?
+    ) -> Bool {
+        guard toggleEnabled else { return true }
+        guard let libraryStoreIDs else { return true }
+        return !libraryIndexContains(playbackStoreID: playbackStoreID, libraryStoreIDs: libraryStoreIDs)
+    }
+
     expect("favorite parity uses playback store ID matches", shouldMarkFavorite(playbackStoreID: "track-123", favoriteStoreIDs: ["track-123"]))
     expect("favorite parity ignores missing playback store IDs", !shouldMarkFavorite(playbackStoreID: nil, favoriteStoreIDs: ["track-123"]))
     expect("favorite parity does not mark unrelated tracks", !shouldMarkFavorite(playbackStoreID: "track-999", favoriteStoreIDs: ["track-123"]))
+
+    section("Apple Music Recent Tracks · non-library filter")
+
+    expect("non-library filter disabled preserves current import behavior",
+           shouldImportRecentTrack(toggleEnabled: false, playbackStoreID: "track-123", libraryStoreIDs: ["track-123"]))
+    expect("non-library filter skips tracks confirmed to be in the local library",
+           !shouldImportRecentTrack(toggleEnabled: true, playbackStoreID: "track-123", libraryStoreIDs: ["track-123"]))
+    expect("non-library filter still imports tracks outside the local library",
+           shouldImportRecentTrack(toggleEnabled: true, playbackStoreID: "track-999", libraryStoreIDs: ["track-123"]))
+    expect("non-library filter still imports tracks when library membership cannot be resolved",
+           shouldImportRecentTrack(toggleEnabled: true, playbackStoreID: "track-123", libraryStoreIDs: nil))
+    expect("non-library filter does not falsely match empty playback store IDs",
+           shouldImportRecentTrack(toggleEnabled: true, playbackStoreID: " ", libraryStoreIDs: ["track-123"]))
 
     let manualResult = ListeningHistoryScanServiceResult(
         importedCount: 2,

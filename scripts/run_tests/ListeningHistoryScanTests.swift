@@ -111,6 +111,75 @@ func runListeningHistoryScanTests() {
     )
     expectEqual("scan accumulates duplicate skips from import batches", duplicateScan.skippedDuplicates, 9)
 
+    section("Listening History scan · foreground startup ordering")
+
+    enum ForegroundAction: String, Equatable {
+        case startEngine
+        case tickEngine
+        case runRecoveryScan
+        case importPlaybackHistory
+        case importRecentTracks
+        case flushBacklog
+        case scheduleBackgroundProcessing
+    }
+
+    func foregroundStartupActions(isUserPaused: Bool, shouldRunForegroundRecoveryScan: Bool) -> [ForegroundAction] {
+        var actions: [ForegroundAction] = []
+
+        if !isUserPaused {
+            actions.append(.startEngine)
+            actions.append(.tickEngine)
+        }
+
+        if shouldRunForegroundRecoveryScan {
+            actions.append(.runRecoveryScan)
+        } else {
+            actions.append(.importPlaybackHistory)
+            if !isUserPaused {
+                actions.append(.importRecentTracks)
+            }
+        }
+
+        actions.append(.flushBacklog)
+        actions.append(.scheduleBackgroundProcessing)
+
+        if !isUserPaused {
+            actions.append(.startEngine)
+            actions.append(.tickEngine)
+        }
+
+        return actions
+    }
+
+    func firstIndex(of action: ForegroundAction, in actions: [ForegroundAction]) -> Int? {
+        actions.firstIndex(of: action)
+    }
+
+    let standardForegroundStart = foregroundStartupActions(isUserPaused: false, shouldRunForegroundRecoveryScan: false)
+    expect(
+        "foreground startup primes the live session before recent-track import",
+        (firstIndex(of: .tickEngine, in: standardForegroundStart) ?? .max) <
+            (firstIndex(of: .importRecentTracks, in: standardForegroundStart) ?? .max)
+    )
+    expect(
+        "foreground startup still imports playback history before flushing backlog",
+        (firstIndex(of: .importPlaybackHistory, in: standardForegroundStart) ?? .max) <
+            (firstIndex(of: .flushBacklog, in: standardForegroundStart) ?? .max)
+    )
+
+    let recoveryForegroundStart = foregroundStartupActions(isUserPaused: false, shouldRunForegroundRecoveryScan: true)
+    expect(
+        "foreground recovery primes the live session before the recovery scan",
+        (firstIndex(of: .tickEngine, in: recoveryForegroundStart) ?? .max) <
+            (firstIndex(of: .runRecoveryScan, in: recoveryForegroundStart) ?? .max)
+    )
+
+    let pausedForegroundStart = foregroundStartupActions(isUserPaused: true, shouldRunForegroundRecoveryScan: false)
+    expect(
+        "paused startup does not run the recent-track importer",
+        !pausedForegroundStart.contains(.importRecentTracks)
+    )
+
     // ─── Listening History scan cutoff ───────────────────────────────────────────
 
     section("Listening History scan · First-scan lookback")

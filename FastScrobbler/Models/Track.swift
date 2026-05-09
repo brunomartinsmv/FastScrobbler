@@ -15,12 +15,31 @@ enum AppGroup {
     }
 }
 
+enum ICloudSyncLocalStore: String {
+    case backlog
+    case scrobbleLog
+}
+
+enum ICloudSyncLocalChangeNotifier {
+    private static let notificationName = Notification.Name("FastScrobbler.ICloudSync.localStoreDidChange")
+
+    static func post(_ store: ICloudSyncLocalStore) {
+        NotificationCenter.default.post(name: notificationName, object: store.rawValue)
+    }
+
+    static var name: Notification.Name {
+        notificationName
+    }
+}
+
 enum AppSettings {
     enum Keys {
         static let scrobbleListeningHistoryEnabled = "FastScrobbler.App.scrobbleListeningHistoryEnabled"
         static let scrobbleAppleMusicAPIEnabled = "FastScrobbler.App.scrobbleAppleMusicAPIEnabled"
+        static let scrobbleOnlyNonLibraryAppleMusicAPITracks = "FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks"
         static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
         static let themeSelection = "FastScrobbler.App.themeSelection"
+        static let iCloudSyncEnabled = "FastScrobbler.App.iCloudSyncEnabled"
     }
 
     static func scrobbleListeningHistoryEnabled() -> Bool {
@@ -39,11 +58,24 @@ enum AppSettings {
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleAppleMusicAPIEnabled)
     }
 
+    static func scrobbleOnlyNonLibraryAppleMusicAPITracks() -> Bool {
+        if AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil { return false }
+        return AppGroup.userDefaults.bool(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+    }
+
     static func themeSelection() -> AppTheme {
         guard let rawValue = UserDefaults.standard.string(forKey: Keys.themeSelection) else {
             return .system
         }
         return AppTheme(rawValue: rawValue) ?? .system
+    }
+
+    static func iCloudSyncEnabled() -> Bool {
+        UserDefaults.standard.bool(forKey: Keys.iCloudSyncEnabled)
+    }
+
+    static func setICloudSyncEnabled(_ isEnabled: Bool) {
+        UserDefaults.standard.set(isEnabled, forKey: Keys.iCloudSyncEnabled)
     }
 }
 

@@ -56,20 +56,9 @@ func runScrobbleEngineTests() {
         return .submitted
     }
 
-    func rawPlaybackTimeCrossedThreshold(_ rawPlaybackTime: Double, duration: Double, threshold: Double, elapsedSinceStart: Double) -> Bool {
+    func rawPlaybackTimeCrossedThreshold(_ rawPlaybackTime: Double, duration: Double, threshold: Double) -> Bool {
         rawPlaybackTime >= threshold &&
-            rawPlaybackTime <= duration + 2 &&
-            elapsedSinceStart >= threshold - 2
-    }
-
-    func effectivePlayedAfterRawFallback(accumulated: Double, rawPlaybackTime: Double, duration: Double, thresholdIndex: Int, elapsedSinceStart: Double) -> Double {
-        let idx = min(max(thresholdIndex, 0), thresholdOptions.count - 1)
-        let threshold = duration * thresholdOptions[idx]
-        guard accumulated < threshold else { return accumulated }
-        if rawPlaybackTimeCrossedThreshold(rawPlaybackTime, duration: duration, threshold: threshold, elapsedSinceStart: elapsedSinceStart) {
-            return threshold
-        }
-        return accumulated
+            rawPlaybackTime <= duration + 2
     }
 
     func shouldDetectLoopRestart(lastPlaybackTime: Double, playbackTime: Double, duration: Double, allowRepeatScrobbles: Bool, resumeWindowActive: Bool = false, gapSeconds: Double? = 1) -> Bool {
@@ -158,9 +147,27 @@ func runScrobbleEngineTests() {
     }
 
     func displayPlayedSeconds(accumulated: Double, rawPlaybackTime: Double, duration: Double) -> Double {
-        let effective = max(accumulated, max(0, rawPlaybackTime))
-        guard duration > 0 else { return effective }
-        return min(effective, duration)
+        let raw = max(0, rawPlaybackTime)
+        guard duration > 0 else { return raw }
+        return min(raw, duration)
+    }
+
+    func nowPlayingCardPlayedSeconds(
+        usesFallbackDuration: Bool,
+        displayPlaybackSeconds: Double,
+        effectivePlayedSeconds: Double,
+        duration: Double
+    ) -> Double {
+        let selected = usesFallbackDuration ? effectivePlayedSeconds : displayPlaybackSeconds
+        return min(max(0, selected), duration)
+    }
+
+    func thresholdQualifiedPlaybackSeconds(
+        usesFallbackDuration: Bool,
+        rawPlaybackTime: Double,
+        effectivePlayedSeconds: Double
+    ) -> Double {
+        usesFallbackDuration ? effectivePlayedSeconds : max(0, rawPlaybackTime)
     }
 
     func renderInactiveStatus(artist: String, title: String, playbackState: SimPlaybackState, played: Double = 0, duration: Double = 0, thresholdIndex: Int = 2, hasSentNowPlaying: Bool = false, hasScrobbled: Bool = false, hasLoved: Bool = false, failureMessage: String? = nil) -> String {
@@ -192,24 +199,6 @@ func runScrobbleEngineTests() {
             return usesFallbackDuration && hasObservedFallbackPlaybackProgress
         }
         return hasObservedPlaybackProgress || (usesFallbackDuration && hasObservedFallbackPlaybackProgress)
-    }
-
-    func shouldBlockAutoScrobbleForUntrustedTimestamp(
-        isMacOS: Bool,
-        hasObservedPlaybackProgress: Bool,
-        hasObservedFallbackPlaybackProgress: Bool = false,
-        pendingColdStartDedupeCheck: Bool,
-        usesFallbackDuration: Bool = false
-    ) -> Bool {
-        if isMacOS {
-            return false
-        }
-        return !autoStartTimestampIsReliable(
-            hasObservedPlaybackProgress: hasObservedPlaybackProgress,
-            hasObservedFallbackPlaybackProgress: hasObservedFallbackPlaybackProgress,
-            pendingColdStartDedupeCheck: pendingColdStartDedupeCheck,
-            usesFallbackDuration: usesFallbackDuration
-        )
     }
 
     func shouldApplyThrottle(lastAttemptSecondsAgo: Double?) -> Bool {
@@ -266,60 +255,25 @@ func runScrobbleEngineTests() {
     expect("index -1 clamped to 0 (10%)",        shouldScrobble(played: 6, duration: 60, thresholdIndex: -1))
     expect("index 99 clamped to 4 (90%)",        !shouldScrobble(played: 53, duration: 60, thresholdIndex: 99))
 
-    section("Engine · Raw playback-time threshold fallback")
+    section("Engine · Raw playback-time threshold position")
 
     let fallbackDuration = 120.0
     let fallbackThreshold = fallbackDuration * thresholdOptions[2]
 
-    expect("raw fallback triggers at exact threshold",
-           rawPlaybackTimeCrossedThreshold(fallbackThreshold, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: fallbackThreshold))
-    expect("raw fallback triggers after threshold",
-           rawPlaybackTimeCrossedThreshold(75, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 75))
-    expect("raw fallback is blocked below threshold",
-           !rawPlaybackTimeCrossedThreshold(59.9, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 59.9))
-    expect("raw fallback tolerates small end-of-track overshoot",
-           rawPlaybackTimeCrossedThreshold(122, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 122))
-    expect("raw fallback rejects impossible playback positions",
-           !rawPlaybackTimeCrossedThreshold(123, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 123))
-    expect("raw fallback is blocked when raw playback only crossed threshold by seeking",
-           !rawPlaybackTimeCrossedThreshold(75, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 5))
-    expect("raw fallback allows small wall-clock timing tolerance",
-           rawPlaybackTimeCrossedThreshold(60, duration: fallbackDuration, threshold: fallbackThreshold, elapsedSinceStart: 58))
-
-    let laggedAccumulated = effectivePlayedAfterRawFallback(
-        accumulated: 48,
-        rawPlaybackTime: 61,
-        duration: fallbackDuration,
-        thresholdIndex: 2,
-        elapsedSinceStart: 61
-    )
-    expect("lagged accumulated time is promoted to threshold after raw playback crosses it",
-           laggedAccumulated == fallbackThreshold,
-           detail: "got \(laggedAccumulated)")
-    expect("promoted fallback time allows auto-scrobble while playing",
-           shouldAutoScrobble(playbackState: .playing, played: laggedAccumulated, duration: fallbackDuration, thresholdIndex: 2))
-
-    let belowThresholdAccumulated = effectivePlayedAfterRawFallback(
-        accumulated: 48,
-        rawPlaybackTime: 59,
-        duration: fallbackDuration,
-        thresholdIndex: 2,
-        elapsedSinceStart: 59
-    )
-    expect("fallback does not promote before raw playback crosses threshold",
-           belowThresholdAccumulated == 48,
-           detail: "got \(belowThresholdAccumulated)")
-
-    let seekedAccumulated = effectivePlayedAfterRawFallback(
-        accumulated: 5,
-        rawPlaybackTime: 75,
-        duration: fallbackDuration,
-        thresholdIndex: 2,
-        elapsedSinceStart: 5
-    )
-    expect("fallback does not promote a quick seek past the threshold",
-           seekedAccumulated == 5,
-           detail: "got \(seekedAccumulated)")
+    expect("raw playback triggers at exact threshold",
+           rawPlaybackTimeCrossedThreshold(fallbackThreshold, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("raw playback triggers after threshold",
+           rawPlaybackTimeCrossedThreshold(75, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("raw playback is blocked below threshold",
+           !rawPlaybackTimeCrossedThreshold(59.9, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("raw playback tolerates small end-of-track overshoot",
+           rawPlaybackTimeCrossedThreshold(122, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("raw playback rejects impossible playback positions",
+           !rawPlaybackTimeCrossedThreshold(123, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("forward seek past threshold qualifies immediately",
+           rawPlaybackTimeCrossedThreshold(75, duration: fallbackDuration, threshold: fallbackThreshold))
+    expect("backward seek below threshold is no longer qualified",
+           !rawPlaybackTimeCrossedThreshold(5, duration: fallbackDuration, threshold: fallbackThreshold))
 
     section("Engine · Fallback self-counted played time")
 
@@ -385,12 +339,85 @@ func runScrobbleEngineTests() {
            fallbackClamped == 180,
            detail: "got \(fallbackClamped)")
 
-    expectEqual("displayed played time prefers accumulated fallback time over raw zero",
+    expectEqual("displayed played time follows raw zero even if accumulated is higher",
                 displayPlayedSeconds(accumulated: 42, rawPlaybackTime: 0, duration: 180),
-                42)
-    expectEqual("displayed played time uses the greater of accumulated and raw playback",
+                0)
+    expectEqual("displayed played time follows raw playback after a seek",
                 displayPlayedSeconds(accumulated: 42, rawPlaybackTime: 50, duration: 180),
                 50)
+    expectEqual("displayed played time clamps to duration",
+                displayPlayedSeconds(accumulated: 42, rawPlaybackTime: 190, duration: 180),
+                180)
+    expectEqual("fallback-duration now playing card uses effective played seconds",
+                nowPlayingCardPlayedSeconds(
+                    usesFallbackDuration: true,
+                    displayPlaybackSeconds: 12,
+                    effectivePlayedSeconds: 42,
+                    duration: 180
+                ),
+                42)
+    expectEqual("normal-duration now playing card uses display playback seconds",
+                nowPlayingCardPlayedSeconds(
+                    usesFallbackDuration: false,
+                    displayPlaybackSeconds: 12,
+                    effectivePlayedSeconds: 42,
+                    duration: 180
+                ),
+                12)
+    expectEqual("fallback-duration now playing card clamps selected played time to duration",
+                nowPlayingCardPlayedSeconds(
+                    usesFallbackDuration: true,
+                    displayPlaybackSeconds: 12,
+                    effectivePlayedSeconds: 240,
+                    duration: 180
+                ),
+                180)
+    expect("fallback-duration now playing card prefers effective played time over display playback time",
+           nowPlayingCardPlayedSeconds(
+                usesFallbackDuration: true,
+                displayPlaybackSeconds: 12,
+                effectivePlayedSeconds: 42,
+                duration: 180
+           ) > nowPlayingCardPlayedSeconds(
+                usesFallbackDuration: false,
+                displayPlaybackSeconds: 12,
+                effectivePlayedSeconds: 42,
+                duration: 180
+           ))
+    expectEqual("fallback-duration auto-scrobble threshold uses effective played seconds",
+                thresholdQualifiedPlaybackSeconds(
+                    usesFallbackDuration: true,
+                    rawPlaybackTime: 12,
+                    effectivePlayedSeconds: 42
+                ),
+                42)
+    expectEqual("normal-duration auto-scrobble threshold uses raw playback time",
+                thresholdQualifiedPlaybackSeconds(
+                    usesFallbackDuration: false,
+                    rawPlaybackTime: 12,
+                    effectivePlayedSeconds: 42
+                ),
+                12)
+    expect("fallback-duration track can qualify threshold even when raw playback time is stuck low",
+           rawPlaybackTimeCrossedThreshold(
+                thresholdQualifiedPlaybackSeconds(
+                    usesFallbackDuration: true,
+                    rawPlaybackTime: 12,
+                    effectivePlayedSeconds: 28
+                ),
+                duration: 180,
+                threshold: 18
+           ))
+    expect("normal-duration track does not qualify threshold when raw playback time is below threshold",
+           !rawPlaybackTimeCrossedThreshold(
+                thresholdQualifiedPlaybackSeconds(
+                    usesFallbackDuration: false,
+                    rawPlaybackTime: 12,
+                    effectivePlayedSeconds: 28
+                ),
+                duration: 180,
+                threshold: 18
+           ))
     expect("fallback session below threshold is not scrobble-eligible early",
            !shouldScrobble(played: 17, duration: 180, thresholdIndex: 0))
 
@@ -454,18 +481,8 @@ func runScrobbleEngineTests() {
 
     expect("auto timestamp is not trusted before playback progression is observed",
            !autoStartTimestampIsReliable(hasObservedPlaybackProgress: false, pendingColdStartDedupeCheck: true))
-    expect("iOS blocks auto-scrobble when timestamp trust has not been established",
-           shouldBlockAutoScrobbleForUntrustedTimestamp(
-                isMacOS: false,
-                hasObservedPlaybackProgress: false,
-                pendingColdStartDedupeCheck: true
-           ))
-    expect("macOS bypasses the final timestamp-trust auto-scrobble guard",
-           !shouldBlockAutoScrobbleForUntrustedTimestamp(
-                isMacOS: true,
-                hasObservedPlaybackProgress: false,
-                pendingColdStartDedupeCheck: true
-           ))
+    expect("timestamp trust remains a dedupe/correction signal rather than a submission blocker",
+           !autoStartTimestampIsReliable(hasObservedPlaybackProgress: false, pendingColdStartDedupeCheck: true))
     expect("fallback session becomes timestamp-reliable after fallback wall-clock progress",
            autoStartTimestampIsReliable(
                 hasObservedPlaybackProgress: false,

@@ -16,6 +16,22 @@ struct WhatsNewView: View {
 
     private let currentSections: [VersionSection] = [
         VersionSection(
+            id: "5.7",
+            version: "5.7",
+            features: [
+                Feature(
+                    systemImage: "icloud",
+                    title: "Option to sync stored app data to iCloud (under \"App Storage\")",
+                    showsProBadge: false
+                ),
+                Feature(
+                    systemImage: "music.note.square.stack",
+                    title: "\"Only scrobble non-library songs\" toggle for the \"Scrobble from Apple Music API\" feature",
+                    showsProBadge: false
+                )
+            ]
+        ),
+        VersionSection(
             id: "5.4",
             version: "5.4",
             features: [

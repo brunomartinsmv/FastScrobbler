@@ -162,6 +162,11 @@ actor ScrobbleBacklog {
         return items.count
     }
 
+    func syncedItemsSnapshot() async -> [Item] {
+        await loadIfNeeded()
+        return items
+    }
+
     func storageSizeBytes() async -> Int64 {
         let urls = [sharedFileURL(), legacyFileURL()].compactMap { $0 }
         var seenPaths = Set<String>()
@@ -451,6 +456,49 @@ actor ScrobbleBacklog {
         return FlushResult(sentCount: sentCount, skippedCount: skippedCount, remainingCount: items.count, sentItems: sentItems)
     }
 
+    func replaceItemsForSync(_ syncedItems: [Item]) async {
+        await loadIfNeeded()
+        items = Self.mergedSyncedItems(local: [], remote: syncedItems)
+        await save()
+    }
+
+    static func mergedSyncedItems(local: [Item], remote: [Item]) -> [Item] {
+        var mergedByID: [UUID: Item] = [:]
+
+        func mutationDate(for item: Item) -> Date {
+            item.lastAttemptAt ?? item.queuedAt
+        }
+
+        func shouldReplace(existing: Item, with candidate: Item) -> Bool {
+            let existingDate = mutationDate(for: existing)
+            let candidateDate = mutationDate(for: candidate)
+            if candidateDate != existingDate {
+                return candidateDate > existingDate
+            }
+            if candidate.queuedAt != existing.queuedAt {
+                return candidate.queuedAt > existing.queuedAt
+            }
+            return candidate.startTimestamp > existing.startTimestamp
+        }
+
+        for item in local + remote {
+            if let existing = mergedByID[item.id] {
+                if shouldReplace(existing: existing, with: item) {
+                    mergedByID[item.id] = item
+                }
+            } else {
+                mergedByID[item.id] = item
+            }
+        }
+
+        return mergedByID.values.sorted {
+            if $0.startTimestamp == $1.startTimestamp {
+                return $0.queuedAt > $1.queuedAt
+            }
+            return $0.startTimestamp > $1.startTimestamp
+        }
+    }
+
     private func loadIfNeeded() async {
         guard !isLoaded else { return }
         isLoaded = true
@@ -502,6 +550,7 @@ actor ScrobbleBacklog {
             )
             try data.write(to: url, options: [.atomic])
             deleteLegacyFileIfRedundant()
+            ICloudSyncLocalChangeNotifier.post(.backlog)
         } catch {
             logger.warning("failed to persist backlog: \(error.localizedDescription, privacy: .public)")
         }

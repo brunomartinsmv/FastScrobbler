@@ -171,6 +171,9 @@ struct ContentView: View {
             refreshMediaLibraryStatusIfNeeded()
             presentSetupIfNeeded()
         }
+        .onValueChange(of: auth.sessionKey) { _ in
+            presentSetupIfNeeded()
+        }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
             guard hasSeenSetup else { return }
             presentWhatsNewIfNeeded()
@@ -314,7 +317,8 @@ struct ContentView: View {
                     Text(album)
                 }
                 if let d = t.durationSeconds, d > 0 {
-                    let playedSeconds = min(max(0, engine.effectivePlayedSeconds), d)
+                    let selectedPlayedSeconds = t.usesFallbackDuration == true ? engine.effectivePlayedSeconds : engine.displayPlaybackSeconds
+                    let playedSeconds = min(max(0, selectedPlayedSeconds), d)
                     let progress = min(playedSeconds / d, 1.0)
                     VStack(spacing: 6) {
                         GeometryReader { geo in

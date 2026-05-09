@@ -129,6 +129,10 @@ final class ScrobbleLogStore: ObservableObject {
         Array(entries.prefix(max(0, limit)))
     }
 
+    func syncedEntriesSnapshot() -> [Entry] {
+        entries
+    }
+
     func manualEntries(limit: Int = Limits.manualDisplayLimit) -> [Entry] {
         Array(entries.filter { $0.source == .manual }.prefix(max(0, limit)))
     }
@@ -172,6 +176,11 @@ final class ScrobbleLogStore: ObservableObject {
 
     func reload() {
         load()
+    }
+
+    func replaceEntriesForSync(_ syncedEntries: [Entry]) {
+        entries = normalizedEntries(Self.mergedSyncedEntries(local: [], remote: syncedEntries), now: Date())
+        save()
     }
 
     func storageSizeBytes() -> Int64 {
@@ -261,6 +270,27 @@ final class ScrobbleLogStore: ObservableObject {
         }.count
     }
 
+    static func mergedSyncedEntries(local: [Entry], remote: [Entry]) -> [Entry] {
+        var mergedByIdentity: [String: Entry] = [:]
+
+        func identity(for entry: Entry) -> String {
+            "\(entry.source.rawValue)|\(entry.track.dedupeKey)|\(entry.startTimestamp)"
+        }
+
+        for entry in local + remote {
+            let key = identity(for: entry)
+            if let existing = mergedByIdentity[key] {
+                if entry.scrobbledAt > existing.scrobbledAt {
+                    mergedByIdentity[key] = entry
+                }
+            } else {
+                mergedByIdentity[key] = entry
+            }
+        }
+
+        return Array(mergedByIdentity.values)
+    }
+
     private func load() {
         let legacyURL = legacyFileURL()
         let sharedURL = sharedFileURL()
@@ -310,6 +340,7 @@ final class ScrobbleLogStore: ObservableObject {
         normalizeEntries(now: Date())
         do {
             try persist(entries, preferredURL: sharedFileURL(), fallbackURL: legacyFileURL())
+            ICloudSyncLocalChangeNotifier.post(.scrobbleLog)
         } catch {
             logger.warning("failed to persist scrobble log: \(error.localizedDescription, privacy: .public)")
         }

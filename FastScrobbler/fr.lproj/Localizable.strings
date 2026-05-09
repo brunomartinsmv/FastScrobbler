@@ -63,6 +63,8 @@
 "Scrobble at %@ of duration" = "Scrobbler à %@ de la durée";
 "Scrobble Controls" = "Contrôles de scrobble";
 "Scrobble from Apple Music API" = "Scrobbler depuis l’API Apple Music";
+"Only scrobble non-library songs" = "Scrobbler uniquement les morceaux hors bibliothèque";
+"Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled." = "Filtre au mieux : FastScrobbler compare les morceaux récents de l’API Apple Music à votre bibliothèque locale et ignore les morceaux qui semblent déjà s’y trouver. Si une correspondance ne peut pas être confirmée, le morceau est quand même scrobblé.";
 "Scrobble Now" = "Scrobbler maintenant";
 "Settings" = "Réglages";
 "Setup" = "Configuration";
@@ -71,6 +73,7 @@
 "State: %@" = "État : %@";
 "Thank you!" = "Merci !";
 "Thank you! ^_^" = "Merci ! ^_^";
+"Unlock Pro features" = "Débloquer les fonctionnalités Pro";
 "This resets settings back to their initial values (your Last.fm account stays connected)." = "Cela réinitialise les réglages à leurs valeurs initiales (votre compte Last.fm reste connecté).";
 "Upgrade to unlock more scrobble controls." = "Passez à la version supérieure pour débloquer plus de contrôles de scrobble.";
 "Replace song artist with album artist when scrobbling" = "Remplacer l’artiste du morceau par l’artiste de l’album lors du scrobble";
@@ -299,3 +302,17 @@
 "error scrobbling" = "erreur de scrobble";
 "just now" = "à l'instant";
 "no duration" = "sans durée";
+"Back up your FastScrobbler data to iCloud and keep it synced across your devices." = "Sauvegardez vos données FastScrobbler dans iCloud et gardez-les synchronisées sur tous vos appareils.";
+"Backlog items" = "Éléments en attente";
+"Backlog storage" = "Stockage en attente";
+"Delete iCloud Data" = "Supprimer les données iCloud";
+"Delete iCloud Data?" = "Supprimer les données iCloud ?";
+"iCloud Sync" = "Synchronisation iCloud";
+"iCloud is currently unavailable on this device." = "iCloud est actuellement indisponible sur cet appareil.";
+"Listening history state" = "État de l’historique d’écoute";
+"Recent tracks state" = "État des morceaux récents";
+"Scrobble log entries" = "Entrées du journal de scrobble";
+"Scrobble log storage" = "Stockage du journal de scrobble";
+"Sync with iCloud" = "Synchroniser avec iCloud";
+"This removes only the iCloud copy of your synced FastScrobbler data. Local data on this iPhone stays intact, and iCloud sync will be turned off here." = "Cela supprime uniquement la copie iCloud de vos données FastScrobbler synchronisées. Les données locales sur cet iPhone restent intactes, et la synchronisation iCloud sera désactivée ici.";
+"Working…" = "Traitement…";

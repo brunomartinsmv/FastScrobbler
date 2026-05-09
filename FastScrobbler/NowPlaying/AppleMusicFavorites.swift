@@ -66,3 +66,38 @@ enum AppleMusicFavorites {
         index?.contains(playbackStoreID: playbackStoreID) == true
     }
 }
+
+enum AppleMusicLibrarySongs {
+    struct Index: Sendable {
+        fileprivate var playbackStoreIDs: Set<String>
+
+        func contains(playbackStoreID: String?) -> Bool {
+            guard let playbackStoreID else { return false }
+            let trimmed = playbackStoreID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { return false }
+            return playbackStoreIDs.contains(trimmed)
+        }
+    }
+
+    static func buildIndex() -> Index? {
+        guard MPMediaLibrary.authorizationStatus() == .authorized else { return nil }
+
+        let query = MPMediaQuery.songs()
+        let items = query.items ?? []
+        guard !items.isEmpty else {
+            return Index(playbackStoreIDs: [])
+        }
+
+        var storeIDs: Set<String> = []
+        storeIDs.reserveCapacity(min(items.count, 2048))
+
+        for item in items {
+            let sid = item.playbackStoreID.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !sid.isEmpty {
+                storeIDs.insert(sid)
+            }
+        }
+
+        return Index(playbackStoreIDs: storeIDs)
+    }
+}

@@ -92,6 +92,7 @@ This repository does **not** include the full production implementation. In part
 - `FastScrobbler/Scrobble/ScrobbleEngine.swift`
 - `FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift`
 - `FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift`
+- `FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift`
 
 As a result, the repository is not a complete drop-in build of the App Store app without providing your own replacements for those files.
 

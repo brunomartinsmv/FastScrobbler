@@ -28,6 +28,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
+    @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = false
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
 
@@ -441,6 +442,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleAppleMusicAPIEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
         AppleMusicRecentTracksImporter.shared.resetState()
@@ -456,6 +458,7 @@ struct SettingsView: View {
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
         scrobbleAppleMusicAPIEnabled = false
+        scrobbleOnlyNonLibraryAppleMusicAPITracks = false
         extendedListeningHistoryScanEnabled = false
     }
 
@@ -716,9 +719,15 @@ struct SettingsView: View {
 }
 
 private struct AppStorageSettingsPage: View {
+    @ObservedObject private var iCloudSync = ICloudSyncCoordinator.shared
     @State private var isRunningStorageMaintenance = false
     @State private var storageUsageSnapshot: StorageUsageSnapshot?
     @State private var storageMaintenanceAlertMessage: String?
+    @State private var isConfirmingICloudDeletion = false
+
+    private var canDeleteICloudData: Bool {
+        !iCloudSync.isBusy && (iCloudSync.isSyncEnabled || iCloudSync.hasCloudData)
+    }
 
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
@@ -732,10 +741,46 @@ private struct AppStorageSettingsPage: View {
                 } label: {
                     Label(
                         isRunningStorageMaintenance ? localized("Cleaning Up…") : localized("Trim Local Storage"),
-                        systemImage: "externaldrive.badge.wifi"
+                        systemImage: "externaldrive.badge.timemachine"
                     )
                 }
                 .disabled(isRunningStorageMaintenance)
+            }
+
+            Section {
+                Toggle(isOn: Binding(
+                    get: { iCloudSync.isSyncEnabled },
+                    set: { newValue in
+                        Task { await setICloudSyncEnabled(newValue) }
+                    }
+                )) {
+                    Text(localized("Sync with iCloud"))
+                }
+                .disabled(iCloudSync.isBusy || (!iCloudSync.isICloudAvailable && !iCloudSync.isSyncEnabled))
+
+                Button {
+                    isConfirmingICloudDeletion = true
+                } label: {
+                    Label(localized("Delete iCloud Data"), systemImage: "trash")
+                        .foregroundStyle(canDeleteICloudData ? .red : .secondary)
+                }
+                .disabled(!canDeleteICloudData)
+            } header: {
+                Text(localized("iCloud Sync"))
+            } footer: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(localized("Back up your FastScrobbler data to iCloud and keep it synced across your devices."))
+
+                    if !iCloudSync.isICloudAvailable {
+                        Text(localized("iCloud is currently unavailable on this device."))
+                    } else if iCloudSync.isBusy {
+                        Text(localized("Working…"))
+                    } else if let error = iCloudSync.lastErrorMessage, !error.isEmpty {
+                        Text(error)
+                    } else if let status = iCloudSync.statusMessage, !status.isEmpty {
+                        Text(status)
+                    }
+                }
             }
 
             Section {
@@ -753,8 +798,9 @@ private struct AppStorageSettingsPage: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await refreshStorageUsageSnapshot()
+            await iCloudSync.refreshStatus()
         }
-        .alert(localized("Storage Cleanup"), isPresented: Binding(
+        .alert(localized("App Storage"), isPresented: Binding(
             get: { storageMaintenanceAlertMessage != nil },
             set: { isPresented in
                 if !isPresented {
@@ -765,6 +811,14 @@ private struct AppStorageSettingsPage: View {
             Button(localized("OK"), role: .cancel) {}
         } message: {
             Text(storageMaintenanceAlertMessage ?? "")
+        }
+        .alert(localized("Delete iCloud Data?"), isPresented: $isConfirmingICloudDeletion) {
+            Button(localized("Delete iCloud Data"), role: .destructive) {
+                Task { await deleteICloudDataTapped() }
+            }
+            Button(localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(localized("This removes only the iCloud copy of your synced FastScrobbler data. Local data on this iPhone stays intact, and iCloud sync will be turned off here."))
         }
     }
 
@@ -784,9 +838,31 @@ private struct AppStorageSettingsPage: View {
         storageUsageSnapshot = await AppModel.shared.collectStorageUsageSnapshot()
     }
 
+    @MainActor
+    private func setICloudSyncEnabled(_ isEnabled: Bool) async {
+        if isEnabled {
+            do {
+                try await iCloudSync.enableSync()
+            } catch {
+                storageMaintenanceAlertMessage = error.localizedDescription
+            }
+        } else {
+            await iCloudSync.disableSync()
+        }
+    }
+
+    @MainActor
+    private func deleteICloudDataTapped() async {
+        do {
+            try await iCloudSync.deleteCloudData()
+        } catch {
+            storageMaintenanceAlertMessage = error.localizedDescription
+        }
+    }
+
     private func storageUsageRow(title: String, value: String?) -> some View {
         HStack {
-            Text(title)
+            Text(localized(title))
             Spacer()
             Text(value ?? localized("Loading…"))
                 .foregroundStyle(.secondary)

@@ -21,6 +21,7 @@ struct RunTestsMain {
         runBackgroundGracePeriodTests()
         runAppleMusicRecentTracksImporterTests()
         runControlWidgetStatusTests()
+        runICloudSyncTests()
         runSettingsDefaultsTests()
         runBacklogTimestampPreservationTests()
         runBacklogCleanupTests()

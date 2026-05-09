@@ -68,7 +68,7 @@
 "Upgrade to unlock more scrobble controls." = "升级以解锁更多 scrobble 控制项。";
 "Replace song artist with album artist when scrobbling" = "Scrobble 时用专辑艺人替换歌曲艺人";
 "Scrobble only the first credited artist" = "仅 scrobble 第一位署名艺人";
-"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "当歌曲列出多个艺人且艺人之间以“&”或逗号分隔时，只 scrobble 第一位艺人。";
+"When a song lists multiple artists separated by \"&\" or commas, only scrobble the first artist." = "当歌曲列出多个艺人且艺人之间以\"&\"或逗号分隔时，只 scrobble 第一位艺人。";
 "Username" = "用户名";
 "You’ll need to sign in again to scrobble." = "你需要重新登录才能 scrobble。";
 "You’re upgraded." = "你已升级。";

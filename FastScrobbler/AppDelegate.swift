@@ -14,6 +14,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         // Ensure shared objects exist for background task launches (no UI scene).
         _ = AppModel.shared
         Task { @MainActor in
+            await ICloudSyncCoordinator.shared.startIfNeeded()
             await ProPurchaseManager.shared.startIfNeeded()
         }
         BackgroundTaskManager.shared.registerIfNeeded()
