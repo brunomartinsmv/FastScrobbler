@@ -1,4 +1,5 @@
 import BackgroundTasks
+import FirebaseCore
 import UIKit
 
 @main
@@ -7,6 +8,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
+        configureFirebaseIfPossible()
+
         URLCache.shared.removeAllCachedResponses()
         URLCache.shared.memoryCapacity = 0
         URLCache.shared.diskCapacity = 0
@@ -39,5 +42,18 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+
+    private func configureFirebaseIfPossible() {
+        guard FirebaseApp.app() == nil else { return }
+        guard let configPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+              let config = NSDictionary(contentsOfFile: configPath),
+              let googleAppID = config["GOOGLE_APP_ID"] as? String,
+              !googleAppID.hasPrefix("REPLACE_") else {
+            assertionFailure("Missing valid GoogleService-Info.plist for Firebase.")
+            return
+        }
+
+        FirebaseApp.configure()
     }
 }

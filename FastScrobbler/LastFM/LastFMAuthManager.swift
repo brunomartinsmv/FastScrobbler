@@ -13,6 +13,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
         case invalidCallbackURL
         case missingTokenInCallback
         case failedToStartWebAuthentication
+        case signInAlreadyInProgress
 
         var errorDescription: String? {
             switch self {
@@ -20,6 +21,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
             case .invalidCallbackURL: return NSLocalizedString("Invalid sign-in callback URL.", comment: "")
             case .missingTokenInCallback: return NSLocalizedString("Last.fm callback did not include an auth token.", comment: "")
             case .failedToStartWebAuthentication: return NSLocalizedString("Could not start Last.fm sign-in.", comment: "")
+            case .signInAlreadyInProgress: return NSLocalizedString("Last.fm sign-in is already in progress.", comment: "")
             }
         }
     }
@@ -37,6 +39,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
     }
 
     func connect() async throws {
+        guard webAuth == nil else { throw AuthError.signInAlreadyInProgress }
         let client = try LastFMClient()
         guard !LastFMSecrets.callbackScheme.isEmpty else { throw AuthError.missingCallbackScheme }
         let callback = "\(LastFMSecrets.callbackScheme)://\(LastFMSecrets.callbackPath)"
@@ -48,20 +51,35 @@ final class LastFMAuthManager: NSObject, ObservableObject {
         guard let url = comps.url else { throw AuthError.invalidCallbackURL }
 
         let callbackURL: URL = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<URL, Error>) in
+            var hasResumed = false
+            let resume: (Result<URL, Error>) -> Void = { result in
+                guard !hasResumed else { return }
+                hasResumed = true
+                switch result {
+                case .success(let callbackURL):
+                    cont.resume(returning: callbackURL)
+                case .failure(let error):
+                    cont.resume(throwing: error)
+                }
+            }
+
             let session = ASWebAuthenticationSession(url: url, callbackURLScheme: LastFMSecrets.callbackScheme) { callbackURL, error in
                 self.webAuth = nil
                 if let error = error as? ASWebAuthenticationSessionError,
                    error.code == .canceledLogin
                 {
-                    cont.resume(throwing: CancellationError())
+                    resume(.failure(CancellationError()))
                     return
                 }
-                if let error { cont.resume(throwing: error); return }
+                if let error {
+                    resume(.failure(error))
+                    return
+                }
                 guard let callbackURL else {
-                    cont.resume(throwing: AuthError.invalidCallbackURL)
+                    resume(.failure(AuthError.invalidCallbackURL))
                     return
                 }
-                cont.resume(returning: callbackURL)
+                resume(.success(callbackURL))
             }
 
             session.presentationContextProvider = self
@@ -69,7 +87,7 @@ final class LastFMAuthManager: NSObject, ObservableObject {
             self.webAuth = session
             guard session.start() else {
                 self.webAuth = nil
-                cont.resume(throwing: AuthError.failedToStartWebAuthentication)
+                resume(.failure(AuthError.failedToStartWebAuthentication))
                 return
             }
         }

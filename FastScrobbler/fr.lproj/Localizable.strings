@@ -33,7 +33,7 @@
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "Remarque : l’Activité en direct ne se mettra pas à jour immédiatement après l’exécution d’un raccourci ou l’utilisation d’un bouton du Centre de contrôle.";
 "Now Playing" = "Lecture en cours";
 "OK" = "OK";
-"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Achat unique, débloque toutes les fonctionnalités Pro à vie. Pas d’abonnement.";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Achat unique, débloque toutes les fonctionnalités Pro à vie. Pas d’abonnement.";
 "Pro" = "Pro";
 "Recent Scrobbles" = "Scrobbles récents";
 /* Remove brackets screen */
@@ -159,7 +159,9 @@
 "Ask a Question or Report a Bug" = "Poser une question ou signaler un bug";
 "App Storage" = "Stockage de l’app";
 "Cleaning Up…" = "Nettoyage…";
-"Recently Played" = "Écouté récemment";
+"Recently Played API" = "API d’écoute récente";
+"Send Now Playing status to Last.fm" = "Envoyer le statut Lecture en cours à Last.fm";
+"Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "Affiche le morceau en cours de lecture sur votre profil Last.fm. Les scrobbles automatiques continuent de fonctionner quand cette option est désactivée.";
 "Request Access" = "Demander l’accès";
 "Request Media Library Access" = "Demander l’accès à la bibliothèque multimédia";
 "Required" = "Obligatoire";
@@ -192,7 +194,7 @@
 "Send Now Playing" = "Envoyer Lecture en cours";
 "Send the current track to Last.fm as now playing." = "Envoyer le morceau actuel à Last.fm comme lecture en cours.";
 "Sent now playing: %@ — %@" = "Lecture en cours envoyée : %@ — %@";
-"Show Live Activity (Beta)" = "Afficher l’Activité en direct (bêta)";
+"Show Live Activity" = "Afficher l’Activité en direct";
 "Sign In" = "Se connecter";
 "Search" = "Rechercher";
 "Sign In to Last.fm" = "Se connecter à Last.fm";

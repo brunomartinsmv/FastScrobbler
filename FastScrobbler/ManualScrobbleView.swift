@@ -190,7 +190,7 @@ struct ManualScrobbleView: View {
         case .live: return ""
         case .backlog: return NSLocalizedString("Backlog", comment: "")
         case .playbackHistory: return NSLocalizedString("Listening History", comment: "")
-        case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
+        case .recentlyPlayed: return NSLocalizedString("Recently Played API", comment: "")
         case .manual: return NSLocalizedString("Manual", comment: "")
         }
     }

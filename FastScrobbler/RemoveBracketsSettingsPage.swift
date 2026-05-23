@@ -1,6 +1,35 @@
 import SwiftUI
 
 struct RemoveBracketsSettingsPage: View {
+    #if os(macOS)
+    private enum CardPalette {
+        static let backgroundOverlay = dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.96),
+            dark: NSColor(white: 0.10, alpha: 0.86)
+        )
+        static let border = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.10),
+            dark: NSColor(white: 1.0, alpha: 0.16)
+        )
+    }
+
+    private enum PagePalette {
+        static let background = dynamicColor(
+            light: NSColor(white: 0.97, alpha: 1.0),
+            dark: NSColor(white: 0.14, alpha: 1.0)
+        )
+    }
+
+    private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+        Color(
+            NSColor(name: nil) { appearance in
+                let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                return bestMatch == .darkAqua ? dark : light
+            }
+        )
+    }
+    #endif
+
     enum Target {
         case songTitles
         case albumTitles
@@ -99,6 +128,21 @@ struct RemoveBracketsSettingsPage: View {
         NSLocalizedString(key, comment: "")
     }
 
+    #if os(macOS)
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(CardPalette.backgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(CardPalette.border, lineWidth: 1)
+            }
+    }
+    #endif
+
     init(target: Target) {
         self.target = target
         _keywordDrafts = State(initialValue: target.loadKeywords().map {
@@ -168,7 +212,7 @@ struct RemoveBracketsSettingsPage: View {
             .padding()
             .padding(.top, 44)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(PagePalette.background)
         .overlay(alignment: .topLeading) {
             MacFloatingCircleButton(
                 systemImage: "chevron.left",
@@ -212,7 +256,7 @@ struct RemoveBracketsSettingsPage: View {
             }
         }
         .disabled(!pro.isPro)
-        .tint(.yellow)
+        .tint(proYellow)
 #else
         Toggle(target.toggleLabel, isOn: removeBracketsEnabledBinding)
 #endif
@@ -243,9 +287,7 @@ struct RemoveBracketsSettingsPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
     }
 
     private var keywordsCard: some View {
@@ -261,9 +303,7 @@ struct RemoveBracketsSettingsPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
         .disabled(areKeywordsDisabled)
         .opacity(areKeywordsDisabled ? 0.5 : 1)
     }

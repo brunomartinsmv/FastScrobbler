@@ -38,6 +38,7 @@ enum AppSettings {
         static let scrobbleAppleMusicAPIEnabled = "FastScrobbler.App.scrobbleAppleMusicAPIEnabled"
         static let scrobbleOnlyNonLibraryAppleMusicAPITracks = "FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks"
         static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
+        static let sendNowPlayingAutomaticallyEnabled = "FastScrobbler.App.sendNowPlayingAutomaticallyEnabled"
         static let themeSelection = "FastScrobbler.App.themeSelection"
         static let iCloudSyncEnabled = "FastScrobbler.App.iCloudSyncEnabled"
     }
@@ -61,6 +62,11 @@ enum AppSettings {
     static func scrobbleOnlyNonLibraryAppleMusicAPITracks() -> Bool {
         if AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+    }
+
+    static func sendNowPlayingAutomaticallyEnabled() -> Bool {
+        if AppGroup.userDefaults.object(forKey: Keys.sendNowPlayingAutomaticallyEnabled) == nil { return true }
+        return AppGroup.userDefaults.bool(forKey: Keys.sendNowPlayingAutomaticallyEnabled)
     }
 
     static func themeSelection() -> AppTheme {

@@ -255,7 +255,7 @@ private struct WhatsNewFeatureCard: View {
                     .foregroundStyle(.black)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.yellow, in: Capsule())
+                    .background(proYellow, in: Capsule())
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

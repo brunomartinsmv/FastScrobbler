@@ -16,3 +16,4 @@ FastScrobbler/Scrobble/ScrobbleEngine.swift
 FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
 FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift
 FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift
+GoogleService-Info.plist

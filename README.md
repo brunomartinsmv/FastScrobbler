@@ -79,11 +79,11 @@ These localisations are included across the iOS app, macOS app, and Control Cent
 - Xcode (recent) and an Apple Developer signing setup
 - Recommended: a physical iPhone with the Apple Music app installed
 - iOS targets:
-  - App: iOS 16+
+  - App: iOS 17.6+
   - Live Activity extension: iOS 16.1+
   - Control Widgets extensions: iOS 18.0+
 - macOS target:
-  - Menu bar app: macOS 14+
+  - Menu bar app: macOS 14.6+
 
 ## Source availability
 
@@ -108,13 +108,17 @@ As a result, the repository is not a complete drop-in build of the App Store app
    - Copy `FastScrobbler/LastFMSecrets_Template.swift` → `FastScrobbler/LastFMSecrets.swift`
    - Fill in `LastFMSecrets.apiKey` and `LastFMSecrets.apiSecret`
    - Keep it uncommitted (it’s in `.gitignore`)
-3. Open `FastScrobbler.xcodeproj` and set your signing team / bundle identifiers.
-4. App Group (required for extensions):
+3. Add Firebase config for Crashlytics:
+   - Register `com.kevin.FastScrobbler` as an Apple app in Firebase and enable Crashlytics (and Google Analytics if you want breadcrumb logs).
+   - Replace the placeholder `GoogleService-Info.plist` at the repo root with the real file downloaded from Firebase.
+   - Keep the filename exactly `GoogleService-Info.plist`.
+4. Open `FastScrobbler.xcodeproj` and set your signing team / bundle identifiers.
+5. App Group (required for extensions):
    - All targets are configured to use an App Group (`group.com.kevin.FastScrobbler`) via entitlements (`*.entitlements`).
    - If you change bundle IDs / team, make sure:
      - The App Group identifier exists in your developer account and matches the entitlements.
    - The Last.fm session key is stored in shared App Group preferences so the app and extensions can access it without Keychain prompts.
-5. MusicKit (required for Apple Music API access):
+6. MusicKit (required for Apple Music API access):
    - Enable the MusicKit service for the iOS and macOS app IDs in Certificates, Identifiers & Profiles.
    - Regenerate/download provisioning profiles after enabling it. Do not add MusicKit token keys manually to `*.entitlements`; Xcode will reject unsupported entitlement keys.
 
@@ -154,7 +158,8 @@ As a result, the repository is not a complete drop-in build of the App Store app
 ## Privacy
 
 - FastScrobbler has no developer-run backend.
-- Network traffic goes directly from your device to Last.fm (`ws.audioscrobbler.com`) after you connect your account.
+- The app sends scrobble requests directly to Last.fm (`ws.audioscrobbler.com`) after you connect your account.
+- If Crashlytics is configured, the app also sends crash diagnostics and related metadata to Firebase / Google.
 - More details: `PRIVACY_POLICY.md`.
 
 ## Project layout

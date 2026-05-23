@@ -27,7 +27,7 @@
 "Not connected" = "No conectado";
 "Now Playing" = "En reproducción";
 "OK" = "OK";
-"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Compra única, desbloquea todas las funciones Pro para siempre. No es una suscripción.";
+"One-time purchase, unlocks all Pro features forever. Not a subscription." = "Compra única, desbloquea todas las funciones Pro para siempre. No es una suscripción.";
 "Pro" = "Pro";
 "Recent Scrobbles" = "Scrobbles recientes";
 /* Remove brackets screen */
@@ -140,7 +140,9 @@
 "Rate FastScrobbler" = "Valorar FastScrobbler";
 "Ask a Question or Report a Bug" = "Hacer una pregunta o informar de un error";
 "Cleaning Up…" = "Limpiando…";
-"Recently Played" = "Reproducido recientemente";
+"Recently Played API" = "API de reproducidos recientemente";
+"Send Now Playing status to Last.fm" = "Enviar el estado En reproducción a Last.fm";
+"Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "Muestra la pista que se está reproduciendo en tu perfil de Last.fm. Los scrobbles automáticos siguen funcionando cuando esto está desactivado.";
 "Request Access" = "Solicitar acceso";
 "Request Media Library Access" = "Solicitar acceso a la fototeca musical";
 "Required" = "Obligatorio";
@@ -166,7 +168,7 @@
 "Send Now Playing" = "Enviar En reproducción";
 "Send the current track to Last.fm as now playing." = "Enviar la pista actual a Last.fm como en reproducción.";
 "Sent now playing: %@ — %@" = "Enviado como En reproducción: %@ — %@";
-"Show Live Activity (Beta)" = "Mostrar Actividad en Vivo (Beta)";
+"Show Live Activity" = "Mostrar Actividad en Vivo";
 "Sign In" = "Iniciar sesión";
 "Sign In to Last.fm" = "Iniciar sesión en Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "Inicia sesión para empezar a hacer scrobble en tu cuenta de Last.fm.";

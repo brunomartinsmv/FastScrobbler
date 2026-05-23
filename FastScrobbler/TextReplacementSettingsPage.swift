@@ -1,6 +1,35 @@
 import SwiftUI
 
 struct TextReplacementSettingsPage: View {
+    #if os(macOS)
+    private enum CardPalette {
+        static let backgroundOverlay = dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.96),
+            dark: NSColor(white: 0.10, alpha: 0.86)
+        )
+        static let border = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.10),
+            dark: NSColor(white: 1.0, alpha: 0.16)
+        )
+    }
+
+    private enum PagePalette {
+        static let background = dynamicColor(
+            light: NSColor(white: 0.97, alpha: 1.0),
+            dark: NSColor(white: 0.14, alpha: 1.0)
+        )
+    }
+
+    private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+        Color(
+            NSColor(name: nil) { appearance in
+                let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                return bestMatch == .darkAqua ? dark : light
+            }
+        )
+    }
+    #endif
+
     private struct RuleDraft: Identifiable {
         let id: UUID
         var find: String
@@ -31,6 +60,21 @@ struct TextReplacementSettingsPage: View {
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
     }
+
+    #if os(macOS)
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(CardPalette.backgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(CardPalette.border, lineWidth: 1)
+            }
+    }
+    #endif
 
     init() {
         _drafts = State(initialValue: ProSettings.textReplacementRules().map { RuleDraft(from: $0) })
@@ -78,7 +122,7 @@ struct TextReplacementSettingsPage: View {
             .padding()
             .padding(.top, 44)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(PagePalette.background)
         .overlay(alignment: .topLeading) {
             MacFloatingCircleButton(
                 systemImage: "chevron.left",
@@ -139,9 +183,7 @@ struct TextReplacementSettingsPage: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
     }
 #endif
 
@@ -223,6 +265,7 @@ struct TextReplacementSettingsPage: View {
             } else {
                 Toggle("", isOn: draft.isEnabled)
                     .labelsHidden()
+                    .tint(proYellow)
                     .scaleEffect(0.85)
                     .frame(width: 51)
                     .onValueChange(of: draft.wrappedValue.isEnabled) { _ in persist() }

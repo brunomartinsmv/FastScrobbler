@@ -14,84 +14,88 @@ struct ContentView: View {
 
     private enum ActionButtonPalette {
         static let cardBackgroundOverlay = dynamicColor(
-            light: UIColor(white: 1.0, alpha: 0.62),
-            dark: UIColor(white: 0.08, alpha: 0.74)
+            light: UIColor(white: 0.97, alpha: 0.85),
+            dark: UIColor(white: 0.10, alpha: 0.86)
+        )
+        static let cardBorder = dynamicColor(
+            light: UIColor(white: 0.0, alpha: 0.10),
+            dark: UIColor(white: 1.0, alpha: 0.16)
         )
         static let openMusic = dynamicColor(
-            light: UIColor(red: 1.00, green: 0.34, blue: 0.42, alpha: 1.0),
-            dark: UIColor(red: 1.00, green: 0.46, blue: 0.54, alpha: 1.0)
+            light: UIColor(red: 0.88, green: 0.45, blue: 0.50, alpha: 1.0),
+            dark: UIColor(red: 0.92, green: 0.54, blue: 0.60, alpha: 1.0)
         )
         static let openMusicForeground = dynamicColor(
-            light: UIColor(red: 0.76, green: 0.18, blue: 0.22, alpha: 1.0),
-            dark: UIColor(red: 1.00, green: 0.72, blue: 0.76, alpha: 1.0)
+            light: UIColor(red: 0.54, green: 0.21, blue: 0.25, alpha: 1.0),
+            dark: UIColor(red: 0.95, green: 0.82, blue: 0.84, alpha: 1.0)
         )
         static let openMusicBorder = dynamicColor(
-            light: UIColor(red: 1.00, green: 0.08, blue: 0.22, alpha: 1.0),
-            dark: UIColor(red: 1.00, green: 0.16, blue: 0.34, alpha: 1.0)
+            light: UIColor(red: 0.78, green: 0.28, blue: 0.34, alpha: 1.0),
+            dark: UIColor(red: 0.84, green: 0.36, blue: 0.42, alpha: 1.0)
         )
         static let openMusicFill = dynamicColor(
-            light: UIColor(red: 1, green: 0.52, blue: 0.57, alpha: 0.08),
-            dark: UIColor(red: 1, green: 0.56, blue: 0.62, alpha: 0.12)
+            light: UIColor(red: 0.95, green: 0.84, blue: 0.86, alpha: 0.18),
+            dark: UIColor(red: 0.56, green: 0.30, blue: 0.34, alpha: 0.28)
         )
         static let resume = dynamicColor(
             light: UIColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 1.0),
             dark: UIColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 1.0)
         )
         static let resumeForeground = dynamicColor(
-            light: UIColor(red: 0.18, green: 0.58, blue: 0.29, alpha: 1.0),
-            dark: UIColor(red: 0.58, green: 0.90, blue: 0.67, alpha: 1.0)
+            light: UIColor(red: 0.10, green: 0.44, blue: 0.21, alpha: 1.0),
+            dark: UIColor(red: 0.76, green: 0.95, blue: 0.81, alpha: 1.0)
         )
         static let resumeBorder = dynamicColor(
             light: UIColor(red: 0.00, green: 0.72, blue: 0.20, alpha: 1.0),
             dark: UIColor(red: 0.00, green: 0.84, blue: 0.31, alpha: 1.0)
         )
         static let resumeFill = dynamicColor(
-            light: UIColor(red: 0.46, green: 0.78, blue: 0.56, alpha: 0.09),
-            dark: UIColor(red: 0.42, green: 0.73, blue: 0.50, alpha: 0.12)
+            light: UIColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 0.20),
+            dark: UIColor(red: 0.16, green: 0.40, blue: 0.23, alpha: 0.30)
         )
         static let scrobbleNow = dynamicColor(
-            light: UIColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 1.0),
-            dark: UIColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 1.0)
+            light: UIColor(red: 0.73, green: 0.42, blue: 0.82, alpha: 1.0),
+            dark: UIColor(red: 0.79, green: 0.52, blue: 0.86, alpha: 1.0)
         )
         static let scrobbleNowForeground = dynamicColor(
-            light: UIColor(red: 0.60, green: 0.27, blue: 0.72, alpha: 1.0),
-            dark: UIColor(red: 0.86, green: 0.68, blue: 0.96, alpha: 1.0)
+            light: UIColor(red: 0.42, green: 0.27, blue: 0.49, alpha: 1.0),
+            dark: UIColor(red: 0.88, green: 0.82, blue: 0.93, alpha: 1.0)
         )
         static let scrobbleNowBorder = dynamicColor(
-            light: UIColor(red: 0.66, green: 0.00, blue: 1.00, alpha: 1.0),
-            dark: UIColor(red: 0.76, green: 0.10, blue: 1.00, alpha: 1.0)
+            light: UIColor(red: 0.58, green: 0.28, blue: 0.72, alpha: 1.0),
+            dark: UIColor(red: 0.66, green: 0.36, blue: 0.78, alpha: 1.0)
         )
         static let scrobbleNowFill = dynamicColor(
-            light: UIColor(red: 0.80, green: 0.50, blue: 0.90, alpha: 0.08),
-            dark: UIColor(red: 0.72, green: 0.50, blue: 0.82, alpha: 0.12)
+            light: UIColor(red: 0.90, green: 0.84, blue: 0.94, alpha: 0.18),
+            dark: UIColor(red: 0.38, green: 0.28, blue: 0.48, alpha: 0.28)
         )
         static let account = dynamicColor(
-            light: UIColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 1.0),
-            dark: UIColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 1.0)
+            light: UIColor(red: 0.34, green: 0.62, blue: 0.86, alpha: 1.0),
+            dark: UIColor(red: 0.42, green: 0.70, blue: 0.90, alpha: 1.0)
         )
         static let accountForeground = dynamicColor(
-            light: UIColor(red: 0.18, green: 0.46, blue: 0.78, alpha: 1.0),
-            dark: UIColor(red: 0.66, green: 0.81, blue: 0.96, alpha: 1.0)
+            light: UIColor(red: 0.21, green: 0.34, blue: 0.50, alpha: 1.0),
+            dark: UIColor(red: 0.80, green: 0.89, blue: 0.96, alpha: 1.0)
         )
         static let accountBorder = dynamicColor(
-            light: UIColor(red: 0.00, green: 0.48, blue: 1.00, alpha: 1.0),
-            dark: UIColor(red: 0.00, green: 0.59, blue: 1.00, alpha: 1.0)
+            light: UIColor(red: 0.24, green: 0.48, blue: 0.72, alpha: 1.0),
+            dark: UIColor(red: 0.30, green: 0.56, blue: 0.78, alpha: 1.0)
         )
         static let accountFill = dynamicColor(
-            light: UIColor(red: 0.42, green: 0.70, blue: 0.92, alpha: 0.08),
-            dark: UIColor(red: 0.40, green: 0.65, blue: 0.84, alpha: 0.11)
+            light: UIColor(red: 0.84, green: 0.90, blue: 0.96, alpha: 0.18),
+            dark: UIColor(red: 0.22, green: 0.34, blue: 0.48, alpha: 0.28)
         )
         static let manualForeground = dynamicColor(
-            light: UIColor(white: 0.12, alpha: 1.0),
-            dark: UIColor(white: 0.82, alpha: 1.0)
+            light: UIColor(white: 0.08, alpha: 1.0),
+            dark: UIColor(white: 0.92, alpha: 1.0)
         )
         static let manualFill = dynamicColor(
-            light: UIColor(white: 0.0, alpha: 0),
-            dark: UIColor(white: 1.0, alpha: 0)
+            light: UIColor(white: 1.0, alpha: 0.60),
+            dark: UIColor(white: 0.16, alpha: 0.70)
         )
         static let disabledFill = dynamicColor(
-            light: UIColor(white: 0.0, alpha: 0.03),
-            dark: UIColor(white: 1.0, alpha: 0.05)
+            light: UIColor(white: 1.0, alpha: 0.52),
+            dark: UIColor(white: 0.20, alpha: 0.64)
         )
 
         private static func dynamicColor(light: UIColor, dark: UIColor) -> Color {
@@ -245,22 +249,19 @@ struct ContentView: View {
             await refreshHome()
         }
         .overlay(alignment: .top) {
-            GeometryReader { geo in
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground),
-                        Color(.systemBackground).opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                // SE has a ~20pt status bar; notch/Dynamic Island devices have ~50pt+.
-                // Use the safe area top inset to scale the gradient height accordingly.
-                .frame(height: geo.safeAreaInsets.top < 30 ? 50 : 70)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-            }
+            // Keep this overlay out of GeometryReader so SwiftUI never snapshots it
+            // at full width with a transient zero-height container during modal transitions.
+            LinearGradient(
+                colors: [
+                    Color(.systemBackground),
+                    Color(.systemBackground).opacity(0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 70)
             .ignoresSafeArea(edges: .top)
+            .allowsHitTesting(false)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             handleTimerTick(now: .now)
@@ -279,6 +280,10 @@ struct ContentView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ActionButtonPalette.cardBackgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(ActionButtonPalette.cardBorder, lineWidth: 1)
             }
     }
 
@@ -300,7 +305,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private var trackCard: some View {
@@ -388,7 +392,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private var controls: some View {
@@ -504,8 +507,8 @@ struct ContentView: View {
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
                 .tint(.clear)
-                .prominentButtonBackground(ActionButtonPalette.manualFill)
-                .brightButtonBorder(ActionButtonPalette.manualForeground)
+                .prominentButtonBackground(.clear)
+                .brightButtonBorder(ActionButtonPalette.manualForeground, showsShadow: false)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -542,7 +545,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private func connectTapped() async {
@@ -690,12 +692,7 @@ private struct ScrobbleLogRowView: View {
                         .clipShape(Capsule())
                 }
                 if entry.source != .live {
-                    Text(sourceLabel(entry.source))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .foregroundStyle(sourceBadgeForeground(entry.source))
-                        .background(sourceBadgeBackground(entry.source))
-                        .clipShape(Capsule())
+                    sourceBadge(entry.source)
                 }
                 Spacer()
             }
@@ -752,12 +749,7 @@ private struct ScrobbleLogRowView: View {
                             .clipShape(Capsule())
                     }
                     if entry.source != .live {
-                        Text(sourceLabel(entry.source))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .foregroundStyle(sourceBadgeForeground(entry.source))
-                            .background(sourceBadgeBackground(entry.source))
-                            .clipShape(Capsule())
+                        sourceBadge(entry.source)
                     }
                     Spacer()
                 }
@@ -777,7 +769,7 @@ private struct ScrobbleLogRowView: View {
         case .live: return ""
         case .backlog: return NSLocalizedString("Backlog", comment: "")
         case .playbackHistory: return NSLocalizedString("Listening History", comment: "")
-        case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
+        case .recentlyPlayed: return NSLocalizedString("Recently Played API", comment: "")
         case .manual: return NSLocalizedString("Manual", comment: "")
         }
     }
@@ -820,6 +812,19 @@ private struct ScrobbleLogRowView: View {
                 return UIColor(red: 0.00, green: 0.29, blue: 0.56, alpha: 1.0)
             }
         )
+    }
+
+    @ViewBuilder
+    private func sourceBadge(_ source: ScrobbleLogStore.Source) -> some View {
+        Text(sourceLabel(source))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .foregroundStyle(sourceBadgeForeground(source))
+            .background {
+                Capsule(style: .continuous)
+                    .fill(sourceBadgeBackground(source))
+            }
+            .compositingGroup()
     }
 
     private func displayDate(for entry: ScrobbleLogStore.Entry) -> Date {
@@ -923,16 +928,16 @@ extension View {
     func prominentButtonBackground(_ color: Color) -> some View {
         self.background {
             Capsule(style: .continuous)
-                .fill(color)
+                .fill(color.opacity(0))
         }
     }
 
-    func brightButtonBorder(_ color: Color) -> some View {
+    func brightButtonBorder(_ color: Color, showsShadow: Bool = true) -> some View {
         self.overlay {
             Capsule(style: .continuous)
-                .strokeBorder(color.opacity(0.95), lineWidth: 1.5)
-                .shadow(color: color.opacity(0.4), radius: 6, x: 0, y: 0)
-                .shadow(color: color.opacity(0.4), radius: 3, x: 0, y: 0)
+                .strokeBorder(color.opacity(0.75), lineWidth: 2)
+                .shadow(color: showsShadow ? color.opacity(0.22) : .clear, radius: 4, x: 0, y: 0)
+                .shadow(color: showsShadow ? color.opacity(0.18) : .clear, radius: 2, x: 0, y: 0)
         }
     }
 }

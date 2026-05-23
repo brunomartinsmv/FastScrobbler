@@ -1,6 +1,8 @@
 import SwiftUI
 import ActivityKit
 
+let proYellow = Color.yellow
+
 struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/kevinlim512/FastScrobbler")!
     private static let redditURL = URL(string: "https://www.reddit.com/r/FastScrobbler/")!
@@ -10,7 +12,7 @@ struct SettingsView: View {
     private static let linksSectionRed = Color(red: 0.72, green: 0.14, blue: 0.14)
     // Insets position the Pro badge overlay to sit just inside the disclosure indicator / toggle
     private static let iosLockedProNavigationBadgeTrailingInset: CGFloat = 24
-    private static let iosLockedProToggleBadgeTrailingInset: CGFloat = 63
+    private static let iosLockedProToggleBadgeTrailingInset: CGFloat = 75
 
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
@@ -30,6 +32,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
     @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = false
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
+    @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
 
     @EnvironmentObject private var auth: LastFMAuthManager
@@ -56,9 +59,10 @@ struct SettingsView: View {
         }
     }
 
-    private enum SettingsRoute: Hashable {
+    fileprivate enum SettingsRoute: Hashable {
         case appStorage
         case appleMusicAPI
+        case debug
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
         case textReplacement
@@ -86,6 +90,8 @@ struct SettingsView: View {
                         AppStorageSettingsPage()
                     case .appleMusicAPI:
                         AppleMusicAPISettingsPage()
+                    case .debug:
+                        DebugSettingsPage()
                     case .removeBracketsFromSongTitles:
                         RemoveBracketsSettingsPage(target: .songTitles)
                     case .removeBracketsFromAlbumTitles:
@@ -192,6 +198,12 @@ struct SettingsView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle("Send Now Playing status to Last.fm", isOn: $sendNowPlayingAutomaticallyEnabled)
+                    Text("Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 scrobbleThresholdSlider()
                 removeBracketsNavigationLink(target: .songTitles)
                 removeBracketsNavigationLink(target: .albumTitles)
@@ -205,7 +217,7 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(!pro.isPro)
-                .tint(.yellow)
+                .tint(proYellow)
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
@@ -218,7 +230,7 @@ struct SettingsView: View {
                     }
                 }
                 .disabled(!pro.isPro)
-                .tint(.yellow)
+                .tint(proYellow)
                 .overlay(alignment: .trailing) {
                     lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                 }
@@ -232,7 +244,7 @@ struct SettingsView: View {
                         }
                     }
                     .disabled(!pro.isPro)
-                    .tint(.yellow)
+                    .tint(proYellow)
                     .overlay(alignment: .trailing) {
                         lockedProBadgeOverlay(trailingInset: Self.iosLockedProToggleBadgeTrailingInset)
                     }
@@ -293,7 +305,7 @@ struct SettingsView: View {
             }
 
             Section("Live Activity") {
-                Toggle("Show Live Activity (Beta)", isOn: $liveActivityEnabled)
+                Toggle("Show Live Activity", isOn: $liveActivityEnabled)
                     .onValueChange(of: liveActivityEnabled) { isEnabled in
                         if isEnabled {
                             LiveActivityManager.shared.startIfPossible()
@@ -444,6 +456,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleAppleMusicAPIEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
         AppleMusicRecentTracksImporter.shared.resetState()
 
@@ -460,6 +473,7 @@ struct SettingsView: View {
         scrobbleAppleMusicAPIEnabled = false
         scrobbleOnlyNonLibraryAppleMusicAPITracks = false
         extendedListeningHistoryScanEnabled = false
+        sendNowPlayingAutomaticallyEnabled = true
     }
 
     @MainActor
@@ -554,7 +568,7 @@ struct SettingsView: View {
                 Text(localized("Scrobble threshold"))
             }
             .disabled(!pro.isPro)
-            .tint(.yellow)
+            .tint(proYellow)
             .frame(maxWidth: .infinity)
             HStack {
                 Text(localized("10%"))
@@ -589,11 +603,11 @@ struct SettingsView: View {
                 }
                 .foregroundStyle(Color.black)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10)
+                .padding(.vertical, 8)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .listRowBackground(Color.yellow)
+            .listRowBackground(proYellow)
         }
     }
 
@@ -724,6 +738,7 @@ private struct AppStorageSettingsPage: View {
     @State private var storageUsageSnapshot: StorageUsageSnapshot?
     @State private var storageMaintenanceAlertMessage: String?
     @State private var isConfirmingICloudDeletion = false
+    @State private var isDebugUnlocked = false
 
     private var canDeleteICloudData: Bool {
         !iCloudSync.isBusy && (iCloudSync.isSyncEnabled || iCloudSync.hasCloudData)
@@ -789,9 +804,22 @@ private struct AppStorageSettingsPage: View {
                 storageUsageRow(title: "Scrobble log entries", value: storageUsageSnapshot.map { "\($0.scrobbleLogCount)" })
                 storageUsageRow(title: "Scrobble log storage", value: storageUsageSnapshot.map { byteCountText($0.scrobbleLogBytes) })
                 storageUsageRow(title: "Listening history state", value: storageUsageSnapshot.map { byteCountText($0.playbackHistoryStateBytes) })
-                storageUsageRow(title: "Recent tracks state", value: storageUsageSnapshot.map { byteCountText($0.recentTracksStateBytes) })
+                storageUsageRow(
+                    title: "Recent tracks state",
+                    value: storageUsageSnapshot.map { byteCountText($0.recentTracksStateBytes) }
+                ) {
+                    isDebugUnlocked = true
+                }
             } footer: {
                 Text(localized("FastScrobbler stores these data to optimise your scrobbling experience. FastScrobbler does NOT store these for data collection purposes."))
+            }
+
+            if isDebugUnlocked {
+                Section {
+                    NavigationLink(value: SettingsView.SettingsRoute.debug) {
+                        Text("Debug")
+                    }
+                }
             }
         }
         .navigationTitle(localized("App Storage"))
@@ -860,9 +888,14 @@ private struct AppStorageSettingsPage: View {
         }
     }
 
-    private func storageUsageRow(title: String, value: String?) -> some View {
+    private func storageUsageRow(title: String, value: String?, titleTapAction: (() -> Void)? = nil) -> some View {
         HStack {
-            Text(localized(title))
+            if let titleTapAction {
+                Text(localized(title))
+                    .onTapGesture(count: 3, perform: titleTapAction)
+            } else {
+                Text(localized(title))
+            }
             Spacer()
             Text(value ?? localized("Loading…"))
                 .foregroundStyle(.secondary)
@@ -875,6 +908,22 @@ private struct AppStorageSettingsPage: View {
     }
 }
 
+private struct DebugSettingsPage: View {
+    var body: some View {
+        Form {
+            Section {
+                Button(role: .destructive) {
+                    fatalError("Crashlytics test crash")
+                } label: {
+                    Label("Test Crashlytics", systemImage: "exclamationmark.triangle")
+                }
+            }
+        }
+        .navigationTitle("Debug")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
 struct ProFeatureBadge: View {
     var body: some View {
         Text("Pro")
@@ -882,7 +931,7 @@ struct ProFeatureBadge: View {
             .foregroundStyle(.black)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background(Color.yellow)
+            .background(proYellow)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .accessibilityLabel("Pro")
     }

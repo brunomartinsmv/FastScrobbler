@@ -16,6 +16,33 @@ struct SetupHelpView: View {
     private static let redditSubmitPlainSubtitle = "Submit a post to r/FastScrobbler, and FastScrobbler will respond to your post."
     private static let redditSubmitMarkdownSubtitle = "[Submit a post to r/FastScrobbler](https://www.reddit.com/r/FastScrobbler/submit/), and FastScrobbler will respond to your post."
 
+    private enum CardPalette {
+        static let backgroundOverlay = dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.96),
+            dark: NSColor(white: 0.10, alpha: 0.86)
+        )
+        static let border = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.10),
+            dark: NSColor(white: 1.0, alpha: 0.16)
+        )
+    }
+
+    private enum PagePalette {
+        static let background = dynamicColor(
+            light: NSColor(white: 0.97, alpha: 1.0),
+            dark: NSColor(white: 0.14, alpha: 1.0)
+        )
+    }
+
+    private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+        Color(
+            NSColor(name: nil) { appearance in
+                let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                return bestMatch == .darkAqua ? dark : light
+            }
+        )
+    }
+
     enum Mode {
         case onboarding
         case help
@@ -40,6 +67,19 @@ struct SetupHelpView: View {
         NSLocalizedString(key, comment: "")
     }
 
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(CardPalette.backgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(CardPalette.border, lineWidth: 1)
+            }
+    }
+
     private var canFinishSetup: Bool {
         auth.sessionKey != nil && permissions.automationStatus == .authorized
     }
@@ -61,6 +101,7 @@ struct SetupHelpView: View {
         let actionTint: Color?
         let actionProminent: Bool
         let actionDisabled: Bool
+        let contentCardBackground: AnyView
 
         init(
             icon: String,
@@ -72,7 +113,8 @@ struct SetupHelpView: View {
             action: (() -> Void)? = nil,
             actionTint: Color? = nil,
             actionProminent: Bool = false,
-            actionDisabled: Bool = false
+            actionDisabled: Bool = false,
+            contentCardBackground: AnyView
         ) {
             self.icon = icon
             self.title = title
@@ -84,6 +126,7 @@ struct SetupHelpView: View {
             self.actionTint = actionTint
             self.actionProminent = actionProminent
             self.actionDisabled = actionDisabled
+            self.contentCardBackground = contentCardBackground
         }
 
         init(
@@ -96,7 +139,8 @@ struct SetupHelpView: View {
             action: (() -> Void)? = nil,
             actionTint: Color? = nil,
             actionProminent: Bool = false,
-            actionDisabled: Bool = false
+            actionDisabled: Bool = false,
+            contentCardBackground: AnyView
         ) {
             self.icon = icon
             self.title = title
@@ -108,6 +152,7 @@ struct SetupHelpView: View {
             self.actionTint = actionTint
             self.actionProminent = actionProminent
             self.actionDisabled = actionDisabled
+            self.contentCardBackground = contentCardBackground
         }
 
         var body: some View {
@@ -157,11 +202,7 @@ struct SetupHelpView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(.primary.opacity(0.10), lineWidth: 0.5)
-            }
+            .background(contentCardBackground)
         }
 
         private func statusBadge(isEnabled: Bool) -> some View {
@@ -209,7 +250,8 @@ struct SetupHelpView: View {
                         action: isConnected ? nil : signInToLastFM,
                         actionTint: .red,
                         actionProminent: true,
-                        actionDisabled: isSigningInToLastFM
+                        actionDisabled: isSigningInToLastFM,
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     let musicControlAllowed = (permissions.automationStatus == .authorized)
@@ -242,7 +284,8 @@ struct SetupHelpView: View {
                         isChecked: musicControlAllowed,
                         showsUncheckedStatus: true,
                         actionTitle: musicControlActionTitle,
-                        action: musicControlAction
+                        action: musicControlAction,
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     let mediaAllowed = (permissions.mediaLibraryStatus == .authorized)
@@ -275,32 +318,37 @@ struct SetupHelpView: View {
                         isChecked: mediaAllowed,
                         showsUncheckedStatus: true,
                         actionTitle: mediaActionTitle,
-                        action: mediaAction
+                        action: mediaAction,
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     HelpRow(
                         icon: "play.circle.fill",
                         title: NSLocalizedString("Start playing music", comment: ""),
-                        subtitle: NSLocalizedString("Start playing music! FastScrobbler will show Now Playing and scrobble when eligible.", comment: "")
+                        subtitle: NSLocalizedString("Start playing music! FastScrobbler will show Now Playing and scrobble when eligible.", comment: ""),
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     HelpRow(
                         icon: "waveform.path.ecg",
                         title: NSLocalizedString("Auto-scrobble troubleshooting", comment: ""),
-                        subtitle: NSLocalizedString("If \"Scrobble Now\" works but auto-scrobble does not, FastScrobbler is usually blocking the play because playback state or duplicate checks do not look trustworthy yet. Check the status card for the exact blocker.", comment: "")
+                        subtitle: NSLocalizedString("If \"Scrobble Now\" works but auto-scrobble does not, FastScrobbler is usually blocking the play because playback state or duplicate checks do not look trustworthy yet. Check the status card for the exact blocker.", comment: ""),
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     HelpRow(
                         icon: "power.circle",
                         title: NSLocalizedString("Start at login", comment: ""),
                         subtitle: NSLocalizedString("Optional: turn this on in Settings if you want FastScrobbler to launch when you sign in to your Mac.", comment: ""),
-                        isChecked: startAtLoginEnabled
+                        isChecked: startAtLoginEnabled,
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
 
                     HelpRow(
                         icon: "questionmark.bubble",
                         title: NSLocalizedString("Questions or Bug Reports?", comment: ""),
-                        subtitle: redditSubmitSubtitle
+                        subtitle: redditSubmitSubtitle,
+                        contentCardBackground: AnyView(contentCardBackground)
                     )
                 }
 
@@ -327,7 +375,7 @@ struct SetupHelpView: View {
             .padding()
             .padding(.top, MacFloatingBarLayout.circleButtonContentTopPadding)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(PagePalette.background)
         .onAppear { refreshStatuses() }
         .onValueChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -361,8 +409,8 @@ struct SetupHelpView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Text(localized("Setup"))
-                .font(.system(size: 34, weight: .bold))
+            Text(mode == .help ? localized("Help") : localized("Setup"))
+                .font(.system(size: 28, weight: .bold))
             Text(localized("A quick checklist to get scrobbling working reliably."))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)

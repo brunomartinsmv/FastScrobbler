@@ -159,7 +159,9 @@
 "Ask a Question or Report a Bug" = "質問するかバグを報告";
 "App Storage" = "アプリのストレージ";
 "Cleaning Up…" = "クリーンアップ中…";
-"Recently Played" = "最近再生した曲";
+"Recently Played API" = "最近再生 API";
+"Send Now Playing status to Last.fm" = "再生中ステータスを Last.fm に送信";
+"Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "現在再生中の曲を Last.fm のプロフィールに表示します。これをオフにしても自動スクロブルは動作します。";
 "Request Access" = "アクセスを許可";
 "Request Media Library Access" = "メディアライブラリへのアクセスを要求";
 "Required" = "必須";
@@ -192,7 +194,7 @@
 "Send Now Playing" = "再生中を送信";
 "Send the current track to Last.fm as now playing." = "現在の曲をLast.fmに再生中として送信します。";
 "Sent now playing: %@ — %@" = "再生中を送信しました: %@ — %@";
-"Show Live Activity (Beta)" = "ライブアクティビティを表示（ベータ）";
+"Show Live Activity" = "ライブアクティビティを表示";
 "Sign In" = "サインイン";
 "Sign In to Last.fm" = "Last.fmにサインイン";
 "Sign in to start scrobbling to your Last.fm account." = "Last.fmアカウントにサインインしてスクロブルを始めてください。";

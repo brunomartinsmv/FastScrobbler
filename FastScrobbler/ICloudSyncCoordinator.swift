@@ -220,6 +220,12 @@ private enum SyncedSettingsStore {
             apply: { if case .bool(let value) = $0 { AppGroup.userDefaults.set(value, forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled) } }
         ),
         Definition(
+            key: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled,
+            storage: .appGroup,
+            read: { .bool(AppGroup.userDefaults.object(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled) as? Bool ?? true) },
+            apply: { if case .bool(let value) = $0 { AppGroup.userDefaults.set(value, forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled) } }
+        ),
+        Definition(
             key: ProSettings.Keys.removeBracketsFromSongTitleKeywords,
             storage: .appGroup,
             read: { .stringArray(ProSettings.removeBracketsFromSongTitleKeywords()) },

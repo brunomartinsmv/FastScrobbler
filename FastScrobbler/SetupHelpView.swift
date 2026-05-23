@@ -205,7 +205,6 @@ struct SetupHelpView: View {
     @State private var mediaStatus: MPMediaLibraryAuthorizationStatus = MPMediaLibrary.authorizationStatus()
     @State private var backgroundRefreshStatus: UIBackgroundRefreshStatus = .restricted
     @State private var isSigningInToLastFM = false
-    @State private var isShowingWhatsNew = false
     @State private var lastFMErrorText: String?
 
     var body: some View {
@@ -235,16 +234,6 @@ struct SetupHelpView: View {
                         scrobblingIssuesNoteRow
                         questionsOrBugReportsRow
                     }
-
-                    Button {
-                        isShowingWhatsNew = true
-                    } label: {
-                        Text(NSLocalizedString("What's New", comment: ""))
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 46)
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.blue)
 
                     Button {
                         onDone()
@@ -279,12 +268,6 @@ struct SetupHelpView: View {
         }
         .toolbar(mode == .help ? .visible : .hidden, for: .navigationBar)
         .interactiveDismissDisabled(mode == .onboarding)
-        .fullScreenCover(isPresented: $isShowingWhatsNew) {
-            WhatsNewView {
-                WhatsNewRelease.markSeen()
-                isShowingWhatsNew = false
-            }
-        }
         .alert(
             NSLocalizedString("Last.fm Sign-in", comment: ""),
             isPresented: Binding(

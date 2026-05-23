@@ -11,76 +11,81 @@ struct ContentView: View {
     private enum Layout {
         static let sectionSpacing: CGFloat = 12
         static let cardPadding: CGFloat = 14
+        static let contentPadding: CGFloat = MacFloatingBarLayout.contentHorizontalPadding
         static let controlsSpacing: CGFloat = 10
-        static let controlsTopPadding: CGFloat = 10
+        static let controlsTopPadding: CGFloat = 4
         static let progressTopPadding: CGFloat = 8
         static let logRowSpacing: CGFloat = 8
     }
 
     private enum ActionButtonPalette {
         static let cardBackgroundOverlay = dynamicColor(
-            light: NSColor(white: 1.0, alpha: 0.62),
-            dark: NSColor(white: 0.08, alpha: 0.74)
+            light: NSColor(white: 1.0, alpha: 0.96),
+            dark: NSColor(white: 0.10, alpha: 0.86)
+        )
+        static let cardBorder = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.10),
+            dark: NSColor(white: 1.0, alpha: 0.16)
         )
         static let resume = dynamicColor(
             light: NSColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 1.0),
             dark: NSColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 1.0)
         )
         static let resumeForeground = dynamicColor(
-            light: NSColor(red: 0.18, green: 0.58, blue: 0.29, alpha: 1.0),
-            dark: NSColor(red: 0.58, green: 0.90, blue: 0.67, alpha: 1.0)
+            light: NSColor(red: 0.10, green: 0.44, blue: 0.21, alpha: 1.0),
+            dark: NSColor(red: 0.76, green: 0.95, blue: 0.81, alpha: 1.0)
         )
         static let resumeBorder = dynamicColor(
             light: NSColor(red: 0.00, green: 0.72, blue: 0.20, alpha: 1.0),
             dark: NSColor(red: 0.00, green: 0.84, blue: 0.31, alpha: 1.0)
         )
         static let resumeFill = dynamicColor(
-            light: NSColor(red: 0.22, green: 0.88, blue: 0.42, alpha: 0.18),
-            dark: NSColor(red: 0.34, green: 0.96, blue: 0.53, alpha: 0.24)
+            light: NSColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 0.20),
+            dark: NSColor(red: 0.16, green: 0.40, blue: 0.23, alpha: 0.30)
         )
         static let scrobbleNow = dynamicColor(
-            light: NSColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 1.0),
-            dark: NSColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 1.0)
+            light: NSColor(red: 0.73, green: 0.42, blue: 0.82, alpha: 1.0),
+            dark: NSColor(red: 0.79, green: 0.52, blue: 0.86, alpha: 1.0)
         )
         static let scrobbleNowForeground = dynamicColor(
-            light: NSColor(red: 0.60, green: 0.27, blue: 0.72, alpha: 1.0),
-            dark: NSColor(red: 0.86, green: 0.68, blue: 0.96, alpha: 1.0)
+            light: NSColor(red: 0.42, green: 0.27, blue: 0.49, alpha: 1.0),
+            dark: NSColor(red: 0.88, green: 0.82, blue: 0.93, alpha: 1.0)
         )
         static let scrobbleNowBorder = dynamicColor(
-            light: NSColor(red: 0.66, green: 0.00, blue: 1.00, alpha: 1.0),
-            dark: NSColor(red: 0.76, green: 0.10, blue: 1.00, alpha: 1.0)
+            light: NSColor(red: 0.58, green: 0.28, blue: 0.72, alpha: 1.0),
+            dark: NSColor(red: 0.66, green: 0.36, blue: 0.78, alpha: 1.0)
         )
         static let scrobbleNowFill = dynamicColor(
-            light: NSColor(red: 0.84, green: 0.30, blue: 1.00, alpha: 0.16),
-            dark: NSColor(red: 0.90, green: 0.42, blue: 1.00, alpha: 0.24)
+            light: NSColor(red: 0.90, green: 0.84, blue: 0.94, alpha: 0.18),
+            dark: NSColor(red: 0.38, green: 0.28, blue: 0.48, alpha: 0.28)
         )
         static let account = dynamicColor(
-            light: NSColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 1.0),
-            dark: NSColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 1.0)
+            light: NSColor(red: 0.34, green: 0.62, blue: 0.86, alpha: 1.0),
+            dark: NSColor(red: 0.42, green: 0.70, blue: 0.90, alpha: 1.0)
         )
         static let accountForeground = dynamicColor(
-            light: NSColor(red: 0.18, green: 0.46, blue: 0.78, alpha: 1.0),
-            dark: NSColor(red: 0.66, green: 0.81, blue: 0.96, alpha: 1.0)
+            light: NSColor(red: 0.21, green: 0.34, blue: 0.50, alpha: 1.0),
+            dark: NSColor(red: 0.80, green: 0.89, blue: 0.96, alpha: 1.0)
         )
         static let accountBorder = dynamicColor(
-            light: NSColor(red: 0.00, green: 0.48, blue: 1.00, alpha: 1.0),
-            dark: NSColor(red: 0.00, green: 0.59, blue: 1.00, alpha: 1.0)
+            light: NSColor(red: 0.24, green: 0.48, blue: 0.72, alpha: 1.0),
+            dark: NSColor(red: 0.30, green: 0.56, blue: 0.78, alpha: 1.0)
         )
         static let accountFill = dynamicColor(
-            light: NSColor(red: 0.16, green: 0.66, blue: 1.00, alpha: 0.14),
-            dark: NSColor(red: 0.28, green: 0.76, blue: 1.00, alpha: 0.22)
+            light: NSColor(red: 0.84, green: 0.90, blue: 0.96, alpha: 0.18),
+            dark: NSColor(red: 0.22, green: 0.34, blue: 0.48, alpha: 0.28)
         )
         static let manualForeground = dynamicColor(
-            light: NSColor(white: 0.12, alpha: 1.0),
-            dark: NSColor(white: 0.82, alpha: 1.0)
+            light: NSColor(white: 0.08, alpha: 1.0),
+            dark: NSColor(white: 0.92, alpha: 1.0)
         )
         static let manualFill = dynamicColor(
-            light: NSColor(white: 0.0, alpha: 0),
-            dark: NSColor(white: 1.0, alpha: 0)
+            light: NSColor(white: 1.0, alpha: 0.60),
+            dark: NSColor(white: 0.16, alpha: 0.70)
         )
         static let disabledFill = dynamicColor(
-            light: NSColor(white: 0.0, alpha: 0.05),
-            dark: NSColor(white: 1.0, alpha: 0.08)
+            light: NSColor(white: 1.0, alpha: 0.52),
+            dark: NSColor(white: 0.20, alpha: 0.64)
         )
 
         private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
@@ -156,7 +161,7 @@ struct ContentView: View {
     }
 
     private var mainContent: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             ScrollView {
                 VStack(alignment: .leading, spacing: Layout.sectionSpacing) {
                     macAttentionBanner
@@ -170,17 +175,16 @@ struct ContentView: View {
                             .font(.footnote)
                     }
                 }
-                .padding()
+                .padding(Layout.contentPadding)
                 .padding(.top, -8)
-                        .padding(.top, MacFloatingBarLayout.contentTopPadding) // room for the floating capsule bar
+                .padding(.top, MacFloatingBarLayout.contentTopPadding) // room for the floating top buttons
                 .animation(.easeInOut(duration: 0.3), value: observer.track)
                 .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
                 .animation(.easeInOut(duration: 0.3), value: engine.statusText)
             }
 
             macPopoverTopButtons
-                .padding(.top, 10)
-                .padding(.trailing, 10)
+                .padding(.top, MacFloatingBarLayout.topButtonsTopInset)
         }
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             handleTimerTick(now: .now)
@@ -190,27 +194,23 @@ struct ContentView: View {
     }
 
     private var macPopoverTopButtons: some View {
-        MacCapsuleBar {
-            HStack(spacing: 10) {
-                Button {
-                    isShowingHelp = true
-                } label: {
-                    Image(systemName: "questionmark.circle")
-                        .font(.system(size: 16, weight: .semibold))
-                        .padding(6)
-                }
-                .help("Help")
-                .accessibilityLabel("Help")
+        HStack(spacing: 10) {
+            MacCapsuleControlButton(
+                title: "Help",
+                systemImage: "questionmark.circle",
+                help: "Help",
+                accessibilityLabel: "Help"
+            ) {
+                isShowingHelp = true
+            }
 
-                Button {
-                    isShowingSettings = true
-                } label: {
-                    Image(systemName: "gear")
-                        .font(.system(size: 16, weight: .semibold))
-                        .padding(6)
-                }
-                .help("Settings")
-                .accessibilityLabel("Settings")
+            MacCapsuleControlButton(
+                title: "Settings",
+                systemImage: "gear",
+                help: "Settings",
+                accessibilityLabel: "Settings"
+            ) {
+                isShowingSettings = true
             }
         }
     }
@@ -221,6 +221,10 @@ struct ContentView: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(ActionButtonPalette.cardBackgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(ActionButtonPalette.cardBorder, lineWidth: 1)
             }
     }
 
@@ -248,7 +252,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Layout.cardPadding)
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private var trackCard: some View {
@@ -311,7 +314,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Layout.cardPadding)
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private var controls: some View {
@@ -327,7 +329,7 @@ struct ContentView: View {
                         Image(systemName: engine.isUserPaused ? "play.fill" : "pause.fill")
                         Text(engine.isUserPaused ? NSLocalizedString("Resume", comment: "") : NSLocalizedString("Pause", comment: ""))
                     }
-                    .font(.body.weight(.bold))
+                    .font(.body.weight(.semibold))
                     .foregroundStyle(engine.isUserPaused ? ActionButtonPalette.resumeForeground : ActionButtonPalette.scrobbleNowForeground)
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
@@ -343,7 +345,7 @@ struct ContentView: View {
                         Task { await connectTapped() }
                     } label: {
                         Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
-                            .font(.body.weight(.bold))
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(ActionButtonPalette.accountForeground)
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
@@ -364,7 +366,7 @@ struct ContentView: View {
                                 .minimumScaleFactor(0.6)
                                 .allowsTightening(true)
                         }
-                        .font(.body.weight(.bold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNowForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight, alignment: .center)
                     }
@@ -384,7 +386,7 @@ struct ContentView: View {
                     }
                 } label: {
                     Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
-                        .font(.body.weight(.bold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(ActionButtonPalette.accountForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
@@ -399,15 +401,15 @@ struct ContentView: View {
                     isShowingManualScrobble = true
                 } label: {
                     Label(NSLocalizedString("Manual Scrobble", comment: ""), systemImage: "plus.circle")
-                        .font(.body.weight(.bold))
+                        .font(.body.weight(.semibold))
                         .foregroundStyle(ActionButtonPalette.manualForeground)
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
                 .tint(.clear)
-                .prominentButtonBackground(ActionButtonPalette.manualFill)
-                .brightButtonBorder(ActionButtonPalette.manualForeground)
+                .prominentButtonBackground(.clear)
+                .brightButtonBorder(ActionButtonPalette.manualForeground, showsShadow: false)
             }
         }
         .padding(.top, Layout.controlsTopPadding)
@@ -531,7 +533,6 @@ struct ContentView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(Layout.cardPadding)
         .background(contentCardBackground)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
     }
 
     private func connectTapped() async {
@@ -676,11 +677,7 @@ private struct ScrobbleLogRowView: View {
                         .clipShape(Capsule())
                 }
                 if entry.source != .live {
-                    Text(sourceLabel(entry.source))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.15))
-                        .clipShape(Capsule())
+                    sourceBadge(entry.source)
                 }
                 Spacer()
             }
@@ -737,11 +734,7 @@ private struct ScrobbleLogRowView: View {
                             .clipShape(Capsule())
                     }
                     if entry.source != .live {
-                        Text(sourceLabel(entry.source))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.15))
-                            .clipShape(Capsule())
+                        sourceBadge(entry.source)
                     }
                     Spacer()
                 }
@@ -761,9 +754,21 @@ private struct ScrobbleLogRowView: View {
         case .live: return ""
         case .backlog: return NSLocalizedString("Backlog", comment: "")
         case .playbackHistory: return NSLocalizedString("Listening History", comment: "")
-        case .recentlyPlayed: return NSLocalizedString("Recently Played", comment: "")
+        case .recentlyPlayed: return NSLocalizedString("Recently Played API", comment: "")
         case .manual: return NSLocalizedString("Manual", comment: "")
         }
+    }
+
+    @ViewBuilder
+    private func sourceBadge(_ source: ScrobbleLogStore.Source) -> some View {
+        Text(sourceLabel(source))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(Color.secondary.opacity(0.15))
+            }
+            .compositingGroup()
     }
 
 }
@@ -797,43 +802,54 @@ extension View {
     func prominentButtonBackground(_ color: Color) -> some View {
         self.background {
             Capsule(style: .continuous)
-                .fill(color)
+                .fill(color.opacity(1))
         }
     }
 
-    func brightButtonBorder(_ color: Color) -> some View {
+    func brightButtonBorder(_ color: Color, showsShadow: Bool = true) -> some View {
         self.overlay {
             Capsule(style: .continuous)
-                .strokeBorder(color.opacity(0.95), lineWidth: 1)
-                .shadow(color: color.opacity(0.4), radius: 5, x: 0, y: 0)
-                .shadow(color: color.opacity(0.5), radius: 2.5, x: 0, y: 0)
+                .strokeBorder(color.opacity(0.75), lineWidth: 1.5)
+                .shadow(color: showsShadow ? color.opacity(0.66) : .clear, radius: 20, x: 0, y: 0)
+                .shadow(color: showsShadow ? color.opacity(0.54) : .clear, radius: 10, x: 0, y: 0)
         }
     }
 }
 
 enum MacFloatingBarLayout {
-    static let contentTopPadding: CGFloat = 52
+    static let contentHorizontalPadding: CGFloat = 16
+    static let topButtonsHeight: CGFloat = 40
+    static let topButtonsTopInset: CGFloat = 12
+    static let contentTopPadding: CGFloat = topButtonsHeight + topButtonsTopInset + 2
     static let circleButtonContentTopPadding: CGFloat = 28
 }
 
-struct MacCapsuleBar<Content: View>: View {
-    private let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
+struct MacCapsuleControlButton: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+    let help: String
+    let accessibilityLabel: String
+    let action: () -> Void
 
     var body: some View {
-        content
-            .buttonStyle(.plain)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
-            }
-            .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.primary)
+                .labelStyle(.titleAndIcon)
+                .padding(.horizontal, 14)
+                .frame(minHeight: MacFloatingBarLayout.topButtonsHeight)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(.primary.opacity(0.12), lineWidth: 0.5)
+                }
+                .shadow(color: .black.opacity(0.18), radius: 10, x: 0, y: 6)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 

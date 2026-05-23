@@ -8,6 +8,7 @@ struct RunTestsMain {
         runProMetadataTests()
         runScrobbleEngineTests()
         runNowPlayingRateLimitTests()
+        runLovedFeatureTests()
         runDedupTimestampToleranceTests()
         runListeningHistoryRecoveryTests()
         runDedupNearestMatchTests()

@@ -56,6 +56,17 @@ func runScrobbleEngineTests() {
         return .submitted
     }
 
+    func shouldSendAutomaticNowPlaying(isEnabled: Bool, hasSentNowPlaying: Bool, playbackState: SimPlaybackState) -> Bool {
+        guard isEnabled else { return false }
+        guard !hasSentNowPlaying else { return false }
+        return playbackState == .playing
+    }
+
+    func shouldRefreshNowPlayingAfterScrobble(isEnabled: Bool, playbackState: SimPlaybackState, sameTrack: Bool) -> Bool {
+        guard isEnabled else { return false }
+        return playbackState == .playing && sameTrack
+    }
+
     func rawPlaybackTimeCrossedThreshold(_ rawPlaybackTime: Double, duration: Double, threshold: Double) -> Bool {
         rawPlaybackTime >= threshold &&
             rawPlaybackTime <= duration + 2
@@ -469,6 +480,17 @@ func runScrobbleEngineTests() {
     expect("paused threshold-qualified status says it is ready on resume",
            thresholdReadyStatus.contains("Ready to scrobble when playback resumes."),
            detail: "got '\(thresholdReadyStatus)'")
+
+    section("Engine · Automatic now playing toggle")
+
+    expect("automatic now playing sends while playing when enabled",
+           shouldSendAutomaticNowPlaying(isEnabled: true, hasSentNowPlaying: false, playbackState: .playing))
+    expect("automatic now playing is skipped when disabled",
+           !shouldSendAutomaticNowPlaying(isEnabled: false, hasSentNowPlaying: false, playbackState: .playing))
+    expect("automatic now playing refresh after scrobble is skipped when disabled",
+           !shouldRefreshNowPlayingAfterScrobble(isEnabled: false, playbackState: .playing, sameTrack: true))
+    expect("automatic now playing refresh after scrobble still requires the same active track",
+           !shouldRefreshNowPlayingAfterScrobble(isEnabled: true, playbackState: .playing, sameTrack: false))
 
     section("Engine · Auto timestamp trust and mac playback-state normalization")
 

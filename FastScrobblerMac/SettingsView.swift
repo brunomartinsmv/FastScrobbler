@@ -10,8 +10,57 @@ struct SettingsView: View {
     private static let linksSectionRed = Color(red: 0.72, green: 0.14, blue: 0.14)
     private static let macSettingsButtonMinHeight: CGFloat = 28
 
+    private enum CardPalette {
+        static let backgroundOverlay = dynamicColor(
+            light: NSColor(white: 1.0, alpha: 0.96),
+            dark: NSColor(white: 0.10, alpha: 0.86)
+        )
+        static let border = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 0.10),
+            dark: NSColor(white: 1.0, alpha: 0.16)
+        )
+
+        private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+            Color(
+                NSColor(name: nil) { appearance in
+                    let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                    return bestMatch == .darkAqua ? dark : light
+                }
+            )
+        }
+    }
+
+    private enum PagePalette {
+        static let background = dynamicColor(
+            light: NSColor(white: 0.97, alpha: 1.0),
+            dark: NSColor(white: 0.14, alpha: 1.0)
+        )
+    }
+
+    private static func dynamicColor(light: NSColor, dark: NSColor) -> Color {
+        Color(
+            NSColor(name: nil) { appearance in
+                let bestMatch = appearance.bestMatch(from: [.aqua, .darkAqua])
+                return bestMatch == .darkAqua ? dark : light
+            }
+        )
+    }
+
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
+    }
+
+    private var contentCardBackground: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(CardPalette.backgroundOverlay)
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(CardPalette.border, lineWidth: 1)
+            }
     }
 
     @AppStorage(ProSettings.Keys.loveOnFavoriteEnabled, store: AppGroup.userDefaults) private var loveOnFavoriteEnabled = false
@@ -24,6 +73,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
+    @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -131,7 +181,7 @@ struct SettingsView: View {
             .padding()
             .padding(.top, MacFloatingBarLayout.contentTopPadding)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(PagePalette.background)
         .overlay(alignment: .topLeading) {
             if onBack != nil {
                 MacFloatingCircleButton(
@@ -193,9 +243,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
         .alert(localized("Couldn't update Start at login"), isPresented: Binding(
             get: { startAtLoginErrorText != nil },
             set: { isPresented in
@@ -219,6 +267,12 @@ struct SettingsView: View {
             Text(localized("Avoids sending the same playback session to Last.fm more than once within a short time window."))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle(localized("Send Now Playing status to Last.fm"), isOn: $sendNowPlayingAutomaticallyEnabled)
+                Text(localized("Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
             scrobbleThresholdSlider()
             removeBracketsNavigationLink(target: .songTitles)
             removeBracketsNavigationLink(target: .albumTitles)
@@ -259,9 +313,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
     }
 
     private var macAccountCard: some View {
@@ -350,9 +402,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
     }
 
     private var macSupportCard: some View {
@@ -367,9 +417,7 @@ struct SettingsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(.thinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.12), radius: 10, x: 0, y: 5)
+        .background(contentCardBackground)
     }
 
     private func performLogout() {
@@ -393,6 +441,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
 
         loveOnFavoriteEnabled = false
@@ -405,6 +454,7 @@ struct SettingsView: View {
         removeBracketsFromAlbumTitlesEnabled = false
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
+        sendNowPlayingAutomaticallyEnabled = true
 
         appLanguage.selection = .system
         Task { @MainActor in

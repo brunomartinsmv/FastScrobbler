@@ -43,6 +43,8 @@
 	<string>public.app-category.music</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>NSApplicationCrashOnExceptions</key>
+	<true/>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>FastScrobbler needs permission to control the Music app to read now-playing track metadata.</string>
 	<key>NSAppleMusicUsageDescription</key>
