@@ -25,7 +25,7 @@ struct AppleMusicAPISettingsPage: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration.")
+                        Text("Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }

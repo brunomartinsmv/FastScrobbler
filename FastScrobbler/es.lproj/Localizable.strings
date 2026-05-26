@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "Cuenta";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Evita enviar la misma sesión de reproducción a Last.fm más de una vez dentro de un corto intervalo de tiempo.";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "Función experimental: hace scrobble automáticamente de hasta 30 canciones reproducidas recientemente mediante la API de Apple Music. Las canciones se registran incluso cuando FastScrobbler está en segundo plano.\n\nNota: Apple no proporciona aquí las marcas de tiempo de reproducción, así que FastScrobbler asigna una marca de tiempo estimada cuando envía el scrobble. Las canciones se registran y se envían como scrobble independientemente de la duración de reproducción.";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "Función experimental: hace scrobble automáticamente de hasta 30 canciones reproducidas recientemente mediante la API de Apple Music. Las canciones se registran incluso cuando FastScrobbler está en segundo plano.\n\nNota: la API no proporciona las marcas de tiempo de reproducción, así que FastScrobbler asigna una marca de tiempo estimada cuando se envía el scrobble. Las canciones se registran y se envían como scrobble independientemente de la duración de reproducción.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Función beta: muestra el estado del scrobbling en la pantalla de bloqueo y en Dynamic Island.";
 "Connected" = "Conectado";
 "Done" = "Listo";
@@ -29,6 +29,7 @@
 "Loved" = "Favorita";
 "No scrobbles yet." = "Aún no hay scrobbles.";
 "No track detected." = "No se detectó ninguna pista.";
+"No Artwork" = "Sin carátula";
 "Not connected" = "No conectado";
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "Nota: la Actividad en Vivo no se actualizará inmediatamente después de ejecutar un atajo o usar un botón del Centro de control.";
 "Now Playing" = "En reproducción";
@@ -140,6 +141,7 @@
 "Off" = "Desactivado";
 "On" = "Activado";
 "Open Media Library Settings" = "Abrir ajustes de fototeca musical";
+"Open Fullscreen Now Playing" = "Abrir reproducción en pantalla completa";
 "Open Music App" = "Abrir app Música";
 "Open Settings" = "Abrir Ajustes";
 "Open System Settings" = "Abrir Ajustes del Sistema";
@@ -159,6 +161,7 @@
 "Ask a Question or Report a Bug" = "Hacer una pregunta o informar de un error";
 "App Storage" = "Almacenamiento de la app";
 "Cleaning Up…" = "Limpiando…";
+"Close Now Playing" = "Cerrar reproducción actual";
 "Recently Played API" = "API de reproducidos recientemente";
 "Send Now Playing status to Last.fm" = "Enviar el estado En reproducción a Last.fm";
 "Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "Muestra la pista que se está reproduciendo en tu perfil de Last.fm. Los scrobbles automáticos siguen funcionando cuando esto está desactivado.";
@@ -208,6 +211,10 @@
 "Support development of the app" = "Apoyar el desarrollo de la app";
 "System" = "Sistema";
 "Theme" = "Tema";
+"App Theme" = "Tema de la app";
+"Button Theme" = "Tema de los botones";
+"Colourful" = "Colorido";
+"Monochrome" = "Monocromo";
 "Background App Refresh" = "Actualización en segundo plano";
 "Live Activities" = "Actividades en Vivo";
 "Required to read Apple Music now-playing metadata." = "Requerido para leer la información de la reproducción actual en Apple Music.";

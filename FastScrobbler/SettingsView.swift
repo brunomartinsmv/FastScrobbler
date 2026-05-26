@@ -1,7 +1,7 @@
 import SwiftUI
 import ActivityKit
 
-let proYellow = Color.yellow
+let proYellow = Color(red: 0.89, green: 0.71, blue: 0.16)
 
 struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/kevinlim512/FastScrobbler")!
@@ -34,6 +34,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
     @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
+    @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -304,6 +305,19 @@ struct SettingsView: View {
                 }
             }
 
+            Section("Theme") {
+                Picker("App Theme", selection: $themeSelectionRawValue) {
+                    Text("System").tag(AppTheme.system.rawValue)
+                    Text("Light").tag(AppTheme.light.rawValue)
+                    Text("Dark").tag(AppTheme.dark.rawValue)
+                }
+
+                Picker("Button Theme", selection: $buttonThemeSelectionRawValue) {
+                    Text("Colourful").tag(ButtonTheme.colorful.rawValue)
+                    Text("Monochrome").tag(ButtonTheme.monochrome.rawValue)
+                }
+            }
+
             Section("Live Activity") {
                 Toggle("Show Live Activity", isOn: $liveActivityEnabled)
                     .onValueChange(of: liveActivityEnabled) { isEnabled in
@@ -327,14 +341,6 @@ struct SettingsView: View {
                 Text("Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-            }
-
-            Section("Theme") {
-                Picker("Theme", selection: $themeSelectionRawValue) {
-                    Text("System").tag(AppTheme.system.rawValue)
-                    Text("Light").tag(AppTheme.light.rawValue)
-                    Text("Dark").tag(AppTheme.dark.rawValue)
-                }
             }
 
             Section("Account") {
@@ -434,8 +440,10 @@ struct SettingsView: View {
     private func resetToInitialSettings() {
         UserDefaults.standard.removeObject(forKey: LiveActivityManager.enabledDefaultsKey)
         UserDefaults.standard.removeObject(forKey: AppSettings.Keys.themeSelection)
+        UserDefaults.standard.removeObject(forKey: AppSettings.Keys.buttonThemeSelection)
         liveActivityEnabled = false
         themeSelectionRawValue = AppTheme.system.rawValue
+        buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
         Task { @MainActor in
             await LiveActivityManager.shared.stop()
         }

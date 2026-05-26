@@ -64,8 +64,12 @@ func runSettingsDefaultsTests() {
     let runtimePreventDuplicatesDefault = true
     let macSettingsPreventDuplicatesDefault = true
     let macSettingsPreventDuplicatesAfterReset = true
+    let macButtonThemeSelectionDefault = "colorful"
+    let macButtonThemeSelectionAfterReset = "colorful"
     expectEqual("macOS duplicate-prevention default matches runtime", macSettingsPreventDuplicatesDefault, runtimePreventDuplicatesDefault)
     expectEqual("macOS reset restores duplicate prevention to runtime default", macSettingsPreventDuplicatesAfterReset, runtimePreventDuplicatesDefault)
+    expectEqual("macOS button theme defaults to colorful", macButtonThemeSelectionDefault, "colorful")
+    expectEqual("macOS reset restores button theme default", macButtonThemeSelectionAfterReset, macButtonThemeSelectionDefault)
 
     let resetClearedKeys: Set<String> = [
         "FastScrobbler.Pro.loveOnFavoriteEnabled",
@@ -85,6 +89,7 @@ func runSettingsDefaultsTests() {
         "FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks",
         "FastScrobbler.App.extendedListeningHistoryScanEnabled",
         "FastScrobbler.App.themeSelection",
+        "FastScrobbler.App.buttonThemeSelection",
         "FastScrobbler.Pro.textReplacementRules",
     ]
 
@@ -93,6 +98,7 @@ func runSettingsDefaultsTests() {
     expect("reset clears non-library Apple Music API filter", resetClearedKeys.contains("FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks"))
     expect("reset clears extendedListeningHistoryScanEnabled", resetClearedKeys.contains("FastScrobbler.App.extendedListeningHistoryScanEnabled"))
     expect("reset clears themeSelection", resetClearedKeys.contains("FastScrobbler.App.themeSelection"))
+    expect("reset clears buttonThemeSelection", resetClearedKeys.contains("FastScrobbler.App.buttonThemeSelection"))
     expect("reset clears textReplacementRules", resetClearedKeys.contains("FastScrobbler.Pro.textReplacementRules"))
     expect("reset clears useFirstArtistOnlyForScrobbling", resetClearedKeys.contains("FastScrobbler.Pro.useFirstArtistOnlyForScrobbling"))
 
@@ -109,6 +115,8 @@ func runSettingsDefaultsTests() {
     let iOSFirstArtistOnlyAfterReset = false
     let themeSelectionDefault = "system"
     let iOSThemeSelectionAfterReset = "system"
+    let buttonThemeSelectionDefault = "colorful"
+    let iOSButtonThemeSelectionAfterReset = "colorful"
     let iCloudSyncDefault = false
     expectEqual("Apple Music API scrobbling defaults off", appleMusicAPIScrobblingDefault, false)
     expectEqual("iOS reset restores Apple Music API scrobbling default", iOSAppleMusicAPIScrobblingAfterReset, appleMusicAPIScrobblingDefault)
@@ -120,6 +128,8 @@ func runSettingsDefaultsTests() {
     expectEqual("iOS reset restores first-artist-only scrobbling default", iOSFirstArtistOnlyAfterReset, firstArtistOnlyDefault)
     expectEqual("theme selection defaults to system", themeSelectionDefault, "system")
     expectEqual("iOS reset restores theme selection default", iOSThemeSelectionAfterReset, themeSelectionDefault)
+    expectEqual("button theme defaults to colorful", buttonThemeSelectionDefault, "colorful")
+    expectEqual("iOS reset restores button theme default", iOSButtonThemeSelectionAfterReset, buttonThemeSelectionDefault)
     expectEqual("iCloud sync defaults off", iCloudSyncDefault, false)
 
     let recentTracksImporterStateAfterReset: [String: Any] = [:]

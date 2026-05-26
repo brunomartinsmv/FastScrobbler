@@ -5,7 +5,7 @@ enum WhatsNewRelease {
         static let lastSeenVersion = "FastScrobbler.WhatsNew.lastSeenVersion"
     }
 
-    static let version = "5.7"
+    static let version = "6.0"
 
     static func currentAppVersion() -> String? {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String

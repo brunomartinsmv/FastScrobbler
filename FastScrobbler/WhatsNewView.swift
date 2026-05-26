@@ -16,6 +16,25 @@ struct WhatsNewView: View {
 
     private let currentSections: [VersionSection] = [
         VersionSection(
+            id: "6.0",
+            version: "6.0",
+            features: [
+                Feature(
+                    systemImage: "music.note.tv",
+                    title: "Tap the \"Now Playing\" card to open a full-screen view",
+                    showsProBadge: false
+                ),
+                Feature(
+                    systemImage: "paintpalette",
+                    title: "Choose between colourful and monochrome button themes",
+                    showsProBadge: false
+                )
+            ]
+        )
+    ]
+
+    private let previousSections: [VersionSection] = [
+        VersionSection(
             id: "5.7",
             version: "5.7",
             features: [
@@ -46,10 +65,7 @@ struct WhatsNewView: View {
                     showsProBadge: true
                 )
             ]
-        )
-    ]
-
-    private let previousSections: [VersionSection] = [
+        ),
         VersionSection(
             id: "4.0",
             version: "4.0",
@@ -163,11 +179,11 @@ struct WhatsNewView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button(role: .cancel) {
                         onContinue()
                     } label: {
-                        Image(systemName: "xmark")
+                        IOSCloseButtonLabel(style: .plain)
                     }
                     .accessibilityLabel("Close")
                 }

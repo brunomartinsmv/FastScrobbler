@@ -229,7 +229,7 @@ struct ScanListeningHistoryIntent: AppIntent {
             isUserPaused: UserDefaults.standard.bool(forKey: ShortcutsActivityKeys.userPaused),
             pauseBehavior: .allowSubmissionWhilePaused
         )
-        ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 1.5)
+        ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 1)
 
         return .result(dialog: IntentDialog(stringLiteral: Self.dialogMessage(for: result)))
     }

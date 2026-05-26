@@ -181,6 +181,18 @@ func runManualScrobbleTests() {
     expectEqual("shortcut current-track scrobble uses button-press time", shortcutCurrentTrackTimestamp(now: manualBaseNow), 1_700_000_100)
     expectEqual("shortcut current-track scrobble matches the first Scrobble Now timestamp", shortcutCurrentTrackTimestamp(now: manualBaseNow), mt1)
 
+    section("Current-track manual scrobble · Pause behavior")
+
+    func canManualCurrentTrackScrobble(isSignedIn: Bool, isUserPaused: Bool) -> Bool {
+        guard isSignedIn else { return false }
+        return true
+    }
+
+    expect("paused state still allows current-track manual scrobble when signed in",
+           canManualCurrentTrackScrobble(isSignedIn: true, isUserPaused: true))
+    expect("signed-out state still blocks current-track manual scrobble",
+           !canManualCurrentTrackScrobble(isSignedIn: false, isUserPaused: true))
+
     // ─── Manual Scrobble — backlog fallback on failure ────────────────────────────
     // Validates the pattern: on error, enqueue to backlog with .manual origin, then re-throw.
 

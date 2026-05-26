@@ -168,6 +168,9 @@
 "Send the current track to Last.fm as now playing." = "Envoyer le morceau actuel à Last.fm comme lecture en cours.";
 "Sent now playing: %@ — %@" = "Lecture en cours envoyée : %@ — %@";
 "Show Live Activity" = "Afficher l’Activité en direct";
+"Button Theme" = "Thème des boutons";
+"Colourful" = "Coloré";
+"Monochrome" = "Monochrome";
 "Sign In" = "Se connecter";
 "Sign In to Last.fm" = "Se connecter à Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "Connectez-vous pour commencer à scrobbler sur votre compte Last.fm.";

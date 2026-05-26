@@ -14,6 +14,9 @@ struct ContentView: View {
         static let contentPadding: CGFloat = MacFloatingBarLayout.contentHorizontalPadding
         static let controlsSpacing: CGFloat = 10
         static let controlsTopPadding: CGFloat = 4
+        static let statusLineSpacing: CGFloat = 5
+        static let trackCardSpacing: CGFloat = 8
+        static let nowPlayingLineSpacing: CGFloat = 4
         static let progressTopPadding: CGFloat = 8
         static let logRowSpacing: CGFloat = 8
     }
@@ -67,6 +70,18 @@ struct ContentView: View {
             light: NSColor(red: 0.21, green: 0.34, blue: 0.50, alpha: 1.0),
             dark: NSColor(red: 0.80, green: 0.89, blue: 0.96, alpha: 1.0)
         )
+        static let monochromeForeground = dynamicColor(
+            light: NSColor(white: 0.0, alpha: 1.0),
+            dark: NSColor(white: 1.0, alpha: 1.0)
+        )
+        static let monochromeFill = dynamicColor(
+            light: NSColor(white: 0.62, alpha: 1.0),
+            dark: NSColor(white: 0.52, alpha: 1.0)
+        )
+        static let monochromeDisabledFill = dynamicColor(
+            light: NSColor(white: 0.72, alpha: 1.0),
+            dark: NSColor(white: 0.42, alpha: 1.0)
+        )
         static let accountBorder = dynamicColor(
             light: NSColor(red: 0.24, green: 0.48, blue: 0.72, alpha: 1.0),
             dark: NSColor(red: 0.30, green: 0.56, blue: 0.78, alpha: 1.0)
@@ -109,10 +124,8 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
+    @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
-    @State private var currentDate: Date = .now
-    // See iOS ContentView — secondTick drives per-second re-renders of time-sensitive views.
-    @State private var secondTick: Int = 0
     @State private var lastScrobbleLogRefreshDate: Date = .distantPast
     @State private var errorText: String?
     @State private var isShowingSetup = false
@@ -186,8 +199,8 @@ struct ContentView: View {
             macPopoverTopButtons
                 .padding(.top, MacFloatingBarLayout.topButtonsTopInset)
         }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            handleTimerTick(now: .now)
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
+            refreshScrobbleLogDisplay(now: .now)
         }
         .navigationTitle("")
         .toolbar {}
@@ -228,15 +241,48 @@ struct ContentView: View {
             }
     }
 
+    private var selectedButtonTheme: ButtonTheme {
+        ButtonTheme(rawValue: buttonThemeSelectionRawValue) ?? .colorful
+    }
+
+    private var usesMonochromeButtons: Bool {
+        selectedButtonTheme == .monochrome
+    }
+
+    private func actionButtonForeground(_ defaultColor: Color) -> Color {
+        usesMonochromeButtons ? ActionButtonPalette.monochromeForeground : defaultColor
+    }
+
+    private func actionButtonTint(_ defaultColor: Color) -> Color {
+        usesMonochromeButtons ? ActionButtonPalette.monochromeFill : defaultColor
+    }
+
+    private func actionButtonFill(_ defaultColor: Color, disabled: Bool = false) -> Color {
+        if usesMonochromeButtons {
+            return disabled ? ActionButtonPalette.monochromeDisabledFill : ActionButtonPalette.monochromeFill
+        }
+        return defaultColor
+    }
+
+    private func actionButtonBorder(_ defaultColor: Color, disabled: Bool = false) -> Color {
+        if usesMonochromeButtons {
+            return ActionButtonPalette.monochromeForeground.opacity(disabled ? 0.35 : 0.85)
+        }
+        return defaultColor
+    }
+
     private var statusCard: some View {
-        let _ = secondTick
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Layout.statusLineSpacing) {
             Text("Last.fm")
                 .font(.title2.weight(.semibold))
             if auth.sessionKey != nil {
-                Text("Connected").foregroundColor(.green)
+                Text("Connected")
+                    .font(.footnote)
+                    .foregroundColor(.green)
             } else {
-                Text("Not connected").foregroundColor(.secondary)
+                Text("Not connected")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
             }
             engineStatusText(engine.statusText)
                 .font(.footnote)
@@ -255,50 +301,17 @@ struct ContentView: View {
     }
 
     private var trackCard: some View {
-        let _ = secondTick
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Layout.trackCardSpacing) {
             HStack {
                 Text("Now Playing")
                     .font(.title2.weight(.semibold))
                 Spacer()
             }
             if let t = observer.track {
-                Text("\(t.artist) - \(t.title)")
-                if let album = t.album, !album.isEmpty {
-                    Text(album)
-                }
+                nowPlayingMetadata(for: t)
                 if let d = t.durationSeconds, d > 0 {
-                    let selectedPlayedSeconds = t.usesFallbackDuration == true ? engine.effectivePlayedSeconds : engine.displayPlaybackSeconds
-                    let playedSeconds = min(max(0, selectedPlayedSeconds), d)
-                    let progress = min(playedSeconds / d, 1.0)
-                    VStack(spacing: 6) {
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.secondary.opacity(0.3))
-                                    .frame(height: 6)
-                                Capsule()
-                                    .fill(Color.primary.opacity(0.8))
-                                    .frame(width: geo.size.width * progress, height: 6)
-                                let thresholdX = geo.size.width * ProSettings.scrobbleThresholdFraction()
-                                RoundedRectangle(cornerRadius: 1)
-                                    .fill(Color.accentColor.opacity(0.7))
-                                    .frame(width: 3, height: 10)
-                                    .offset(x: thresholdX - 1.5)
-                            }
-                        }
-                        .frame(height: 6)
-                        HStack {
-                            Text(formatTime(playedSeconds))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Text(formatTime(d))
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.top, Layout.progressTopPadding)
+                    TrackPlaybackProgressView(track: t, engine: engine, formatTime: formatTime)
+                        .padding(.top, Layout.progressTopPadding)
                 } else if auth.sessionKey != nil {
                     Text("Auto-scrobble needs a stable playback duration and timestamp before it can submit automatically.")
                         .font(.footnote)
@@ -316,6 +329,32 @@ struct ContentView: View {
         .background(contentCardBackground)
     }
 
+    @ViewBuilder
+    private func nowPlayingMetadata(for track: Track) -> some View {
+        VStack(alignment: .leading, spacing: Layout.nowPlayingLineSpacing) {
+            Text(track.title)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.primary)
+                .minimumScaleFactor(0.68)
+                .multilineTextAlignment(.leading)
+
+            Text(track.artist)
+                .font(.body.weight(.medium))
+                .foregroundStyle(.primary.opacity(0.82))
+                .minimumScaleFactor(0.78)
+                .multilineTextAlignment(.leading)
+
+            if let album = track.album, !album.isEmpty {
+                Text(album)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .minimumScaleFactor(0.78)
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var controls: some View {
         let actionButtonHeight: CGFloat = 32
         let actionButtonSpacing: CGFloat = Layout.controlsSpacing
@@ -330,14 +369,14 @@ struct ContentView: View {
                         Text(engine.isUserPaused ? NSLocalizedString("Resume", comment: "") : NSLocalizedString("Pause", comment: ""))
                     }
                     .font(.body.weight(.semibold))
-                    .foregroundStyle(engine.isUserPaused ? ActionButtonPalette.resumeForeground : ActionButtonPalette.scrobbleNowForeground)
+                    .foregroundStyle(actionButtonForeground(engine.isUserPaused ? ActionButtonPalette.resumeForeground : ActionButtonPalette.scrobbleNowForeground))
                     .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow)
-                .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill)
-                .brightButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder)
+                .tint(actionButtonTint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow))
+                .prominentButtonBackground(actionButtonFill(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill))
+                .brightButtonBorder(actionButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder))
                 .disabled(auth.sessionKey == nil)
 
                 if auth.sessionKey == nil {
@@ -346,14 +385,14 @@ struct ContentView: View {
                     } label: {
                         Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
                             .font(.body.weight(.semibold))
-                            .foregroundStyle(ActionButtonPalette.accountForeground)
+                            .foregroundStyle(actionButtonForeground(ActionButtonPalette.accountForeground))
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
                     .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(ActionButtonPalette.account)
-                    .prominentButtonBackground(ActionButtonPalette.accountFill)
-                    .brightButtonBorder(ActionButtonPalette.accountBorder)
+                    .tint(actionButtonTint(ActionButtonPalette.account))
+                    .prominentButtonBackground(actionButtonFill(ActionButtonPalette.accountFill))
+                    .brightButtonBorder(actionButtonBorder(ActionButtonPalette.accountBorder))
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
@@ -367,15 +406,14 @@ struct ContentView: View {
                                 .allowsTightening(true)
                         }
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(engine.isUserPaused ? .secondary : ActionButtonPalette.scrobbleNowForeground)
+                        .foregroundStyle(actionButtonForeground(ActionButtonPalette.scrobbleNowForeground))
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight, alignment: .center)
                     }
                     .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(ActionButtonPalette.scrobbleNow)
-                    .prominentButtonBackground(engine.isUserPaused ? ActionButtonPalette.disabledFill : ActionButtonPalette.scrobbleNowFill)
-                    .brightButtonBorder(engine.isUserPaused ? .secondary.opacity(0.35) : ActionButtonPalette.scrobbleNowBorder)
-                    .disabled(engine.isUserPaused)
+                    .tint(actionButtonTint(ActionButtonPalette.scrobbleNow))
+                    .prominentButtonBackground(actionButtonFill(ActionButtonPalette.scrobbleNowFill))
+                    .brightButtonBorder(actionButtonBorder(ActionButtonPalette.scrobbleNowBorder))
                 }
             }
 
@@ -387,14 +425,14 @@ struct ContentView: View {
                 } label: {
                     Label(NSLocalizedString("View Profile in Last.fm", comment: ""), systemImage: "person.circle")
                         .font(.body.weight(.semibold))
-                        .foregroundStyle(ActionButtonPalette.accountForeground)
+                        .foregroundStyle(actionButtonForeground(ActionButtonPalette.accountForeground))
                         .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                 }
                 .buttonStyle(.bordered)
                 .pillButtonBorder()
-                .tint(ActionButtonPalette.account)
-                .prominentButtonBackground(ActionButtonPalette.accountFill)
-                .brightButtonBorder(ActionButtonPalette.accountBorder)
+                .tint(actionButtonTint(ActionButtonPalette.account))
+                .prominentButtonBackground(actionButtonFill(ActionButtonPalette.accountFill))
+                .brightButtonBorder(actionButtonBorder(ActionButtonPalette.accountBorder))
                 .disabled(auth.profileURL == nil)
 
                 Button {
@@ -523,7 +561,6 @@ struct ContentView: View {
                         ScrobbleLogRowView(
                             entry: entry,
                             isLast: entry.id == entries.last?.id,
-                            currentDate: currentDate,
                             engine: engine
                         )
                     }
@@ -572,13 +609,7 @@ struct ContentView: View {
         }
     }
 
-    private func handleTimerTick(now: Date) {
-        secondTick &+= 1
-        refreshScrobbleLogDisplay(now: now)
-    }
-
     private func refreshScrobbleLogDisplay(now: Date, forceReload: Bool = false) {
-        currentDate = now
         guard forceReload || now.timeIntervalSince(lastScrobbleLogRefreshDate) >= 60 else { return }
         scrobbleLog.reload()
         lastScrobbleLogRefreshDate = now
@@ -642,48 +673,10 @@ struct ContentView: View {
 private struct ScrobbleLogRowView: View {
     let entry: ScrobbleLogStore.Entry
     let isLast: Bool
-    let currentDate: Date
     let engine: ScrobbleEngine
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
-                Text("\(entry.track.artist) — \(entry.track.title)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                if entry.track.artist.isEmpty || entry.track.title.isEmpty {
-                    Text("Error")
-                        .font(.caption.weight(.semibold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .foregroundStyle(.white)
-                        .background(Color.orange)
-                        .clipShape(Capsule())
-                }
-            }
-            if let album = entry.track.album, !album.isEmpty {
-                Text(album)
-                    .font(.footnote)
-                    .foregroundStyle(.primary)
-            }
-            HStack(spacing: 8) {
-                Text(RelativeScrobbleTimeFormatter.string(from: entry.scrobbledAt, to: currentDate))
-                if entry.lovedOnLastFM == true {
-                    Text("Loved")
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .foregroundStyle(.white)
-                        .background(Color.red)
-                        .clipShape(Capsule())
-                }
-                if entry.source != .live {
-                    sourceBadge(entry.source)
-                }
-                Spacer()
-            }
-            .font(.caption)
-            .foregroundStyle(.primary)
-        }
+        rowContent
         .frame(maxWidth: .infinity, alignment: .leading)
         // Suppress inherited animations so new scrobble rows appear instantly rather than sliding in.
         .transaction { $0.animation = nil }
@@ -703,14 +696,31 @@ private struct ScrobbleLogRowView: View {
                 Label("Scrobble Again", systemImage: "arrow.clockwise")
             }
         } preview: {
-            VStack(alignment: .leading, spacing: 4) {
+            rowContent
+            .padding()
+        }
+
+        if !isLast {
+            Divider()
+        }
+    }
+
+    private var rowContent: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.track.title)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+
                 HStack(spacing: 6) {
-                    Text("\(entry.track.artist) — \(entry.track.title)")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
+                    Text(entry.track.artist)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.primary.opacity(0.82))
+                        .multilineTextAlignment(.leading)
                     if entry.track.artist.isEmpty || entry.track.title.isEmpty {
                         Text("Error")
-                            .font(.caption.weight(.semibold))
+                            .font(.caption.weight(.medium))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 2)
                             .foregroundStyle(.white)
@@ -718,34 +728,32 @@ private struct ScrobbleLogRowView: View {
                             .clipShape(Capsule())
                     }
                 }
+
                 if let album = entry.track.album, !album.isEmpty {
                     Text(album)
-                        .font(.footnote)
-                        .foregroundStyle(.primary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.leading)
                 }
-                HStack(spacing: 8) {
-                    Text(RelativeScrobbleTimeFormatter.string(from: entry.scrobbledAt, to: currentDate))
-                    if entry.lovedOnLastFM == true {
-                        Text("Loved")
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .foregroundStyle(.white)
-                            .background(Color.red)
-                            .clipShape(Capsule())
-                    }
-                    if entry.source != .live {
-                        sourceBadge(entry.source)
-                    }
-                    Spacer()
-                }
-                .font(.caption)
-                .foregroundStyle(.primary)
             }
-            .padding()
-        }
 
-        if !isLast {
-            Divider()
+            HStack(spacing: 8) {
+                RelativeScrobbleTimeView(date: entry.scrobbledAt)
+                if entry.lovedOnLastFM == true {
+                    Text("Loved")
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .foregroundStyle(.white)
+                        .background(Color.red)
+                        .clipShape(Capsule())
+                }
+                if entry.source != .live {
+                    sourceBadge(entry.source)
+                }
+                Spacer()
+            }
+            .font(.caption)
+            .foregroundStyle(.primary)
         }
     }
 
@@ -771,6 +779,58 @@ private struct ScrobbleLogRowView: View {
             .compositingGroup()
     }
 
+}
+
+private struct TrackPlaybackProgressView: View {
+    let track: Track
+    let engine: ScrobbleEngine
+    let formatTime: (TimeInterval) -> String
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { _ in
+            let duration = track.durationSeconds ?? 0
+            let playedSeconds = engine.liveDisplayedPlayedSeconds(for: track)
+            let progress = duration > 0 ? min(playedSeconds / duration, 1.0) : 0
+
+            VStack(spacing: 6) {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.3))
+                            .frame(height: 6)
+                        Capsule()
+                            .fill(Color.primary.opacity(0.8))
+                            .frame(width: geo.size.width * progress, height: 6)
+                        let thresholdX = geo.size.width * ProSettings.scrobbleThresholdFraction()
+                        RoundedRectangle(cornerRadius: 1)
+                            .fill(Color.accentColor.opacity(0.7))
+                            .frame(width: 3, height: 10)
+                            .offset(x: thresholdX - 1.5)
+                    }
+                }
+                .frame(height: 6)
+                HStack {
+                    Text(formatTime(playedSeconds))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(formatTime(duration))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
+private struct RelativeScrobbleTimeView: View {
+    let date: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            Text(RelativeScrobbleTimeFormatter.string(from: date, to: context.date))
+        }
+    }
 }
 
 extension View {
@@ -802,7 +862,7 @@ extension View {
     func prominentButtonBackground(_ color: Color) -> some View {
         self.background {
             Capsule(style: .continuous)
-                .fill(color.opacity(1))
+                .fill(color.opacity(0.1))
         }
     }
 
@@ -834,7 +894,7 @@ struct MacCapsuleControlButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.primary)
                 .labelStyle(.titleAndIcon)
                 .padding(.horizontal, 14)
@@ -862,7 +922,7 @@ struct MacFloatingCircleButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .frame(width: 36, height: 36)
                 .background(.ultraThinMaterial, in: Circle())

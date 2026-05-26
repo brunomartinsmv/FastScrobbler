@@ -8,6 +8,8 @@ struct FastScrobblerMacApp: App {
     @StateObject private var appLanguage = AppLanguageStore.shared
 
     init() {
+        UserDefaults.standard.register(defaults: ["NSApplicationCrashOnExceptions": true])
+        Self.configureFirebaseIfPossible()
         _ = AppLanguageStore.shared
     }
 
@@ -23,13 +25,29 @@ struct FastScrobblerMacApp: App {
     }
 }
 
+private extension FastScrobblerMacApp {
+    static var didConfigureFirebase = false
+
+    static func configureFirebaseIfPossible() {
+        guard !didConfigureFirebase else { return }
+        guard let configPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
+              let config = NSDictionary(contentsOfFile: configPath),
+              let googleAppID = config["GOOGLE_APP_ID"] as? String,
+              !googleAppID.hasPrefix("REPLACE_") else {
+            assertionFailure("Missing valid GoogleService-Info.plist for Firebase.")
+            return
+        }
+
+        FirebaseApp.configure()
+        didConfigureFirebase = true
+    }
+}
+
 @MainActor
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private let model = AppModel.shared
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        configureFirebaseIfPossible()
-
         let rootView = MacPopoverRootView(content: ContentView())
             .environmentObject(model.auth)
             .environmentObject(model.observer)
@@ -55,21 +73,11 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
-        MenuBarController.shared.showPrimaryInterfaceIfNeeded()
-    }
-
-    private func configureFirebaseIfPossible() {
-        guard FirebaseApp.app() == nil else { return }
-        guard let configPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
-              let config = NSDictionary(contentsOfFile: configPath),
-              let googleAppID = config["GOOGLE_APP_ID"] as? String,
-              !googleAppID.hasPrefix("REPLACE_") else {
-            assertionFailure("Missing valid GoogleService-Info.plist for Firebase.")
-            return
+        DispatchQueue.main.async {
+            MenuBarController.shared.showPrimaryInterfaceIfNeeded()
         }
-
-        FirebaseApp.configure()
     }
+
 }
 
 private struct MacPopoverRootView<Content: View>: View {

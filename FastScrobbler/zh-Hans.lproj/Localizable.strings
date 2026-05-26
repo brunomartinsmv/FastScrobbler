@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "账户";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一播放会话。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。即使 FastScrobbler 在后台运行，歌曲也会被记录。\n\n注意：这里的播放时间戳并非由 Apple 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。即使 FastScrobbler 在后台运行，歌曲也会被记录。\n\n注意：播放时间戳并非由该 API 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
 "Connected" = "已连接";
 "Done" = "完成";
@@ -29,6 +29,7 @@
 "Loved" = "Loved";
 "No scrobbles yet." = "还没有 scrobble。";
 "No track detected." = "未检测到歌曲。";
+"No Artwork" = "无封面图";
 "Not connected" = "未连接";
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "注意：运行快捷指令或使用控制中心按钮后，实时活动不会立即更新。";
 "Now Playing" = "正在播放";
@@ -140,6 +141,7 @@
 "Off" = "关闭";
 "On" = "开启";
 "Open Media Library Settings" = "打开媒体资料库设置";
+"Open Fullscreen Now Playing" = "打开全屏正在播放";
 "Open Music App" = "打开音乐 App";
 "Open Settings" = "打开设置";
 "Open System Settings" = "打开系统设置";
@@ -159,6 +161,7 @@
 "Ask a Question or Report a Bug" = "提问或报告错误";
 "App Storage" = "App 存储";
 "Cleaning Up…" = "清理中…";
+"Close Now Playing" = "关闭正在播放";
 "Recently Played API" = "最近播放 API";
 "Send Now Playing status to Last.fm" = "将“正在播放”状态发送到 Last.fm";
 "Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "在你的 Last.fm 个人资料上显示当前正在播放的歌曲。关闭后，自动 scrobble 仍会继续工作。";
@@ -209,6 +212,10 @@
 "Support development of the app" = "支持应用开发";
 "System" = "系统";
 "Theme" = "主题";
+"App Theme" = "应用主题";
+"Button Theme" = "按钮主题";
+"Colourful" = "彩色";
+"Monochrome" = "单色";
 "Background App Refresh" = "后台 App 刷新";
 "Live Activities" = "实时活动";
 "Required to read Apple Music now-playing metadata." = "读取 Apple Music 当前播放元数据所必需。";

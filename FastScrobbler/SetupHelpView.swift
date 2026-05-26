@@ -255,11 +255,11 @@ struct SetupHelpView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 if mode == .help {
-                    ToolbarItem(placement: .topBarTrailing) {
+                    ToolbarItem(placement: .cancellationAction) {
                         Button(role: .cancel) {
                             onDone()
                         } label: {
-                            Image(systemName: "xmark")
+                            IOSCloseButtonLabel(style: .plain)
                         }
                         .accessibilityLabel("Close")
                     }

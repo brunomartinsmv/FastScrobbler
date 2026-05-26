@@ -165,6 +165,14 @@ func runAppleMusicRecentTracksImporterTests() {
             abs(priorEnd - candidateEnd) <= toleranceSeconds
     }
 
+    func apiDuplicateToleranceSeconds(
+        durationSeconds: Int,
+        baseToleranceSeconds: Int = 6 * 60,
+        durationPaddingSeconds: Int = 4 * 60
+    ) -> Int {
+        max(baseToleranceSeconds, max(0, durationSeconds) + durationPaddingSeconds)
+    }
+
     func statusAfterImport(
         resourcesCount: Int,
         importedCount: Int,
@@ -298,6 +306,8 @@ func runAppleMusicRecentTracksImporterTests() {
            wasPreviouslyImported(candidateStart: 10_060, candidateEnd: 10_220, record: priorImport))
     expect("same ID outside prior synthetic tolerance is not considered exact prior import reuse",
            !wasPreviouslyImported(candidateStart: 10_091, candidateEnd: 10_271, record: priorImport))
+    expectEqual("short tracks use a 6-minute duplicate floor", apiDuplicateToleranceSeconds(durationSeconds: 30), 360)
+    expectEqual("tracks longer than the floor use duration plus 4 minutes", apiDuplicateToleranceSeconds(durationSeconds: 500), 740)
 
     expectEqual(
         "lookback-rejected pass reports timestampConfidenceTooLow",

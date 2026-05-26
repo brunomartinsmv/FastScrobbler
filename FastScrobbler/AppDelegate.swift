@@ -4,6 +4,8 @@ import UIKit
 
 @main
 final class AppDelegate: UIResponder, UIApplicationDelegate {
+    private var didConfigureFirebase = false
+
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -45,7 +47,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     private func configureFirebaseIfPossible() {
-        guard FirebaseApp.app() == nil else { return }
+        guard !didConfigureFirebase else { return }
         guard let configPath = Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist"),
               let config = NSDictionary(contentsOfFile: configPath),
               let googleAppID = config["GOOGLE_APP_ID"] as? String,
@@ -55,5 +57,6 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         FirebaseApp.configure()
+        didConfigureFirebase = true
     }
 }

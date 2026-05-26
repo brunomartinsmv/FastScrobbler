@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "アカウント";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。FastScrobblerがバックグラウンドにある間も曲は記録されます。\n\n注: ここではAppleから再生時刻が提供されないため、FastScrobblerがスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。FastScrobblerがバックグラウンドにある場合でも曲は記録されます。\n\n注: 再生時刻はAPIから提供されないため、FastScrobblerはスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
 "Connected" = "接続済み";
 "Done" = "完了";
@@ -29,6 +29,7 @@
 "Loved" = "Loved";
 "No scrobbles yet." = "まだスクロブルはありません。";
 "No track detected." = "曲が検出されていません。";
+"No Artwork" = "アートワークなし";
 "Not connected" = "未接続";
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "注: ショートカットの実行やコントロールセンターボタンの使用後、ライブアクティビティはすぐには更新されません。";
 "Now Playing" = "再生中";
@@ -140,6 +141,7 @@
 "Off" = "オフ";
 "On" = "オン";
 "Open Media Library Settings" = "メディアライブラリ設定を開く";
+"Open Fullscreen Now Playing" = "フルスクリーン再生画面を開く";
 "Open Music App" = "ミュージックアプリを開く";
 "Open Settings" = "設定を開く";
 "Open System Settings" = "システム設定を開く";
@@ -159,6 +161,7 @@
 "Ask a Question or Report a Bug" = "質問するかバグを報告";
 "App Storage" = "アプリのストレージ";
 "Cleaning Up…" = "クリーンアップ中…";
+"Close Now Playing" = "再生中画面を閉じる";
 "Recently Played API" = "最近再生 API";
 "Send Now Playing status to Last.fm" = "再生中ステータスを Last.fm に送信";
 "Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "現在再生中の曲を Last.fm のプロフィールに表示します。これをオフにしても自動スクロブルは動作します。";
@@ -207,6 +210,10 @@
 "Support development of the app" = "アプリ開発を支援";
 "System" = "システム";
 "Theme" = "テーマ";
+"App Theme" = "アプリのテーマ";
+"Button Theme" = "ボタンのテーマ";
+"Colourful" = "カラフル";
+"Monochrome" = "モノクロ";
 /* Added manually for missing Setup and Pro localizations. */
 "Background App Refresh" = "バックグラウンド更新";
 "Live Activities" = "ライブアクティビティ";

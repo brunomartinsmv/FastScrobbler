@@ -74,6 +74,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
     @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
+    @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
@@ -214,6 +215,18 @@ struct SettingsView: View {
                     ForEach(AppLanguage.allCases) { language in
                         Text(language.title).tag(language)
                     }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .frame(width: 180)
+            }
+            .fixedSize()
+
+            HStack(alignment: .center, spacing: -20) {
+                Text(localized("Button Theme"))
+                Picker(localized("Button Theme"), selection: $buttonThemeSelectionRawValue) {
+                    Text(localized("Colourful")).tag(ButtonTheme.colorful.rawValue)
+                    Text(localized("Monochrome")).tag(ButtonTheme.monochrome.rawValue)
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
@@ -442,6 +455,7 @@ struct SettingsView: View {
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.buttonThemeSelection)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
 
         loveOnFavoriteEnabled = false
@@ -455,6 +469,7 @@ struct SettingsView: View {
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
         sendNowPlayingAutomaticallyEnabled = true
+        buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
         appLanguage.selection = .system
         Task { @MainActor in

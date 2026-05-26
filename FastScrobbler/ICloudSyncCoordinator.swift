@@ -154,6 +154,19 @@ private enum SyncedSettingsStore {
             }
         ),
         Definition(
+            key: AppSettings.Keys.buttonThemeSelection,
+            storage: .standard,
+            read: { .string(UserDefaults.standard.string(forKey: AppSettings.Keys.buttonThemeSelection) ?? ButtonTheme.colorful.rawValue) },
+            apply: {
+                guard case .string(let value) = $0 else { return }
+                if value == ButtonTheme.colorful.rawValue {
+                    UserDefaults.standard.removeObject(forKey: AppSettings.Keys.buttonThemeSelection)
+                } else {
+                    UserDefaults.standard.set(value, forKey: AppSettings.Keys.buttonThemeSelection)
+                }
+            }
+        ),
+        Definition(
             key: AppSettings.Keys.iCloudSyncEnabled,
             storage: .standard,
             read: { .bool(AppSettings.iCloudSyncEnabled()) },

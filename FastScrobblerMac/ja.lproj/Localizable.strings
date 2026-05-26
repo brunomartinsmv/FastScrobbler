@@ -168,6 +168,9 @@
 "Send the current track to Last.fm as now playing." = "現在の曲をLast.fmに再生中として送信します。";
 "Sent now playing: %@ — %@" = "再生中を送信しました: %@ — %@";
 "Show Live Activity" = "ライブアクティビティを表示";
+"Button Theme" = "ボタンのテーマ";
+"Colourful" = "カラフル";
+"Monochrome" = "モノクロ";
 "Sign In" = "サインイン";
 "Sign In to Last.fm" = "Last.fmにサインイン";
 "Sign in to start scrobbling to your Last.fm account." = "Last.fmアカウントにサインインしてスクロブルを始めてください。";

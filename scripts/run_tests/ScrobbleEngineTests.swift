@@ -173,6 +173,24 @@ func runScrobbleEngineTests() {
         return min(max(0, selected), duration)
     }
 
+    func liveNowPlayingCardPlayedSeconds(
+        usesFallbackDuration: Bool,
+        sessionMatchesCurrentTrack: Bool,
+        observerPlaybackTime: Double,
+        displayPlaybackSeconds: Double,
+        effectivePlayedSeconds: Double,
+        duration: Double
+    ) -> Double {
+        let rawPlaybackTime = max(0, observerPlaybackTime)
+        let selected: Double
+        if sessionMatchesCurrentTrack {
+            selected = usesFallbackDuration ? max(effectivePlayedSeconds, rawPlaybackTime) : rawPlaybackTime
+        } else {
+            selected = rawPlaybackTime
+        }
+        return min(max(0, selected), duration)
+    }
+
     func thresholdQualifiedPlaybackSeconds(
         usesFallbackDuration: Bool,
         rawPlaybackTime: Double,
@@ -480,6 +498,38 @@ func runScrobbleEngineTests() {
     expect("paused threshold-qualified status says it is ready on resume",
            thresholdReadyStatus.contains("Ready to scrobble when playback resumes."),
            detail: "got '\(thresholdReadyStatus)'")
+
+    section("Engine · Paused now-playing progress remains live")
+
+    let pausedLiveProgress = liveNowPlayingCardPlayedSeconds(
+        usesFallbackDuration: false,
+        sessionMatchesCurrentTrack: true,
+        observerPlaybackTime: 42,
+        displayPlaybackSeconds: 25,
+        effectivePlayedSeconds: 25,
+        duration: 60
+    )
+    expectEqual("paused standard-duration progress follows live observer playback time", pausedLiveProgress, 42)
+
+    let pausedFallbackLiveProgress = liveNowPlayingCardPlayedSeconds(
+        usesFallbackDuration: true,
+        sessionMatchesCurrentTrack: true,
+        observerPlaybackTime: 15,
+        displayPlaybackSeconds: 12,
+        effectivePlayedSeconds: 30,
+        duration: 180
+    )
+    expectEqual("paused fallback-duration progress preserves accumulated play time when it exceeds live raw playback", pausedFallbackLiveProgress, 30)
+
+    let pausedMismatchedSessionProgress = liveNowPlayingCardPlayedSeconds(
+        usesFallbackDuration: true,
+        sessionMatchesCurrentTrack: false,
+        observerPlaybackTime: 18,
+        displayPlaybackSeconds: 40,
+        effectivePlayedSeconds: 55,
+        duration: 180
+    )
+    expectEqual("paused progress ignores stale session state when the observed track changed", pausedMismatchedSessionProgress, 18)
 
     section("Engine · Automatic now playing toggle")
 

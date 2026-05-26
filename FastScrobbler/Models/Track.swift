@@ -4,6 +4,7 @@ import Foundation
 enum AppGroup {
     static let id = "group.com.kevin.FastScrobbler"
     // Falls back to .standard so the app still functions outside an app group (e.g. unit tests).
+
     static let userDefaults = UserDefaults(suiteName: id) ?? .standard
 
     static func sharedContainerURL() -> URL? {
@@ -40,6 +41,7 @@ enum AppSettings {
         static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
         static let sendNowPlayingAutomaticallyEnabled = "FastScrobbler.App.sendNowPlayingAutomaticallyEnabled"
         static let themeSelection = "FastScrobbler.App.themeSelection"
+        static let buttonThemeSelection = "FastScrobbler.App.buttonThemeSelection"
         static let iCloudSyncEnabled = "FastScrobbler.App.iCloudSyncEnabled"
     }
 
@@ -76,6 +78,13 @@ enum AppSettings {
         return AppTheme(rawValue: rawValue) ?? .system
     }
 
+    static func buttonThemeSelection() -> ButtonTheme {
+        guard let rawValue = UserDefaults.standard.string(forKey: Keys.buttonThemeSelection) else {
+            return .colorful
+        }
+        return ButtonTheme(rawValue: rawValue) ?? .colorful
+    }
+
     static func iCloudSyncEnabled() -> Bool {
         UserDefaults.standard.bool(forKey: Keys.iCloudSyncEnabled)
     }
@@ -89,6 +98,15 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case system
     case light
     case dark
+
+    var id: String {
+        rawValue
+    }
+}
+
+enum ButtonTheme: String, CaseIterable, Identifiable {
+    case colorful
+    case monochrome
 
     var id: String {
         rawValue

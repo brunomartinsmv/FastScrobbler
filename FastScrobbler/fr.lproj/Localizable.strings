@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "Compte";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Empêche d’envoyer la même session de lecture à Last.fm plus d’une fois dans un court laps de temps.";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even while FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by Apple here, so FastScrobbler assigns an estimated timestamp when it submits the scrobble. Songs are recorded and scrobbled regardless of playback duration." = "Fonction expérimentale : scrobble automatiquement jusqu’à 30 morceaux récemment écoutés via l’API Apple Music. Les morceaux sont enregistrés même lorsque FastScrobbler est en arrière-plan.\n\nRemarque : Apple ne fournit pas ici les horodatages de lecture, donc FastScrobbler attribue un horodatage estimé au moment de l’envoi du scrobble. Les morceaux sont enregistrés et scrobblés quelle que soit la durée d’écoute.";
+"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "Fonction expérimentale : scrobble automatiquement jusqu’à 30 morceaux récemment écoutés via l’API Apple Music. Les morceaux sont enregistrés même lorsque FastScrobbler est en arrière-plan.\n\nRemarque : l’API ne fournit pas les horodatages de lecture, donc FastScrobbler attribue un horodatage estimé lorsque le scrobble est envoyé. Les morceaux sont enregistrés et scrobblés quelle que soit la durée d’écoute.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Fonction bêta : affiche l’état du scrobbling sur l’écran verrouillé et la Dynamic Island.";
 "Connected" = "Connecté";
 "Done" = "Terminé";
@@ -29,6 +29,7 @@
 "Loved" = "Aimé";
 "No scrobbles yet." = "Aucun scrobble pour le moment.";
 "No track detected." = "Aucun morceau détecté.";
+"No Artwork" = "Aucune illustration";
 "Not connected" = "Non connecté";
 "Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button." = "Remarque : l’Activité en direct ne se mettra pas à jour immédiatement après l’exécution d’un raccourci ou l’utilisation d’un bouton du Centre de contrôle.";
 "Now Playing" = "Lecture en cours";
@@ -140,6 +141,7 @@
 "Off" = "Désactivé";
 "On" = "Activé";
 "Open Media Library Settings" = "Ouvrir les réglages de la bibliothèque multimédia";
+"Open Fullscreen Now Playing" = "Ouvrir la lecture en plein écran";
 "Open Music App" = "Ouvrir l’app Musique";
 "Open Settings" = "Ouvrir Réglages";
 "Open System Settings" = "Ouvrir Réglages Système";
@@ -159,6 +161,7 @@
 "Ask a Question or Report a Bug" = "Poser une question ou signaler un bug";
 "App Storage" = "Stockage de l’app";
 "Cleaning Up…" = "Nettoyage…";
+"Close Now Playing" = "Fermer la lecture en cours";
 "Recently Played API" = "API d’écoute récente";
 "Send Now Playing status to Last.fm" = "Envoyer le statut Lecture en cours à Last.fm";
 "Display the currently playing track on your Last.fm profile. Automatic scrobbles still work when this is off." = "Affiche le morceau en cours de lecture sur votre profil Last.fm. Les scrobbles automatiques continuent de fonctionner quand cette option est désactivée.";
@@ -208,6 +211,10 @@
 "Support development of the app" = "Soutenir le développement de l’app";
 "System" = "Système";
 "Theme" = "Thème";
+"App Theme" = "Thème de l’app";
+"Button Theme" = "Thème des boutons";
+"Colourful" = "Coloré";
+"Monochrome" = "Monochrome";
 /* Added manually for missing Setup and Pro localizations. */
 "Background App Refresh" = "Actualisation en arrière-plan";
 "Live Activities" = "Activités en direct";

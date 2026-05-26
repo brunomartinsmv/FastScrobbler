@@ -14,6 +14,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private let quitMenu: NSMenu
     private var globalDismissMonitor: Any?
     private var localDismissMonitor: Any?
+    private var isPresentationQueued = false
     private static let statusBarSymbolNames = [
         "music.note.arrow.trianglehead.clockwise",
         "music.note",
@@ -116,8 +117,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     }
 
     func showPrimaryInterfaceIfNeeded() {
-        guard !popover.isShown else { return }
-        showPopover()
+        queuePopoverPresentationIfNeeded()
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {
@@ -146,7 +146,17 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
                 popoverWindow?.makeKey()
             }
         } else {
-            showPopover()
+            queuePopoverPresentationIfNeeded()
+        }
+    }
+
+    private func queuePopoverPresentationIfNeeded() {
+        guard !popover.isShown, !isPresentationQueued else { return }
+        isPresentationQueued = true
+        DispatchQueue.main.async {
+            self.isPresentationQueued = false
+            guard !self.popover.isShown else { return }
+            self.showPopover()
         }
     }
 
@@ -154,11 +164,12 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         guard let button = statusItem.button else { return }
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        // Make the popover window key so SwiftUI renders buttons with full colour
-        popover.contentViewController?.view.window?.makeKey()
         installDismissMonitors()
-        // Post after presenting so any refresh work can't delay the popover from appearing.
+        // Defer window activation and refresh work until AppKit finishes the popover's
+        // first layout pass. Making the hosting window key synchronously while `show`
+        // is still laying out can trigger AppKit's layout-recursion diagnostic.
         DispatchQueue.main.async {
+            self.popover.contentViewController?.view.window?.makeKey()
             NotificationCenter.default.post(name: .fastScrobblerPopoverWillShow, object: nil)
         }
     }

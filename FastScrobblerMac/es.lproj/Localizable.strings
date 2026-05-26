@@ -169,6 +169,9 @@
 "Send the current track to Last.fm as now playing." = "Enviar la pista actual a Last.fm como en reproducción.";
 "Sent now playing: %@ — %@" = "Enviado como En reproducción: %@ — %@";
 "Show Live Activity" = "Mostrar Actividad en Vivo";
+"Button Theme" = "Tema de los botones";
+"Colourful" = "Colorido";
+"Monochrome" = "Monocromo";
 "Sign In" = "Iniciar sesión";
 "Sign In to Last.fm" = "Iniciar sesión en Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "Inicia sesión para empezar a hacer scrobble en tu cuenta de Last.fm.";

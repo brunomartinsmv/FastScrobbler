@@ -170,6 +170,9 @@
 "Send the current track to Last.fm as now playing." = "将当前歌曲作为\"正在播放\"发送到 Last.fm。";
 "Sent now playing: %@ — %@" = "已发送\"正在播放\"：%@ — %@";
 "Show Live Activity" = "显示实时活动";
+"Button Theme" = "按钮主题";
+"Colourful" = "彩色";
+"Monochrome" = "单色";
 "Sign In" = "登录";
 "Sign In to Last.fm" = "登录 Last.fm";
 "Sign in to start scrobbling to your Last.fm account." = "登录后即可开始向你的 Last.fm 账户 scrobble。";
