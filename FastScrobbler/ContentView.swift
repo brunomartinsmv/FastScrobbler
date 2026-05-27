@@ -452,20 +452,20 @@ struct ContentView: View {
     private func nowPlayingMetadata(for track: Track) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(track.title)
-                .font(.headline.weight(.bold))
+                .font(.body.weight(.bold))
                 .foregroundStyle(.primary)
                 .minimumScaleFactor(0.68)
                 .multilineTextAlignment(.leading)
 
             Text(track.artist)
-                .font(.headline.weight(.semibold))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(.primary.opacity(0.82))
                 .minimumScaleFactor(0.78)
                 .multilineTextAlignment(.leading)
 
             if let album = track.album, !album.isEmpty {
                 Text(album)
-                    .font(.headline)
+                    .font(.body)
                     .foregroundStyle(.secondary)
                     .minimumScaleFactor(0.78)
                     .multilineTextAlignment(.leading)
