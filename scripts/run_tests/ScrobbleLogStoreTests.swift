@@ -12,7 +12,7 @@ func runScrobbleLogStoreTests() {
     }
 
     let maxStoredEntries = 100
-    let defaultDisplayLimit = 40
+    let defaultDisplayLimit = 50
     let manualDisplayLimit = 30
     let maxEntryAgeSeconds = 21 * 24 * 60 * 60
 
@@ -92,7 +92,7 @@ func runScrobbleLogStoreTests() {
             scrobbledAt: now - index
         )
     }
-    expectEqual("recentEntries uses the 40-entry default display limit", recentEntries(helperEntries).count, defaultDisplayLimit)
+    expectEqual("recentEntries uses the 50-entry default display limit", recentEntries(helperEntries).count, defaultDisplayLimit)
     expectEqual("manualEntries filters manual rows before applying the 30-entry limit", manualEntries(helperEntries).count, manualDisplayLimit)
     expectEqual("negative helper limits return no entries", recentEntries(helperEntries, limit: -1).count, 0)
 
@@ -110,8 +110,9 @@ func runScrobbleLogStoreTests() {
 
     section("Scrobble Log · Record duplicate policy")
 
-    func shouldRecord(existing: [FakeLogEntry], candidate: FakeLogEntry) -> Bool {
-        if candidate.source != "playbackHistory",
+    func shouldRecord(existing: [FakeLogEntry], candidate: FakeLogEntry, allowExactDuplicates: Bool = false) -> Bool {
+        if !allowExactDuplicates,
+           candidate.source != "playbackHistory",
            existing.contains(where: { $0.startTimestamp == candidate.startTimestamp && $0.key == candidate.key }) {
             return false
         }
@@ -122,6 +123,8 @@ func runScrobbleLogStoreTests() {
     let duplicatePlaybackHistory = FakeLogEntry(id: "history-dup", source: "playbackHistory", key: "track-a", startTimestamp: now - 4_000, scrobbledAt: now - 5)
     expect("record rejects non-playback-history exact duplicates", !shouldRecord(existing: [shared], candidate: duplicateLive))
     expect("record allows playback-history exact duplicates", shouldRecord(existing: [shared], candidate: duplicatePlaybackHistory))
+    expect("record allows exact duplicates when duplicate prevention is disabled",
+           shouldRecord(existing: [shared], candidate: duplicateLive, allowExactDuplicates: true))
 
     section("Scrobble Log · Display timestamp source")
 

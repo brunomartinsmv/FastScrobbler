@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "账户";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一播放会话。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "实验性功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。即使 FastScrobbler 在后台运行，歌曲也会被记录。\n\n注意：播放时间戳并非由该 API 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
+"Beta feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "Beta 功能：通过 Apple Music API 自动 scrobble 最多 30 首最近播放的歌曲。即使 FastScrobbler 在后台运行，歌曲也会被记录。\n\n注意：播放时间戳并非由该 API 提供，因此 FastScrobbler 会在提交 scrobble 时分配一个估算时间戳。无论播放时长如何，歌曲都会被记录并 scrobble。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
 "Connected" = "已连接";
 "Done" = "完成";
@@ -64,8 +64,10 @@
 "Scrobble at %@ of duration" = "在播放到 %@ 时 scrobble";
 "Scrobble Controls" = "Scrobble 控制";
 "Scrobble from Apple Music API" = "从 Apple Music API scrobble";
+"Need more plays?" = "需要捕捉更多播放记录？";
+"Turn on \"Scrobble from Apple Music API\" if you need to capture more plays, including non-library songs." = "如果你需要捕捉更多播放记录，包括非资料库歌曲，请开启“从 Apple Music API scrobble”。";
 "Only scrobble non-library songs" = "仅 scrobble 非资料库歌曲";
-"Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled." = "尽力而为过滤：FastScrobbler 会将 Apple Music API 最近播放的歌曲与你的本地资料库进行比较，并跳过看起来已经在资料库中的歌曲。如果无法确认匹配，该歌曲仍会被 scrobble。";
+"Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled. Recommended when \"Scrobble from Listening History\" is enabled." = "尽力而为过滤：FastScrobbler 会检查最近通过 API 播放的歌曲是否已存在于你的资料库中，并跳过这些歌曲。如果 FastScrobbler 无法确认匹配，该歌曲仍会被 scrobble。建议在启用“从播放历史 scrobble”时使用。";
 "Scrobble Now" = "立即 Scrobble";
 "Settings" = "设置";
 "Setup" = "设置向导";

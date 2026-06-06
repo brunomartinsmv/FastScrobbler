@@ -116,31 +116,21 @@ func runListeningHistoryScanTests() {
     enum ForegroundAction: String, Equatable {
         case startEngine
         case tickEngine
-        case runRecoveryScan
-        case importPlaybackHistory
-        case importRecentTracks
+        case scanListeningHistory
         case flushBacklog
         case scheduleBackgroundProcessing
     }
 
-    func foregroundStartupActions(isUserPaused: Bool, shouldRunForegroundRecoveryScan: Bool) -> [ForegroundAction] {
+    func foregroundStartupActions(isUserPaused: Bool) -> [ForegroundAction] {
         var actions: [ForegroundAction] = []
 
         if !isUserPaused {
             actions.append(.startEngine)
             actions.append(.tickEngine)
+            actions.append(.scanListeningHistory)
+            actions.append(.flushBacklog)
         }
 
-        if shouldRunForegroundRecoveryScan {
-            actions.append(.runRecoveryScan)
-        } else {
-            actions.append(.importPlaybackHistory)
-            if !isUserPaused {
-                actions.append(.importRecentTracks)
-            }
-        }
-
-        actions.append(.flushBacklog)
         actions.append(.scheduleBackgroundProcessing)
 
         if !isUserPaused {
@@ -155,30 +145,147 @@ func runListeningHistoryScanTests() {
         actions.firstIndex(of: action)
     }
 
-    let standardForegroundStart = foregroundStartupActions(isUserPaused: false, shouldRunForegroundRecoveryScan: false)
+    let standardForegroundStart = foregroundStartupActions(isUserPaused: false)
     expect(
-        "foreground startup primes the live session before recent-track import",
+        "foreground startup primes the live session before scanning listening history",
         (firstIndex(of: .tickEngine, in: standardForegroundStart) ?? .max) <
-            (firstIndex(of: .importRecentTracks, in: standardForegroundStart) ?? .max)
+            (firstIndex(of: .scanListeningHistory, in: standardForegroundStart) ?? .max)
     )
     expect(
-        "foreground startup still imports playback history before flushing backlog",
-        (firstIndex(of: .importPlaybackHistory, in: standardForegroundStart) ?? .max) <
+        "foreground startup scans listening history before flushing backlog",
+        (firstIndex(of: .scanListeningHistory, in: standardForegroundStart) ?? .max) <
             (firstIndex(of: .flushBacklog, in: standardForegroundStart) ?? .max)
     )
-
-    let recoveryForegroundStart = foregroundStartupActions(isUserPaused: false, shouldRunForegroundRecoveryScan: true)
     expect(
-        "foreground recovery primes the live session before the recovery scan",
-        (firstIndex(of: .tickEngine, in: recoveryForegroundStart) ?? .max) <
-            (firstIndex(of: .runRecoveryScan, in: recoveryForegroundStart) ?? .max)
+        "foreground startup uses the unified scan path",
+        standardForegroundStart.contains(.scanListeningHistory)
     )
 
-    let pausedForegroundStart = foregroundStartupActions(isUserPaused: true, shouldRunForegroundRecoveryScan: false)
+    let pausedForegroundStart = foregroundStartupActions(isUserPaused: true)
     expect(
-        "paused startup does not run the recent-track importer",
-        !pausedForegroundStart.contains(.importRecentTracks)
+        "paused startup does not scan listening history",
+        !pausedForegroundStart.contains(.scanListeningHistory)
     )
+    expect(
+        "paused startup does not submit backlog",
+        !pausedForegroundStart.contains(.flushBacklog)
+    )
+
+    section("Listening History scan · user-triggered orchestration")
+
+    enum UserInitiatedEntryPoint: CaseIterable {
+        case homeRefresh
+        case settingsScan
+        case shortcutScan
+    }
+
+    enum UserInitiatedAction: String, Equatable {
+        case refreshObserver
+        case startEngine
+        case tickEngine
+        case runSharedScan
+    }
+
+    func userInitiatedScanActions(entryPoint: UserInitiatedEntryPoint, isUserPaused: Bool) -> [UserInitiatedAction] {
+        var actions: [UserInitiatedAction] = []
+
+        if !isUserPaused, entryPoint != .shortcutScan {
+            actions.append(.refreshObserver)
+            actions.append(.startEngine)
+            actions.append(.tickEngine)
+        }
+
+        actions.append(.runSharedScan)
+        return actions
+    }
+
+    for entryPoint in UserInitiatedEntryPoint.allCases {
+        let actions = userInitiatedScanActions(entryPoint: entryPoint, isUserPaused: false)
+        let expected: [UserInitiatedAction] = entryPoint == .shortcutScan
+            ? [.runSharedScan]
+            : [.refreshObserver, .startEngine, .tickEngine, .runSharedScan]
+        expectEqual("user-triggered scan path is correct for \(entryPoint)", actions, expected)
+    }
+
+    for entryPoint in UserInitiatedEntryPoint.allCases {
+        let actions = userInitiatedScanActions(entryPoint: entryPoint, isUserPaused: true)
+        expectEqual(
+            "paused user-triggered scans skip live priming for \(entryPoint)",
+            actions,
+            [.runSharedScan]
+        )
+    }
+
+    section("Listening History scan · empty-result retry")
+
+    func simulateRetryablePlaybackHistoryScan(
+        firstPassImported: Int,
+        firstPassSkippedDuplicates: Int,
+        retryImported: Int,
+        retrySkippedDuplicates: Int = 0,
+        isUserPaused: Bool,
+        retryEnabled: Bool
+    ) -> (totalImported: Int, totalSkippedDuplicates: Int, retryRan: Bool, importPasses: Int) {
+        var totalImported = firstPassImported
+        var totalSkippedDuplicates = firstPassSkippedDuplicates
+        var retryRan = false
+        var importPasses = 1
+
+        let shouldRetry =
+            retryEnabled &&
+            !isUserPaused &&
+            firstPassImported == 0 &&
+            firstPassSkippedDuplicates == 0
+
+        if shouldRetry {
+            retryRan = true
+            importPasses += 1
+            totalImported += retryImported
+            totalSkippedDuplicates += retrySkippedDuplicates
+        }
+
+        return (totalImported, totalSkippedDuplicates, retryRan, importPasses)
+    }
+
+    let delayedMetadataRecovery = simulateRetryablePlaybackHistoryScan(
+        firstPassImported: 0,
+        firstPassSkippedDuplicates: 0,
+        retryImported: 3,
+        isUserPaused: false,
+        retryEnabled: true
+    )
+    expect("empty first pass triggers exactly one retry", delayedMetadataRecovery.retryRan)
+    expectEqual("retry imports late library plays", delayedMetadataRecovery.totalImported, 3)
+    expectEqual("retry performs exactly two playback-history import passes", delayedMetadataRecovery.importPasses, 2)
+
+    let noRetryAfterSuccess = simulateRetryablePlaybackHistoryScan(
+        firstPassImported: 2,
+        firstPassSkippedDuplicates: 0,
+        retryImported: 5,
+        isUserPaused: false,
+        retryEnabled: true
+    )
+    expect("successful first pass skips retry", !noRetryAfterSuccess.retryRan)
+    expectEqual("successful first pass keeps original import count", noRetryAfterSuccess.totalImported, 2)
+
+    let noRetryAfterDuplicates = simulateRetryablePlaybackHistoryScan(
+        firstPassImported: 0,
+        firstPassSkippedDuplicates: 2,
+        retryImported: 4,
+        isUserPaused: false,
+        retryEnabled: true
+    )
+    expect("duplicate-only first pass skips retry", !noRetryAfterDuplicates.retryRan)
+    expectEqual("duplicate-only first pass preserves skipped duplicate count", noRetryAfterDuplicates.totalSkippedDuplicates, 2)
+
+    let noRetryWhilePaused = simulateRetryablePlaybackHistoryScan(
+        firstPassImported: 0,
+        firstPassSkippedDuplicates: 0,
+        retryImported: 4,
+        isUserPaused: true,
+        retryEnabled: true
+    )
+    expect("paused scans do not retry empty playback-history results", !noRetryWhilePaused.retryRan)
 
     // ─── Listening History scan cutoff ───────────────────────────────────────────
 

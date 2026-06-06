@@ -30,7 +30,7 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
     @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
-    @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = false
+    @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = true
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
     @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
@@ -479,7 +479,7 @@ struct SettingsView: View {
         removeAllBracketsFromAlbumTitlesEnabled = false
         scrobbleListeningHistoryEnabled = true
         scrobbleAppleMusicAPIEnabled = false
-        scrobbleOnlyNonLibraryAppleMusicAPITracks = false
+        scrobbleOnlyNonLibraryAppleMusicAPITracks = true
         extendedListeningHistoryScanEnabled = false
         sendNowPlayingAutomaticallyEnabled = true
     }
@@ -491,7 +491,7 @@ struct SettingsView: View {
         isScanningListeningHistory = true
         defer { isScanningListeningHistory = false }
 
-        let result = await AppModel.shared.scanListeningHistory(
+        let result = await AppModel.shared.runUserInitiatedListeningHistoryScan(
             allowExtendedLookback: true,
             allowSubmissionWhilePaused: true,
             bypassRecentTrackCooldown: true

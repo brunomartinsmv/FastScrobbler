@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "アカウント";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "実験的機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。FastScrobblerがバックグラウンドにある場合でも曲は記録されます。\n\n注: 再生時刻はAPIから提供されないため、FastScrobblerはスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
+"Beta feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "ベータ機能: Apple Music API経由で最近再生した曲を最大30曲まで自動でスクロブルします。FastScrobblerがバックグラウンドにある場合でも曲は記録されます。\n\n注: 再生時刻はAPIから提供されないため、FastScrobblerはスクロブル送信時に推定の時刻を割り当てます。再生時間に関係なく、曲は記録されスクロブルされます。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
 "Connected" = "接続済み";
 "Done" = "完了";
@@ -64,8 +64,10 @@
 "Scrobble at %@ of duration" = "%@再生時点でスクロブル";
 "Scrobble Controls" = "スクロブル設定";
 "Scrobble from Apple Music API" = "Apple Music APIからスクロブル";
+"Need more plays?" = "もっと再生を取り込みたいですか？";
+"Turn on \"Scrobble from Apple Music API\" if you need to capture more plays, including non-library songs." = "ライブラリ外の曲を含め、より多くの再生を取り込みたい場合は「Apple Music APIからスクロブル」をオンにしてください。";
 "Only scrobble non-library songs" = "ライブラリ外の曲のみスクロブルする";
-"Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled." = "ベストエフォートのフィルター: FastScrobblerはApple Music APIの最近再生した曲をローカルライブラリと照合し、すでにライブラリ内にあるように見える曲をスキップします。一致を確認できない場合でも、その曲はスクロブルされます。";
+"Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled. Recommended when \"Scrobble from Listening History\" is enabled." = "ベストエフォートのフィルター: FastScrobblerは最近再生したAPI経由の曲がライブラリに存在するかを確認し、存在する場合はスキップします。FastScrobblerが一致を確認できない場合、その曲はスクロブルされます。「再生履歴からスクロブル」がオンのときにおすすめです。";
 "Scrobble Now" = "今すぐスクロブル";
 "Settings" = "設定";
 "Setup" = "セットアップ";

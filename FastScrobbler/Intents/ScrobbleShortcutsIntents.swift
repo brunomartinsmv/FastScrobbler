@@ -227,7 +227,8 @@ struct ScanListeningHistoryIntent: AppIntent {
             allowExtendedLookback: true,
             bypassRecentTrackCooldown: true,
             isUserPaused: UserDefaults.standard.bool(forKey: ShortcutsActivityKeys.userPaused),
-            pauseBehavior: .allowSubmissionWhilePaused
+            pauseBehavior: .allowSubmissionWhilePaused,
+            retryEmptyPlaybackHistoryImportOnce: true
         )
         ControlWidgetStatusStore.markSuccess(.scanListeningHistory, duration: 1)
 

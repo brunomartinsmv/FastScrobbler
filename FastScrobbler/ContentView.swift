@@ -638,7 +638,7 @@ struct ContentView: View {
 
     @MainActor
     private func refreshHome() async {
-        await AppModel.shared.scanListeningHistory(bypassRecentTrackCooldown: true)
+        await AppModel.shared.runUserInitiatedListeningHistoryScan(bypassRecentTrackCooldown: true)
         scrobbleLog.reload()
         lastScrobbleLogRefreshDate = .now
     }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AppleMusicAPISettingsPage: View {
     @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
-    @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = false
+    @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = true
 
     private func localized(_ key: String) -> String {
         NSLocalizedString(key, comment: "")
@@ -25,9 +25,9 @@ struct AppleMusicAPISettingsPage: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text("Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration.")
+                        Text(localized("Beta feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration."))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                     .padding(.top, 16)
                 }
@@ -46,9 +46,9 @@ struct AppleMusicAPISettingsPage: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(localized("Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled."))
+                        Text(localized("Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled. Recommended when \"Scrobble from Listening History\" is enabled."))
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary)
                     }
                     .padding(.top, 16)
                 }

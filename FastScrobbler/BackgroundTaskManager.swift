@@ -30,7 +30,7 @@ final class BackgroundTaskManager {
     private var isRegistered = false
 #if os(iOS)
     private static let liveScrobbleExpirationSafetyMarginSeconds: TimeInterval = 2
-    private static let maxLiveScrobbleGraceRenewals = 2
+    private static let maxLiveScrobbleGraceRenewals = 3
     private static let minLiveScrobbleGraceRenewalIntervalSeconds: TimeInterval = 6
     private var liveScrobbleGraceTaskID: UIBackgroundTaskIdentifier = .invalid
     private var liveScrobbleGraceWatchdogTask: Task<Void, Never>?
@@ -84,15 +84,14 @@ final class BackgroundTaskManager {
         scheduleAppRefresh()
 
         runBGTask(task, softTimeoutSeconds: 25) {
-            await AppModel.shared.backgroundTick()
+            await AppModel.shared.performScheduledBackgroundRecovery()
         }
     }
 
     func scheduleProcessingIfNeeded() {
         Task { @MainActor in
             let pending = await ScrobbleBacklog.shared.pendingCount()
-            let hasActiveTrack = AppModel.shared.observer.track != nil
-            if pending > 0 || hasActiveTrack {
+            if Self.shouldScheduleProcessing(pendingCount: pending) {
                 self.scheduleProcessing()
             } else {
                 BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: BackgroundTaskIdentifiers.processing)
@@ -121,8 +120,12 @@ final class BackgroundTaskManager {
         scheduleProcessingIfNeeded()
 
         runBGTask(task, softTimeoutSeconds: 120) {
-            await AppModel.shared.backgroundTick()
+            await AppModel.shared.performScheduledBackgroundRecovery()
         }
+    }
+
+    static func shouldScheduleProcessing(pendingCount: Int) -> Bool {
+        pendingCount > 0
     }
 
     private func runBGTask(_ task: BGTask, softTimeoutSeconds: TimeInterval, work: @escaping @MainActor () async -> Void) {
@@ -199,6 +202,11 @@ final class BackgroundTaskManager {
         UIApplication.shared.endBackgroundTask(liveScrobbleGraceTaskID)
         liveScrobbleGraceTaskID = .invalid
         logger.info("ended live scrobble grace period")
+    }
+
+    @MainActor
+    var isLiveScrobbleGracePeriodActive: Bool {
+        liveScrobbleGraceTaskID != .invalid && !liveScrobbleGraceDidExpire
     }
 
     @MainActor

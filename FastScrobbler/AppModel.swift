@@ -22,12 +22,8 @@ final class AppModel {
         static let backlogFlushIntervalSeconds: TimeInterval = 30
         static let backgroundTimeSafetyMarginSeconds: TimeInterval = 2
         static let backgroundLastChanceWindowSeconds: TimeInterval = 18
-        static let backgroundProjectionWindowSeconds: TimeInterval = 30
+        static let backgroundProjectionWindowSeconds: TimeInterval = 45
         static let inactivePlaybackToleranceSeconds: TimeInterval = 8
-    }
-
-    private enum ForegroundRecovery {
-        static let extendedScanThresholdSeconds: TimeInterval = 15 * 60
     }
 
     let auth: LastFMAuthManager
@@ -65,6 +61,9 @@ final class AppModel {
     }
 
     private func performStart() async {
+        AppSettings.migrateLegacyAppGroupSettingsIfNeeded()
+        AppSettings.seedScrobbleOnlyNonLibraryAppleMusicAPITracksIfNeeded()
+        ProSettings.migrateLegacyAppGroupSettingsIfNeeded()
         await runStorageMaintenanceIfNeeded()
         await ICloudSyncCoordinator.shared.startIfNeeded()
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
@@ -104,22 +103,14 @@ final class AppModel {
         if let sessionKey = auth.sessionKey {
             await auth.refreshUserInfoIfNeeded()
 
-            let shouldPrimeLiveSessionBeforeForegroundImports = !engine.isUserPaused
-            if shouldPrimeLiveSessionBeforeForegroundImports {
-                // Build the active playback session before any foreground recovery import runs so
-                // the recent-tracks importer can suppress the current live play.
-                engine.start()
-                await engine.tickAsync()
+            let shouldRunForegroundScan = !engine.isUserPaused
+            if shouldRunForegroundScan {
+                await primeForegroundListeningHistoryScanIfNeeded()
             }
-
-            let backgroundedAt = UserDefaults.standard.object(forKey: Keys.lastEnteredBackgroundAt) as? Date
-            let shouldRunForegroundRecoveryScan =
-                !engine.isUserPaused &&
-                backgroundedAt.map { Date().timeIntervalSince($0) >= ForegroundRecovery.extendedScanThresholdSeconds } == true
 
             let imported: Int
             let recentImported: Int
-            if shouldRunForegroundRecoveryScan {
+            if shouldRunForegroundScan {
                 let scanResult = await scanListeningHistory(
                     allowExtendedLookback: false,
                     allowSubmissionWhilePaused: false,
@@ -128,24 +119,13 @@ final class AppModel {
                 imported = scanResult.importedCount
                 recentImported = scanResult.importedRecentTrackCount
             } else {
-                imported = await PlaybackHistoryImporter.shared.importIntoBacklog(
-                    backlog: backlog,
-                    scrobbleLog: scrobbleLog,
-                    maxItems: 200
-                )
-                if engine.isUserPaused {
-                    recentImported = 0
-                } else {
-                    recentImported = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
-                        backlog: backlog,
-                        scrobbleLog: scrobbleLog,
-                        maxItems: 30,
-                        bypassCooldown: true
-                    ).importedCount
-                }
+                imported = 0
+                recentImported = 0
             }
             UserDefaults.standard.removeObject(forKey: Keys.lastEnteredBackgroundAt)
-            await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0 || recentImported > 0)
+            if !engine.isUserPaused {
+                await flushBacklogIfNeeded(sessionKey: sessionKey, force: imported > 0 || recentImported > 0)
+            }
             BackgroundTaskManager.shared.scheduleProcessingIfNeeded()
         }
 
@@ -323,10 +303,11 @@ final class AppModel {
             observer.playbackState == .playing
     }
 
-    func backgroundTick() async {
+    // Scheduled BG tasks are recovery-only: import missed plays and flush backlog
+    // without resuming the live scrobble engine's in-memory session.
+    func performScheduledBackgroundRecovery() async {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
-        observer.refreshOnceIfAuthorized()
         await purgePlaybackHistoryBacklogIfNeeded()
         _ = await PlaybackHistoryImporter.shared.importIntoBacklog(backlog: backlog, scrobbleLog: scrobbleLog)
         if !engine.isUserPaused {
@@ -337,19 +318,45 @@ final class AppModel {
             )
             if let sessionKey = auth.sessionKey {
                 let result = await backlog.flush(sessionKey: sessionKey)
+                let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
                 for item in result.sentItems {
                     scrobbleLog.record(
                         track: item.track,
                         startTimestamp: item.startTimestamp,
                         scrobbledAt: item.scrobbledAt,
                         source: scrobbleLogSource(for: item.origin),
-                        lovedOnLastFM: item.lovedOnLastFM
+                        lovedOnLastFM: item.lovedOnLastFM,
+                        allowExactDuplicates: !preventDuplicates
                     )
                     AppReviewManager.shared.recordSuccessfulScrobble()
                 }
             }
         }
-        await engine.tickAsync()
+    }
+
+    /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
+    @discardableResult
+    func runUserInitiatedListeningHistoryScan(
+        maxItems: Int = 200,
+        allowExtendedLookback: Bool = false,
+        allowSubmissionWhilePaused: Bool = false,
+        bypassRecentTrackCooldown: Bool = false
+    ) async -> ListeningHistoryScanResult {
+        let shouldPrimeForegroundScan = !engine.isUserPaused
+        if shouldPrimeForegroundScan {
+            await primeForegroundListeningHistoryScanIfNeeded()
+        }
+
+        return await performListeningHistoryScan(
+            maxItems: maxItems,
+            allowExtendedLookback: allowExtendedLookback,
+            allowSubmissionWhilePaused: allowSubmissionWhilePaused,
+            bypassRecentTrackCooldown: bypassRecentTrackCooldown,
+            retryEmptyPlaybackHistoryImportOnce: true,
+            beforePlaybackHistoryRetry: shouldPrimeForegroundScan ? { [weak self] in
+                await self?.primeForegroundListeningHistoryScanIfNeeded()
+            } : nil
+        )
     }
 
     /// Imports plays from Apple Music listening history (when supported) and flushes the backlog if signed in.
@@ -360,6 +367,24 @@ final class AppModel {
         allowSubmissionWhilePaused: Bool = false,
         bypassRecentTrackCooldown: Bool = false
     ) async -> ListeningHistoryScanResult {
+        await performListeningHistoryScan(
+            maxItems: maxItems,
+            allowExtendedLookback: allowExtendedLookback,
+            allowSubmissionWhilePaused: allowSubmissionWhilePaused,
+            bypassRecentTrackCooldown: bypassRecentTrackCooldown,
+            retryEmptyPlaybackHistoryImportOnce: false,
+            beforePlaybackHistoryRetry: nil
+        )
+    }
+
+    private func performListeningHistoryScan(
+        maxItems: Int,
+        allowExtendedLookback: Bool,
+        allowSubmissionWhilePaused: Bool,
+        bypassRecentTrackCooldown: Bool,
+        retryEmptyPlaybackHistoryImportOnce: Bool,
+        beforePlaybackHistoryRetry: (() async -> Void)?
+    ) async -> ListeningHistoryScanResult {
         await ListeningHistoryScanService.scan(
             backlog: backlog,
             scrobbleLog: scrobbleLog,
@@ -368,10 +393,22 @@ final class AppModel {
             allowExtendedLookback: allowExtendedLookback,
             bypassRecentTrackCooldown: bypassRecentTrackCooldown,
             isUserPaused: engine.isUserPaused,
-            pauseBehavior: allowSubmissionWhilePaused ? .allowSubmissionWhilePaused : .respectPause
+            pauseBehavior: allowSubmissionWhilePaused ? .allowSubmissionWhilePaused : .respectPause,
+            retryEmptyPlaybackHistoryImportOnce: retryEmptyPlaybackHistoryImportOnce,
+            beforePlaybackHistoryRetry: beforePlaybackHistoryRetry
         ) {
             AppReviewManager.shared.recordSuccessfulScrobble()
         }
+    }
+
+    private func primeForegroundListeningHistoryScanIfNeeded() async {
+        guard !engine.isUserPaused else { return }
+
+        // Build the active playback session before any foreground recovery import runs so
+        // the recent-tracks importer can suppress the current live play.
+        observer.refreshOnceIfAuthorized()
+        engine.start()
+        await engine.tickAsync()
     }
 
     func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
@@ -441,13 +478,15 @@ final class AppModel {
         UserDefaults.standard.set(now, forKey: Keys.lastBacklogFlushAt)
 
         let result = await backlog.flush(sessionKey: sessionKey)
+        let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
         for item in result.sentItems {
             scrobbleLog.record(
                 track: item.track,
                 startTimestamp: item.startTimestamp,
                 scrobbledAt: item.scrobbledAt,
                 source: scrobbleLogSource(for: item.origin),
-                lovedOnLastFM: item.lovedOnLastFM
+                lovedOnLastFM: item.lovedOnLastFM,
+                allowExactDuplicates: !preventDuplicates
             )
             AppReviewManager.shared.recordSuccessfulScrobble()
         }

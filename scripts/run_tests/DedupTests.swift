@@ -49,3 +49,134 @@ func runDedupNearestMatchTests() {
     expect("different dedupeKey is ignored", mostSimilar(items: similarItems, key: "track-b", around: 1005, tolerance: 10)?.startTimestamp == 1001,
            detail: "got \(mostSimilar(items: similarItems, key: "track-b", around: 1005, tolerance: 10)?.startTimestamp ?? -1)")
 }
+
+func runDedupRandomizedPreventionTests() {
+    section("Dedup · Seeded randomized duplicate prevention")
+
+    struct SeededRandomNumberGenerator {
+        private(set) var state: UInt64
+
+        mutating func next() -> UInt64 {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return state
+        }
+
+        mutating func int(in range: ClosedRange<Int>) -> Int {
+            let span = UInt64(range.upperBound - range.lowerBound + 1)
+            return range.lowerBound + Int(next() % span)
+        }
+
+        mutating func bool() -> Bool {
+            next().isMultiple(of: 2)
+        }
+    }
+
+    struct FakeQueueEntry {
+        let dedupeKey: String
+        let startTimestamp: Int
+        let origin: String?
+    }
+
+    func containsSimilar(items: [FakeScrobble], key: String, around ts: Int, tolerance: Int) -> Bool {
+        let tol = max(0, tolerance)
+        return items.contains(where: { $0.dedupeKey == key && abs($0.startTimestamp - ts) <= tol })
+    }
+
+    func simulateEnqueue(
+        queue: inout [FakeQueueEntry],
+        key: String,
+        ts: Int,
+        origin: String?,
+        allowExactDuplicates: Bool = false
+    ) -> Bool {
+        let allowsOriginExactDuplicates = origin == "playbackHistory"
+        if !allowExactDuplicates,
+           !allowsOriginExactDuplicates,
+           queue.contains(where: { $0.dedupeKey == key && $0.startTimestamp == ts })
+        {
+            return false
+        }
+
+        queue.append(FakeQueueEntry(dedupeKey: key, startTimestamp: ts, origin: origin))
+        return true
+    }
+
+    let seed: UInt64 = 0x5C0BB1E5
+    var rng = SeededRandomNumberGenerator(state: seed)
+    var timestampFailures: [String] = []
+    var enqueueFailures: [String] = []
+    let tolerance = 10
+
+    for index in 0..<250 {
+        let key = "track-\(rng.int(in: 0...24))"
+        let otherKey = "\(key)-other"
+        let baseTimestamp = 1_700_000_000 + rng.int(in: 0...80_000)
+        let existing = [FakeScrobble(dedupeKey: key, startTimestamp: baseTimestamp)]
+        let insideOffset = rng.bool() ? rng.int(in: 0...tolerance) : -rng.int(in: 0...tolerance)
+        let outsideMagnitude = rng.int(in: (tolerance + 1)...(tolerance + 90))
+        let outsideOffset = rng.bool() ? outsideMagnitude : -outsideMagnitude
+        let nearbyOffset = rng.int(in: -tolerance...tolerance)
+
+        if !containsSimilar(items: existing, key: key, around: baseTimestamp + insideOffset, tolerance: tolerance) {
+            timestampFailures.append("seed=\(seed) case=\(index) key=\(key) base=\(baseTimestamp) offset=\(insideOffset) expected duplicate")
+        }
+
+        if containsSimilar(items: existing, key: key, around: baseTimestamp + outsideOffset, tolerance: tolerance) {
+            timestampFailures.append("seed=\(seed) case=\(index) key=\(key) base=\(baseTimestamp) offset=\(outsideOffset) expected allowed")
+        }
+
+        if containsSimilar(items: existing, key: otherKey, around: baseTimestamp + nearbyOffset, tolerance: tolerance) {
+            timestampFailures.append("seed=\(seed) case=\(index) key=\(otherKey) base=\(baseTimestamp) offset=\(nearbyOffset) expected different track allowed")
+        }
+
+        if !containsSimilar(items: existing, key: key, around: baseTimestamp, tolerance: -rng.int(in: 1...40)) {
+            timestampFailures.append("seed=\(seed) case=\(index) key=\(key) base=\(baseTimestamp) negative tolerance should allow exact match")
+        }
+
+        if containsSimilar(items: existing, key: key, around: baseTimestamp + 1, tolerance: -rng.int(in: 1...40)) {
+            timestampFailures.append("seed=\(seed) case=\(index) key=\(key) base=\(baseTimestamp) negative tolerance should reject non-exact match")
+        }
+    }
+
+    var queue: [FakeQueueEntry] = []
+    var expectedExactDuplicates = 0
+    var expectedAccepted = 0
+
+    for index in 0..<180 {
+        let key = "queued-track-\(rng.int(in: 0...17))"
+        let timestamp = 2_000_000_000 + rng.int(in: 0...30)
+        let origin: String? = rng.int(in: 0...5) == 0 ? "playbackHistory" : nil
+        let allowExactDuplicates = rng.int(in: 0...11) == 0
+        let shouldReject = !allowExactDuplicates &&
+            origin != "playbackHistory" &&
+            queue.contains(where: { $0.dedupeKey == key && $0.startTimestamp == timestamp })
+        let accepted = simulateEnqueue(
+            queue: &queue,
+            key: key,
+            ts: timestamp,
+            origin: origin,
+            allowExactDuplicates: allowExactDuplicates
+        )
+
+        if accepted == shouldReject {
+            enqueueFailures.append("seed=\(seed) case=\(index) key=\(key) ts=\(timestamp) origin=\(origin ?? "nil") allowExactDuplicates=\(allowExactDuplicates) accepted=\(accepted)")
+        }
+
+        if shouldReject {
+            expectedExactDuplicates += 1
+        } else {
+            expectedAccepted += 1
+        }
+    }
+
+    expect("randomized timestamp duplicate checks match tolerance rules",
+           timestampFailures.isEmpty,
+           detail: timestampFailures.prefix(3).joined(separator: " | "))
+    expect("randomized enqueue policy rejects only exact non-playback-history duplicates",
+           enqueueFailures.isEmpty,
+           detail: enqueueFailures.prefix(3).joined(separator: " | "))
+    expectEqual("randomized enqueue accepted count matches expected policy", queue.count, expectedAccepted)
+    expect("randomized enqueue generated at least one rejected duplicate",
+           expectedExactDuplicates > 0,
+           detail: "seed=\(seed) rejected=\(expectedExactDuplicates)")
+}

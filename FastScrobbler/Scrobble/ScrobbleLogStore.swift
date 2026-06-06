@@ -1,11 +1,129 @@
 import Foundation
 import OSLog
 
+enum RecoveryDuplicateMatchLevel: Int, Comparable, Sendable {
+    case none = 0
+    case weakDuplicate = 1
+    case strongDuplicate = 2
+
+    static func < (lhs: RecoveryDuplicateMatchLevel, rhs: RecoveryDuplicateMatchLevel) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
+}
+
+struct RecoveryDuplicateMatch<Matched: Sendable>: Sendable {
+    let level: RecoveryDuplicateMatchLevel
+    let matched: Matched
+}
+
+enum RecoveryDuplicateStoredSource: Sendable {
+    case live
+    case backlog
+    case playbackHistory
+    case recentlyPlayed
+    case manual
+}
+
+enum RecoveryDuplicateMatcher {
+    static let balancedExactStartToleranceSeconds = 10
+    static let balancedPlayedAtToleranceSeconds = 90
+
+    struct Evaluation: Sendable {
+        let level: RecoveryDuplicateMatchLevel
+        let startDistance: Int
+        let playedAtDistance: Int?
+    }
+
+    static func playbackDurationSeconds(for storedTrack: Track, fallbackTrack: Track) -> Int? {
+        let candidates = [storedTrack.durationSeconds, fallbackTrack.durationSeconds]
+        for candidate in candidates {
+            guard let candidate, candidate > 0 else { continue }
+            return Int(candidate.rounded(.down))
+        }
+        return nil
+    }
+
+    static func playedAtTimestamp(
+        for source: RecoveryDuplicateStoredSource,
+        startTimestamp: Int,
+        storedTrack: Track,
+        fallbackTrack: Track
+    ) -> Int {
+        switch source {
+        case .manual:
+            return startTimestamp
+        case .playbackHistory:
+            return startTimestamp
+        case .live, .backlog, .recentlyPlayed:
+            guard let durationSeconds = playbackDurationSeconds(for: storedTrack, fallbackTrack: fallbackTrack) else {
+                return startTimestamp
+            }
+            return startTimestamp + durationSeconds
+        }
+    }
+
+    static func evaluate(
+        storedTrack: Track,
+        storedStartTimestamp: Int,
+        storedSource: RecoveryDuplicateStoredSource,
+        candidateTrack: Track,
+        candidateStartTimestamp: Int,
+        candidatePlayedAtTimestamp: Int,
+        exactStartToleranceSeconds: Int = balancedExactStartToleranceSeconds,
+        playedAtToleranceSeconds: Int = balancedPlayedAtToleranceSeconds,
+        weakStartToleranceSeconds: Int
+    ) -> Evaluation {
+        guard storedTrack.dedupeKey == candidateTrack.dedupeKey else {
+            return Evaluation(level: .none, startDistance: .max, playedAtDistance: nil)
+        }
+
+        let weakTol = max(0, weakStartToleranceSeconds)
+        let exactTol = max(0, exactStartToleranceSeconds)
+        let playedTol = max(0, playedAtToleranceSeconds)
+        let startDistance = abs(storedStartTimestamp - candidateStartTimestamp)
+
+        if startDistance <= exactTol {
+            return Evaluation(level: .strongDuplicate, startDistance: startDistance, playedAtDistance: nil)
+        }
+
+        let storedPlayedAtTimestamp = playedAtTimestamp(
+            for: storedSource,
+            startTimestamp: storedStartTimestamp,
+            storedTrack: storedTrack,
+            fallbackTrack: candidateTrack
+        )
+        let playedAtDistance = abs(storedPlayedAtTimestamp - candidatePlayedAtTimestamp)
+
+        if playedAtDistance <= playedTol {
+            return Evaluation(level: .strongDuplicate, startDistance: startDistance, playedAtDistance: playedAtDistance)
+        }
+
+        if weakTol > 0, startDistance <= weakTol {
+            return Evaluation(level: .weakDuplicate, startDistance: startDistance, playedAtDistance: nil)
+        }
+
+        return Evaluation(level: .none, startDistance: startDistance, playedAtDistance: playedAtDistance)
+    }
+
+    static func isPreferred(_ candidate: Evaluation, over current: Evaluation?) -> Bool {
+        guard let current else { return true }
+        guard candidate.level != current.level else {
+            let candidateScore = candidate.playedAtDistance ?? candidate.startDistance
+            let currentScore = current.playedAtDistance ?? current.startDistance
+            if candidateScore != currentScore {
+                return candidateScore < currentScore
+            }
+            return candidate.startDistance < current.startDistance
+        }
+        return candidate.level > current.level
+    }
+}
+
 @MainActor
 final class ScrobbleLogStore: ObservableObject {
     enum Limits {
         static let maxStoredEntries = 100
-        static let defaultDisplayLimit = 40
+        static let defaultDisplayLimit = 50
         static let manualDisplayLimit = 30
         static let maxEntryAge: TimeInterval = 21 * 24 * 60 * 60
     }
@@ -142,7 +260,8 @@ final class ScrobbleLogStore: ObservableObject {
         startTimestamp: Int,
         scrobbledAt: Date = Date(),
         source: Source,
-        lovedOnLastFM: Bool = false
+        lovedOnLastFM: Bool = false,
+        allowExactDuplicates: Bool = false
     ) {
         let entry = Entry(
             id: UUID(),
@@ -153,7 +272,8 @@ final class ScrobbleLogStore: ObservableObject {
             lovedOnLastFM: lovedOnLastFM
         )
 
-        if source != .playbackHistory,
+        if !allowExactDuplicates,
+           source != .playbackHistory,
            entries.contains(where: { $0.startTimestamp == startTimestamp && $0.track.dedupeKey == track.dedupeKey })
         {
             return
@@ -218,32 +338,58 @@ final class ScrobbleLogStore: ObservableObject {
             .min(by: { abs($0.startTimestamp - startTimestamp) < abs($1.startTimestamp - startTimestamp) })
     }
 
+    func recoveryDuplicateMatch(
+        track: Track,
+        startTimestamp: Int,
+        playedAt: Date,
+        exactStartToleranceSeconds: Int = RecoveryDuplicateMatcher.balancedExactStartToleranceSeconds,
+        playedAtToleranceSeconds: Int = RecoveryDuplicateMatcher.balancedPlayedAtToleranceSeconds,
+        weakStartToleranceSeconds: Int
+    ) -> RecoveryDuplicateMatch<Entry>? {
+        let candidatePlayedAtTimestamp = Int(playedAt.timeIntervalSince1970.rounded(.down))
+        var bestEntry: Entry?
+        var bestEvaluation: RecoveryDuplicateMatcher.Evaluation?
+
+        for entry in entries {
+            let evaluation = RecoveryDuplicateMatcher.evaluate(
+                storedTrack: entry.track,
+                storedStartTimestamp: entry.startTimestamp,
+                storedSource: recoveryDuplicateStoredSource(for: entry.source),
+                candidateTrack: track,
+                candidateStartTimestamp: startTimestamp,
+                candidatePlayedAtTimestamp: candidatePlayedAtTimestamp,
+                exactStartToleranceSeconds: exactStartToleranceSeconds,
+                playedAtToleranceSeconds: playedAtToleranceSeconds,
+                weakStartToleranceSeconds: weakStartToleranceSeconds
+            )
+            guard evaluation.level != .none else { continue }
+            if RecoveryDuplicateMatcher.isPreferred(evaluation, over: bestEvaluation) {
+                bestEntry = entry
+                bestEvaluation = evaluation
+            }
+        }
+
+        guard let bestEntry, let bestEvaluation else { return nil }
+        return RecoveryDuplicateMatch(level: bestEvaluation.level, matched: bestEntry)
+    }
+
     func containsPlaybackHistoryMatch(track: Track, playedAt: Date, endTimestampToleranceSeconds: Int) -> Bool {
         let playedAtTimestamp = Int(playedAt.timeIntervalSince1970.rounded(.down))
         let tol = max(0, endTimestampToleranceSeconds)
 
         return entries.contains(where: { entry in
-            guard entry.track.dedupeKey == track.dedupeKey else { return false }
-            let directMatch = abs(entry.startTimestamp - playedAtTimestamp) <= tol
-
-            switch entry.source {
-            case .playbackHistory, .recentlyPlayed, .manual:
-                return directMatch
-            case .live:
-                guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
-                    return directMatch
-                }
-
-                let expectedEndTimestamp = entry.startTimestamp + durationSeconds
-                return abs(expectedEndTimestamp - playedAtTimestamp) <= tol
-            case .backlog:
-                guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
-                    return directMatch
-                }
-
-                let expectedEndTimestamp = entry.startTimestamp + durationSeconds
-                return directMatch || abs(expectedEndTimestamp - playedAtTimestamp) <= tol
-            }
+            let evaluation = RecoveryDuplicateMatcher.evaluate(
+                storedTrack: entry.track,
+                storedStartTimestamp: entry.startTimestamp,
+                storedSource: recoveryDuplicateStoredSource(for: entry.source),
+                candidateTrack: track,
+                candidateStartTimestamp: playedAtTimestamp,
+                candidatePlayedAtTimestamp: playedAtTimestamp,
+                exactStartToleranceSeconds: 0,
+                playedAtToleranceSeconds: tol,
+                weakStartToleranceSeconds: 0
+            )
+            return evaluation.level == .strongDuplicate
         })
     }
 
@@ -347,12 +493,7 @@ final class ScrobbleLogStore: ObservableObject {
     }
 
     private func playbackDurationSeconds(for storedTrack: Track, fallbackTrack: Track) -> Int? {
-        let candidates = [storedTrack.durationSeconds, fallbackTrack.durationSeconds]
-        for candidate in candidates {
-            guard let candidate, candidate > 0 else { continue }
-            return Int(candidate.rounded(.down))
-        }
-        return nil
+        RecoveryDuplicateMatcher.playbackDurationSeconds(for: storedTrack, fallbackTrack: fallbackTrack)
     }
 
     private func normalizeEntries(now: Date) {
@@ -386,30 +527,32 @@ final class ScrobbleLogStore: ObservableObject {
         exactTimestampToleranceSeconds: Int,
         endTimestampToleranceSeconds: Int
     ) -> Bool {
-        guard entry.track.dedupeKey == track.dedupeKey else { return false }
+        let evaluation = RecoveryDuplicateMatcher.evaluate(
+            storedTrack: entry.track,
+            storedStartTimestamp: entry.startTimestamp,
+            storedSource: recoveryDuplicateStoredSource(for: entry.source),
+            candidateTrack: track,
+            candidateStartTimestamp: startTimestamp,
+            candidatePlayedAtTimestamp: playedAtTimestamp,
+            exactStartToleranceSeconds: exactTimestampToleranceSeconds,
+            playedAtToleranceSeconds: endTimestampToleranceSeconds,
+            weakStartToleranceSeconds: 0
+        )
+        return evaluation.level == .strongDuplicate
+    }
 
-        let exactMatch = abs(entry.startTimestamp - startTimestamp) <= exactTimestampToleranceSeconds
-        let directPlayedAtMatch = abs(entry.startTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
-
-        switch entry.source {
-        case .playbackHistory, .recentlyPlayed, .manual:
-            return exactMatch || directPlayedAtMatch
+    private func recoveryDuplicateStoredSource(for source: Source) -> RecoveryDuplicateStoredSource {
+        switch source {
         case .live:
-            guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
-                return exactMatch || directPlayedAtMatch
-            }
-
-            let expectedEndTimestamp = entry.startTimestamp + durationSeconds
-            return exactMatch || abs(expectedEndTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
+            return .live
         case .backlog:
-            guard let durationSeconds = playbackDurationSeconds(for: entry.track, fallbackTrack: track) else {
-                return exactMatch || directPlayedAtMatch
-            }
-
-            let expectedEndTimestamp = entry.startTimestamp + durationSeconds
-            return exactMatch ||
-                directPlayedAtMatch ||
-                abs(expectedEndTimestamp - playedAtTimestamp) <= endTimestampToleranceSeconds
+            return .backlog
+        case .playbackHistory:
+            return .playbackHistory
+        case .recentlyPlayed:
+            return .recentlyPlayed
+        case .manual:
+            return .manual
         }
     }
 

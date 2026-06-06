@@ -45,28 +45,47 @@ enum AppSettings {
         static let iCloudSyncEnabled = "FastScrobbler.App.iCloudSyncEnabled"
     }
 
+    static func migrateLegacyAppGroupSettingsIfNeeded() {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleListeningHistoryEnabled)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleAppleMusicAPIEnabled)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.extendedListeningHistoryScanEnabled)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.sendNowPlayingAutomaticallyEnabled)
+    }
+
     static func scrobbleListeningHistoryEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleListeningHistoryEnabled)
         // nil means the key was never written; default to enabled.
         if AppGroup.userDefaults.object(forKey: Keys.scrobbleListeningHistoryEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleListeningHistoryEnabled)
     }
 
     static func extendedListeningHistoryScanEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.extendedListeningHistoryScanEnabled)
         if AppGroup.userDefaults.object(forKey: Keys.extendedListeningHistoryScanEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.extendedListeningHistoryScanEnabled)
     }
 
     static func scrobbleAppleMusicAPIEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleAppleMusicAPIEnabled)
         if AppGroup.userDefaults.object(forKey: Keys.scrobbleAppleMusicAPIEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleAppleMusicAPIEnabled)
     }
 
     static func scrobbleOnlyNonLibraryAppleMusicAPITracks() -> Bool {
-        if AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil { return false }
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+        if AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
     }
 
+    static func seedScrobbleOnlyNonLibraryAppleMusicAPITracksIfNeeded() {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+        guard AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil else { return }
+        AppGroup.userDefaults.set(true, forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+    }
+
     static func sendNowPlayingAutomaticallyEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.sendNowPlayingAutomaticallyEnabled)
         if AppGroup.userDefaults.object(forKey: Keys.sendNowPlayingAutomaticallyEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.sendNowPlayingAutomaticallyEnabled)
     }
@@ -91,6 +110,12 @@ enum AppSettings {
 
     static func setICloudSyncEnabled(_ isEnabled: Bool) {
         UserDefaults.standard.set(isEnabled, forKey: Keys.iCloudSyncEnabled)
+    }
+
+    private static func migrateLegacyAppGroupValueIfNeeded(forKey key: String) {
+        guard AppGroup.userDefaults.object(forKey: key) == nil else { return }
+        guard let legacyValue = UserDefaults.standard.object(forKey: key) else { return }
+        AppGroup.userDefaults.set(legacyValue, forKey: key)
     }
 }
 
@@ -180,61 +205,77 @@ enum ProSettings {
         "Special"
     ]
 
+    static func migrateLegacyAppGroupSettingsIfNeeded() {
+        for key in appGroupBackedKeys {
+            migrateLegacyAppGroupValueIfNeeded(forKey: key)
+        }
+    }
+
     static func loveOnFavoriteEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.loveOnFavoriteEnabled)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.loveOnFavoriteEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.loveOnFavoriteEnabled)
     }
 
     static func useAlbumArtistForScrobbling() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.useAlbumArtistForScrobbling)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.useAlbumArtistForScrobbling) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.useAlbumArtistForScrobbling)
     }
 
     static func useFirstArtistOnlyForScrobbling() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.useFirstArtistOnlyForScrobbling)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.useFirstArtistOnlyForScrobbling) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.useFirstArtistOnlyForScrobbling)
     }
 
     static func stripEpAndSingleSuffixFromAlbum() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.stripEpAndSingleSuffixFromAlbum)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.stripEpAndSingleSuffixFromAlbum) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.stripEpAndSingleSuffixFromAlbum)
     }
 
     static func removeBracketsFromSongTitlesEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeBracketsFromSongTitlesEnabled)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.removeBracketsFromSongTitlesEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.removeBracketsFromSongTitlesEnabled)
     }
 
     static func removeAllBracketsFromSongTitlesEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeAllBracketsFromSongTitlesEnabled)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.removeAllBracketsFromSongTitlesEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.removeAllBracketsFromSongTitlesEnabled)
     }
 
     static func removeBracketsFromAlbumTitlesEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeBracketsFromAlbumTitlesEnabled)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.removeBracketsFromAlbumTitlesEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.removeBracketsFromAlbumTitlesEnabled)
     }
 
     static func removeAllBracketsFromAlbumTitlesEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeAllBracketsFromAlbumTitlesEnabled)
         guard ProEntitlement.isPro else { return false }
         if AppGroup.userDefaults.object(forKey: Keys.removeAllBracketsFromAlbumTitlesEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.removeAllBracketsFromAlbumTitlesEnabled)
     }
 
     static func preventDuplicateScrobblesEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.preventDuplicateScrobblesEnabled)
         // Default to true — safer to skip a duplicate scrobble than to send one.
         if AppGroup.userDefaults.object(forKey: Keys.preventDuplicateScrobblesEnabled) == nil { return true }
         return AppGroup.userDefaults.bool(forKey: Keys.preventDuplicateScrobblesEnabled)
     }
 
     static func scrobbleThresholdFraction() -> Double {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleThresholdIndex)
         guard ProEntitlement.isPro else { return scrobbleThresholdOptions[defaultScrobbleThresholdIndex] }
         let idx = AppGroup.userDefaults.object(forKey: Keys.scrobbleThresholdIndex) as? Int ?? defaultScrobbleThresholdIndex
         let clamped = min(max(idx, 0), scrobbleThresholdOptions.count - 1)
@@ -247,6 +288,7 @@ enum ProSettings {
     }
 
     static func removeBracketsFromSongTitleKeywords() -> [String] {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeBracketsFromSongTitleKeywords)
         guard let data = AppGroup.userDefaults.data(forKey: Keys.removeBracketsFromSongTitleKeywords) else {
             return defaultRemoveBracketsKeywords
         }
@@ -265,6 +307,7 @@ enum ProSettings {
     }
 
     static func removeBracketsFromAlbumTitleKeywords() -> [String] {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.removeBracketsFromAlbumTitleKeywords)
         guard let data = AppGroup.userDefaults.data(forKey: Keys.removeBracketsFromAlbumTitleKeywords) else {
             return defaultRemoveBracketsFromAlbumTitleKeywords
         }
@@ -294,6 +337,7 @@ enum ProSettings {
     ]
 
     static func textReplacementRules() -> [TextReplacementRule] {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.textReplacementRules)
         let saved = AppGroup.userDefaults.data(forKey: Keys.textReplacementRules)
             .flatMap { try? JSONDecoder().decode([TextReplacementRule].self, from: $0) } ?? []
         // Merge persisted enabled-state into built-in rules so they always appear first (pinned).
@@ -310,6 +354,28 @@ enum ProSettings {
     static func setTextReplacementRules(_ rules: [TextReplacementRule]) {
         guard let data = try? JSONEncoder().encode(rules) else { return }
         AppGroup.userDefaults.set(data, forKey: Keys.textReplacementRules)
+    }
+
+    private static let appGroupBackedKeys = [
+        Keys.loveOnFavoriteEnabled,
+        Keys.scrobbleThresholdIndex,
+        Keys.useAlbumArtistForScrobbling,
+        Keys.useFirstArtistOnlyForScrobbling,
+        Keys.stripEpAndSingleSuffixFromAlbum,
+        Keys.removeBracketsFromSongTitlesEnabled,
+        Keys.removeAllBracketsFromSongTitlesEnabled,
+        Keys.removeBracketsFromSongTitleKeywords,
+        Keys.removeBracketsFromAlbumTitlesEnabled,
+        Keys.removeAllBracketsFromAlbumTitlesEnabled,
+        Keys.removeBracketsFromAlbumTitleKeywords,
+        Keys.preventDuplicateScrobblesEnabled,
+        Keys.textReplacementRules,
+    ]
+
+    private static func migrateLegacyAppGroupValueIfNeeded(forKey key: String) {
+        guard AppGroup.userDefaults.object(forKey: key) == nil else { return }
+        guard let legacyValue = UserDefaults.standard.object(forKey: key) else { return }
+        AppGroup.userDefaults.set(legacyValue, forKey: key)
     }
 
     static func sanitizedRemoveBracketsKeywords(_ keywords: [String]) -> [String] {

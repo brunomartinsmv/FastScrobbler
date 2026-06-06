@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 
 @MainActor
 enum ListeningHistoryScanService {
@@ -28,11 +29,20 @@ enum ListeningHistoryScanService {
     private enum Limits {
         static let maxImports = 1000
         static let maxFlushBatches = 80
+        static let emptyPlaybackHistoryRetryDelayNanoseconds: UInt64 = 1_500_000_000
     }
 
     private enum Keys {
         static let lastBacklogFlushAt = "FastScrobbler.AppModel.lastBacklogFlushAt"
     }
+
+    private struct PlaybackHistoryImportSummary {
+        let importedCount: Int
+        let skippedDuplicateCount: Int
+        let newestObservedPlayedAt: Date?
+    }
+
+    private static let logger = Logger(subsystem: "FastScrobbler", category: "ListeningHistoryScanService")
 
     @discardableResult
     static func scan(
@@ -44,6 +54,8 @@ enum ListeningHistoryScanService {
         bypassRecentTrackCooldown: Bool = false,
         isUserPaused: Bool = false,
         pauseBehavior: PauseBehavior = .respectPause,
+        retryEmptyPlaybackHistoryImportOnce: Bool = false,
+        beforePlaybackHistoryRetry: (() async -> Void)? = nil,
         recordSuccessfulScrobble: (() -> Void)? = nil
     ) async -> Result {
         if !AppSettings.scrobbleListeningHistoryEnabled() {
@@ -51,24 +63,47 @@ enum ListeningHistoryScanService {
         }
 
         let extendedLookback = allowExtendedLookback && AppSettings.extendedListeningHistoryScanEnabled()
-        var totalImported = 0
-        var totalSkippedDuplicates = 0
-        if maxItems > 0, AppSettings.scrobbleListeningHistoryEnabled() {
-            while totalImported < Limits.maxImports {
-                if Task.isCancelled { break }
+        let playbackHistorySummary = await importPlaybackHistory(
+            backlog: backlog,
+            scrobbleLog: scrobbleLog,
+            maxItems: maxItems,
+            extendedLookback: extendedLookback
+        )
+        var totalImported = playbackHistorySummary.importedCount
+        var totalSkippedDuplicates = playbackHistorySummary.skippedDuplicateCount
+        var playbackHistoryRetryRan = false
+        var newestObservedPlayedAt = playbackHistorySummary.newestObservedPlayedAt
 
-                let batchLimit = min(maxItems, Limits.maxImports - totalImported)
-                let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
+        logger.info(
+            "listening-history playback scan first pass: imported=\(playbackHistorySummary.importedCount, privacy: .public) skippedDuplicates=\(playbackHistorySummary.skippedDuplicateCount, privacy: .public) newestObservedPlayedAt=\(String(describing: playbackHistorySummary.newestObservedPlayedAt), privacy: .public)"
+        )
+
+        if shouldRetryEmptyPlaybackHistoryImport(
+            retryEmptyPlaybackHistoryImportOnce: retryEmptyPlaybackHistoryImportOnce,
+            isUserPaused: isUserPaused,
+            firstPass: playbackHistorySummary
+        ) {
+            playbackHistoryRetryRan = true
+            try? await Task.sleep(nanoseconds: Limits.emptyPlaybackHistoryRetryDelayNanoseconds)
+            if Task.isCancelled {
+                logger.info("listening-history playback scan retry canceled before re-run")
+                playbackHistoryRetryRan = false
+            } else {
+                await beforePlaybackHistoryRetry?()
+
+                let retrySummary = await importPlaybackHistory(
                     backlog: backlog,
                     scrobbleLog: scrobbleLog,
-                    maxItems: batchLimit,
-                    mode: .recentBackfill(extendedLookback: extendedLookback)
+                    maxItems: maxItems,
+                    extendedLookback: extendedLookback
                 )
-                let imported = importResult.importedCount
-                totalSkippedDuplicates += importResult.skippedDuplicateCount
+                totalImported += retrySummary.importedCount
+                totalSkippedDuplicates += retrySummary.skippedDuplicateCount
+                newestObservedPlayedAt = maxOptionalDate(newestObservedPlayedAt, retrySummary.newestObservedPlayedAt)
 
-                guard imported > 0 else { break }
-                totalImported += imported
+                logger.info(
+                    "listening-history playback scan retry: imported=\(retrySummary.importedCount, privacy: .public) skippedDuplicates=\(retrySummary.skippedDuplicateCount, privacy: .public) newestObservedPlayedAt=\(String(describing: retrySummary.newestObservedPlayedAt), privacy: .public)"
+                )
             }
         }
 
@@ -79,6 +114,10 @@ enum ListeningHistoryScanService {
             bypassCooldown: bypassRecentTrackCooldown
         )
         totalSkippedDuplicates += recentImportResult.skippedDuplicateCount
+
+        logger.info(
+            "listening-history scan complete: playbackImported=\(totalImported, privacy: .public) recentImported=\(recentImportResult.importedCount, privacy: .public) skippedDuplicates=\(totalSkippedDuplicates, privacy: .public) retryRan=\(playbackHistoryRetryRan, privacy: .public) newestObservedPlayedAt=\(String(describing: newestObservedPlayedAt), privacy: .public)"
+        )
 
         let shouldSuppressFlushWhilePaused = isUserPaused && pauseBehavior == .respectPause
         guard let sessionKey, !shouldSuppressFlushWhilePaused else {
@@ -145,13 +184,15 @@ enum ListeningHistoryScanService {
         AppGroup.userDefaults.set(Date(), forKey: Keys.lastBacklogFlushAt)
 
         let result = await backlog.flush(sessionKey: sessionKey)
+        let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
         for item in result.sentItems {
             scrobbleLog.record(
                 track: item.track,
                 startTimestamp: item.startTimestamp,
                 scrobbledAt: item.scrobbledAt,
                 source: scrobbleLogSource(for: item.origin),
-                lovedOnLastFM: item.lovedOnLastFM
+                lovedOnLastFM: item.lovedOnLastFM,
+                allowExactDuplicates: !preventDuplicates
             )
             recordSuccessfulScrobble?()
         }
@@ -168,6 +209,69 @@ enum ListeningHistoryScanService {
             return .manual
         case .live, .none:
             return .backlog
+        }
+    }
+
+    private static func importPlaybackHistory(
+        backlog: ScrobbleBacklog,
+        scrobbleLog: ScrobbleLogStore,
+        maxItems: Int,
+        extendedLookback: Bool
+    ) async -> PlaybackHistoryImportSummary {
+        guard maxItems > 0, AppSettings.scrobbleListeningHistoryEnabled() else {
+            return PlaybackHistoryImportSummary(importedCount: 0, skippedDuplicateCount: 0, newestObservedPlayedAt: nil)
+        }
+
+        var totalImported = 0
+        var totalSkippedDuplicates = 0
+        var newestObservedPlayedAt: Date?
+
+        while totalImported < Limits.maxImports {
+            if Task.isCancelled { break }
+
+            let batchLimit = min(maxItems, Limits.maxImports - totalImported)
+            let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
+                backlog: backlog,
+                scrobbleLog: scrobbleLog,
+                maxItems: batchLimit,
+                mode: .recentBackfill(extendedLookback: extendedLookback)
+            )
+            let imported = importResult.importedCount
+            totalSkippedDuplicates += importResult.skippedDuplicateCount
+            newestObservedPlayedAt = maxOptionalDate(newestObservedPlayedAt, importResult.newestObservedPlayedAt)
+
+            guard imported > 0 else { break }
+            totalImported += imported
+        }
+
+        return PlaybackHistoryImportSummary(
+            importedCount: totalImported,
+            skippedDuplicateCount: totalSkippedDuplicates,
+            newestObservedPlayedAt: newestObservedPlayedAt
+        )
+    }
+
+    private static func shouldRetryEmptyPlaybackHistoryImport(
+        retryEmptyPlaybackHistoryImportOnce: Bool,
+        isUserPaused: Bool,
+        firstPass: PlaybackHistoryImportSummary
+    ) -> Bool {
+        retryEmptyPlaybackHistoryImportOnce &&
+            !isUserPaused &&
+            firstPass.importedCount == 0 &&
+            firstPass.skippedDuplicateCount == 0
+    }
+
+    private static func maxOptionalDate(_ lhs: Date?, _ rhs: Date?) -> Date? {
+        switch (lhs, rhs) {
+        case let (l?, r?):
+            return max(l, r)
+        case let (l?, nil):
+            return l
+        case let (nil, r?):
+            return r
+        case (nil, nil):
+            return nil
         }
     }
 }

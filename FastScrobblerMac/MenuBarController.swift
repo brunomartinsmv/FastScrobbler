@@ -165,13 +165,11 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         NSApp.activate(ignoringOtherApps: true)
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         installDismissMonitors()
-        // Defer window activation and refresh work until AppKit finishes the popover's
-        // first layout pass. Making the hosting window key synchronously while `show`
-        // is still laying out can trigger AppKit's layout-recursion diagnostic.
-        DispatchQueue.main.async {
-            self.popover.contentViewController?.view.window?.makeKey()
-            NotificationCenter.default.post(name: .fastScrobblerPopoverWillShow, object: nil)
-        }
+    }
+
+    func popoverDidShow(_ notification: Notification) {
+        popover.contentViewController?.view.window?.makeKey()
+        NotificationCenter.default.post(name: .fastScrobblerPopoverWillShow, object: nil)
     }
 
     func popoverDidClose(_ notification: Notification) {

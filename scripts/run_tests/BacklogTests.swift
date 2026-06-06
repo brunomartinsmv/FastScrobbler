@@ -90,13 +90,100 @@ func runBacklogTests() {
     let added4 = simulateEnqueue(queue: &bq, key: "track-b", ts: 1000, origin: nil)                  // diff track, same ts
     let added5 = simulateEnqueue(queue: &bq, key: "track-a", ts: 3000, origin: "playbackHistory")    // history base
     let added6 = simulateEnqueue(queue: &bq, key: "track-a", ts: 3000, origin: "playbackHistory")    // same-minute history dup
+    let added7 = simulateEnqueue(queue: &bq, key: "track-a", ts: 1000, origin: nil, allowDuplicates: true)
 
     expect("first enqueue accepted",                    added1)
     expect("exact duplicate rejected",                  !added2)
     expect("same track different timestamp accepted",   added3)
     expect("different track same timestamp accepted",   added4)
     expect("playback-history exact duplicate accepted", added5 && added6)
-    expect("queue has 5 items (not 6)",                 bq.count == 5, detail: "got \(bq.count)")
+    expect("exact duplicate accepted when explicitly allowed", added7)
+    expect("queue has 6 items after allowed duplicate", bq.count == 6, detail: "got \(bq.count)")
+
+    section("Backlog · Recovery duplicate strength")
+
+    enum RecoveryMatchLevel: Equatable {
+        case none
+        case weak
+        case strong
+    }
+
+    func recoveryPlayedAtTimestamp(startTimestamp: Int, durationSeconds: Int?, origin: String?) -> Int {
+        if origin == "manual" {
+            return startTimestamp
+        }
+        guard let durationSeconds else { return startTimestamp }
+        return startTimestamp + durationSeconds
+    }
+
+    func recoveryDuplicateLevel(
+        existingStart: Int,
+        existingDurationSeconds: Int?,
+        existingOrigin: String?,
+        candidateStart: Int,
+        candidatePlayedAt: Int,
+        exactTolerance: Int = 10,
+        playedTolerance: Int = 90,
+        weakTolerance: Int
+    ) -> RecoveryMatchLevel {
+        let weakTol = max(0, weakTolerance)
+        let exactTol = max(0, exactTolerance)
+        let playedTol = max(0, playedTolerance)
+        let startDistance = abs(existingStart - candidateStart)
+
+        if startDistance <= exactTol {
+            return .strong
+        }
+
+        let playedAtDistance = abs(recoveryPlayedAtTimestamp(startTimestamp: existingStart, durationSeconds: existingDurationSeconds, origin: existingOrigin) - candidatePlayedAt)
+
+        if playedAtDistance <= playedTol {
+            return .strong
+        }
+
+        if weakTol > 0, startDistance <= weakTol {
+            return .weak
+        }
+
+        return .none
+    }
+
+    expectEqual(
+        "recently-played backlog rows create strong duplicates when playedAt matches",
+        recoveryDuplicateLevel(
+            existingStart: 1_000,
+            existingDurationSeconds: 200,
+            existingOrigin: "recentlyPlayed",
+            candidateStart: 1_020,
+            candidatePlayedAt: 1_200,
+            weakTolerance: 360
+        ),
+        .strong
+    )
+    expectEqual(
+        "exact same-track recovery start remains a strong duplicate",
+        recoveryDuplicateLevel(
+            existingStart: 1_000,
+            existingDurationSeconds: 200,
+            existingOrigin: "recentlyPlayed",
+            candidateStart: 1_000,
+            candidatePlayedAt: 1_200,
+            weakTolerance: 360
+        ),
+        .strong
+    )
+    expectEqual(
+        "manual backlog rows keep exact-start duplicate behavior instead of using inferred end times",
+        recoveryDuplicateLevel(
+            existingStart: 1_000,
+            existingDurationSeconds: 200,
+            existingOrigin: "manual",
+            candidateStart: 1_120,
+            candidatePlayedAt: 1_200,
+            weakTolerance: 360
+        ),
+        .weak
+    )
 
 }
 

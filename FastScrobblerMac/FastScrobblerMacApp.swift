@@ -8,7 +8,6 @@ struct FastScrobblerMacApp: App {
     @StateObject private var appLanguage = AppLanguageStore.shared
 
     init() {
-        UserDefaults.standard.register(defaults: ["NSApplicationCrashOnExceptions": true])
         Self.configureFirebaseIfPossible()
         _ = AppLanguageStore.shared
     }

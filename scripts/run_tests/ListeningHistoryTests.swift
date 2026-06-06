@@ -32,7 +32,7 @@ func runListeningHistoryRecoveryTests() {
 
         if let durationSeconds, durationSeconds > 0 {
             return (0..<synthesizedPlayCount).map { index in
-                playedAt - durationSeconds * (synthesizedPlayCount - index)
+                playedAt - durationSeconds * (synthesizedPlayCount - index - 1)
             }
         }
 
@@ -53,7 +53,7 @@ func runListeningHistoryRecoveryTests() {
         scrobbleLoopedTracks: false
     )
     expectEqual("first sighting imports only the current lastPlayedDate play", recoveredStarts.count, 1)
-    expect("first sighting uses playback start when duration is known", recoveredStarts == [1_222], detail: "got \(recoveredStarts)")
+    expect("first sighting uses Apple's lastPlayedDate when duration is known", recoveredStarts == [1_234], detail: "got \(recoveredStarts)")
 
     let conservativeStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 15,
@@ -65,7 +65,7 @@ func runListeningHistoryRecoveryTests() {
         scrobbleLoopedTracks: false
     )
     expectEqual("known play-count increases can recover all new plays", conservativeStarts.count, 15)
-    expect("known play-count increases stagger timestamps", conservativeStarts == [3_505, 3_565, 3_625, 3_685, 3_745, 3_805, 3_865, 3_925, 3_985, 4_045, 4_105, 4_165, 4_225, 4_285, 4_345], detail: "got \(conservativeStarts)")
+    expect("known play-count increases stagger timestamps", conservativeStarts == [3_565, 3_625, 3_685, 3_745, 3_805, 3_865, 3_925, 3_985, 4_045, 4_105, 4_165, 4_225, 4_285, 4_345, 4_405], detail: "got \(conservativeStarts)")
 
     let loopToggleStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 20,
@@ -87,7 +87,7 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: false,
         scrobbleLoopedTracks: false
     )
-    expect("same playedAt growth imports only the new delta play", samePlayedAtGrowthStarts == [1_000], detail: "got \(samePlayedAtGrowthStarts)")
+    expect("same playedAt growth imports only the new delta play", samePlayedAtGrowthStarts == [1_200], detail: "got \(samePlayedAtGrowthStarts)")
 
     let samePlayedAtMultiGrowthStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 5,
@@ -98,7 +98,7 @@ func runListeningHistoryRecoveryTests() {
         preventDuplicates: false,
         scrobbleLoopedTracks: false
     )
-    expect("same playedAt multi-growth imports only the delta timeline", samePlayedAtMultiGrowthStarts == [800, 1_000], detail: "got \(samePlayedAtMultiGrowthStarts)")
+    expect("same playedAt multi-growth imports only the delta timeline", samePlayedAtMultiGrowthStarts == [1_000, 1_200], detail: "got \(samePlayedAtMultiGrowthStarts)")
 
     let unknownDurationStarts = recoveredPlaybackHistoryStartTimestamps(
         playCount: 1,
@@ -123,7 +123,7 @@ func runListeningHistoryRecoveryTests() {
         if let durationSeconds, durationSeconds > 0 {
             let spacingSeconds = max(Int(durationSeconds.rounded(.down)), 1)
             return (0..<count).map { index in
-                max(1, playedAt - spacingSeconds * (count - index))
+                max(1, playedAt - spacingSeconds * (count - index - 1))
             }
         }
 
@@ -137,27 +137,27 @@ func runListeningHistoryRecoveryTests() {
     expectEqual(
         "zero playCount is clamped to one import candidate",
         productionPlaybackHistoryStartTimestamps(playedAt: 500, playCount: 0, durationSeconds: 30),
-        [470]
+        [500]
     )
     expectEqual(
         "negative playCount is clamped to one import candidate",
         productionPlaybackHistoryStartTimestamps(playedAt: 500, playCount: -4, durationSeconds: 30),
-        [470]
+        [500]
     )
     expectEqual(
         "fractional durations are rounded down before spacing recovered plays",
         productionPlaybackHistoryStartTimestamps(playedAt: 1_000, playCount: 3, durationSeconds: 30.9),
-        [910, 940, 970]
+        [940, 970, 1_000]
     )
     expectEqual(
         "sub-second positive durations still space candidates at least one second apart",
         productionPlaybackHistoryStartTimestamps(playedAt: 10, playCount: 3, durationSeconds: 0.4),
-        [7, 8, 9]
+        [8, 9, 10]
     )
     expectEqual(
         "known-duration candidates are clamped to valid Last.fm timestamps",
         productionPlaybackHistoryStartTimestamps(playedAt: 2, playCount: 3, durationSeconds: 5),
-        [1, 1, 1]
+        [1, 1, 2]
     )
     expectEqual(
         "unknown-duration recovered candidates are clamped near the Unix epoch",
@@ -170,15 +170,11 @@ func runListeningHistoryRecoveryTests() {
         originalPlayedAt: Int,
         durationSeconds: Double?
     ) -> Int {
-        guard let durationSeconds, durationSeconds > 0 else {
-            return originalPlayedAt
-        }
-
-        return startTimestamp + max(Int(durationSeconds.rounded(.down)), 1)
+        originalPlayedAt
     }
 
     expectEqual(
-        "candidate playedAt uses synthesized end time when duration is known",
+        "candidate playedAt preserves Apple's timestamp when duration is known",
         playbackHistoryPlayedAt(startTimestamp: 970, originalPlayedAt: 1_000, durationSeconds: 30.9),
         1_000
     )
@@ -188,9 +184,132 @@ func runListeningHistoryRecoveryTests() {
         1_050
     )
     expectEqual(
-        "candidate playedAt uses at least one-second duration for tiny positive durations",
+        "candidate playedAt preserves Apple's timestamp for tiny positive durations",
         playbackHistoryPlayedAt(startTimestamp: 9, originalPlayedAt: 10, durationSeconds: 0.4),
         10
+    )
+
+    section("Listening History · Media library snapshot diff")
+
+    struct FakeLibrarySnapshotRecord: Equatable {
+        let itemID: String
+        let dedupeKey: String
+        let playCount: Int
+        let lastPlayedAt: Int?
+        let durationSeconds: Int?
+    }
+
+    func snapshotCandidateStarts(
+        current: FakeLibrarySnapshotRecord,
+        previous: FakeLibrarySnapshotRecord?,
+        fetchCutoff: Int,
+        importedKeys: Set<String> = [],
+        maxDelta: Int = 80,
+        repeatGapSeconds: Int = 5
+    ) -> [Int] {
+        guard let playedAt = current.lastPlayedAt else { return [] }
+        guard playedAt > fetchCutoff else { return [] }
+
+        let baselinePlayedAt = previous?.lastPlayedAt
+        let baselinePlayCount = previous?.playCount
+        let hasNewPlayedAt = baselinePlayedAt.map { playedAt > $0 } ?? true
+        let hasCountIncrease = baselinePlayCount.map { current.playCount > $0 } ?? false
+        guard hasNewPlayedAt || hasCountIncrease else { return [] }
+
+        let delta: Int = {
+            guard let baselinePlayCount else { return 1 }
+            let increased = current.playCount - baselinePlayCount
+            if increased > 0 { return increased }
+            return hasNewPlayedAt ? 1 : 0
+        }()
+        let count = min(max(delta, 0), maxDelta)
+        guard count > 0 else { return [] }
+
+        let starts: [Int]
+        if let durationSeconds = current.durationSeconds, durationSeconds > 0 {
+            let spacing = durationSeconds + repeatGapSeconds
+            starts = (0..<count).map { index in
+                let end = playedAt - spacing * (count - index - 1)
+                return max(1, end - durationSeconds)
+            }
+        } else if count == 1 {
+            starts = [playedAt]
+        } else {
+            starts = (0..<count).map { index in
+                max(1, playedAt - (count - index - 1))
+            }
+        }
+
+        return starts.filter { start in
+            !importedKeys.contains("\(current.itemID)|\(current.dedupeKey)|\(start)|\(playedAt)")
+        }
+    }
+
+    let snapshotCurrent = FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 4, lastPlayedAt: 2_000, durationSeconds: 180)
+    expectEqual(
+        "first snapshot sighting imports only the latest play inside lookback",
+        snapshotCandidateStarts(current: snapshotCurrent, previous: nil, fetchCutoff: 1_000),
+        [1_820]
+    )
+    expectEqual(
+        "unchanged snapshot produces no candidates",
+        snapshotCandidateStarts(current: snapshotCurrent, previous: snapshotCurrent, fetchCutoff: 1_000),
+        []
+    )
+    expectEqual(
+        "single play-count increase creates one synthesized start",
+        snapshotCandidateStarts(
+            current: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 5, lastPlayedAt: 2_200, durationSeconds: 180),
+            previous: snapshotCurrent,
+            fetchCutoff: 1_000
+        ),
+        [2_020]
+    )
+    expectEqual(
+        "multi-play delta expands backwards from lastPlayedDate with a small gap",
+        snapshotCandidateStarts(
+            current: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 7, lastPlayedAt: 2_555, durationSeconds: 180),
+            previous: snapshotCurrent,
+            fetchCutoff: 1_000
+        ),
+        [2_005, 2_190, 2_375]
+    )
+    expectEqual(
+        "lastPlayedDate advance without play-count increase creates one safe candidate",
+        snapshotCandidateStarts(
+            current: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 4, lastPlayedAt: 2_300, durationSeconds: 180),
+            previous: snapshotCurrent,
+            fetchCutoff: 1_000
+        ),
+        [2_120]
+    )
+    expectEqual(
+        "import ledger prevents re-importing the same synthesized candidate",
+        snapshotCandidateStarts(
+            current: snapshotCurrent,
+            previous: nil,
+            fetchCutoff: 1_000,
+            importedKeys: ["pid:1|track-a|1820|2000"]
+        ),
+        []
+    )
+    expectEqual(
+        "large play-count jumps are capped at the per-track safety limit",
+        snapshotCandidateStarts(
+            current: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 100, lastPlayedAt: 5_000, durationSeconds: 60),
+            previous: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 0, lastPlayedAt: 4_000, durationSeconds: 60),
+            fetchCutoff: 1_000
+        ).count,
+        80
+    )
+    expectEqual(
+        "missing duration multi-delta falls back to one-second spacing",
+        snapshotCandidateStarts(
+            current: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 3, lastPlayedAt: 2_000, durationSeconds: nil),
+            previous: FakeLibrarySnapshotRecord(itemID: "pid:1", dedupeKey: "track-a", playCount: 1, lastPlayedAt: 1_800, durationSeconds: nil),
+            fetchCutoff: 1_000
+        ),
+        [1_999, 2_000]
     )
 
     struct FakeHistoryCandidate {
@@ -373,14 +492,14 @@ func runListeningHistoryRecoveryTests() {
         durationSeconds: 200,
         existingStarts: [400, 600, 800]
     )
-    expectEqual("same-timestamp growth only surfaces one new start", sameTimestampDeltaOnlyStarts, [1_000])
+    expectEqual("same-timestamp growth only surfaces one new start", sameTimestampDeltaOnlyStarts, [1_200])
 
     let sameTimestampRescanStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
         playedAt: 1_200,
         playCount: 4,
         previousPlayCount: 4,
         durationSeconds: 200,
-        existingStarts: [400, 600, 800, 1_000]
+        existingStarts: [400, 600, 800, 1_200]
     )
     expectEqual("same-timestamp rescan imports nothing after state catches up", sameTimestampRescanStarts, [])
 
@@ -391,18 +510,18 @@ func runListeningHistoryRecoveryTests() {
         durationSeconds: 200,
         existingStarts: [400, 600]
     )
-    expectEqual("same-timestamp two-play growth yields only two new starts", sameTimestampTwoPlayDeltaStarts, [800, 1_000])
+    expectEqual("same-timestamp two-play growth yields only two new starts", sameTimestampTwoPlayDeltaStarts, [1_000, 1_200])
 
     let sameTimestampLiveOverlapStarts = importedPlaybackHistoryStartsForSameTimestampGrowth(
         playedAt: 1_200,
         playCount: 4,
         previousPlayCount: 3,
         durationSeconds: 200,
-        existingStarts: [1_000]
+        existingStarts: [1_200]
     )
     expectEqual("same-timestamp growth is fully suppressed when the new play already exists", sameTimestampLiveOverlapStarts, [])
 
-    section("Listening History · Match counting against stored timestamps")
+    section("Listening History · Strong recovery duplicate matching")
 
     struct FakeHistoryMatch {
         let dedupeKey: String
@@ -411,134 +530,131 @@ func runListeningHistoryRecoveryTests() {
         let style: String
     }
 
-    func playbackHistoryImportMatchCount(
-        items: [FakeHistoryMatch],
+    enum FakeRecoveryDuplicateLevel {
+        case none
+        case weak
+        case strong
+    }
+
+    func playedAtTimestamp(for item: FakeHistoryMatch) -> Int {
+        switch item.style {
+        case "manual", "history":
+            return item.startTimestamp
+        default:
+            guard let durationSeconds = item.durationSeconds else { return item.startTimestamp }
+            return item.startTimestamp + durationSeconds
+        }
+    }
+
+    func recoveryDuplicateLevel(
+        item: FakeHistoryMatch,
         key: String,
-        startTimestamp: Int,
-        playedAt: Int,
-        exactTolerance: Int,
-        playedTolerance: Int
-    ) -> Int {
+        candidateStart: Int,
+        candidatePlayedAt: Int,
+        exactTolerance: Int = 10,
+        playedTolerance: Int = 90,
+        weakTolerance: Int
+    ) -> FakeRecoveryDuplicateLevel {
+        guard item.dedupeKey == key else { return .none }
+
+        let weakTol = max(0, weakTolerance)
         let exactTol = max(0, exactTolerance)
         let playedTol = max(0, playedTolerance)
+        let startDistance = abs(item.startTimestamp - candidateStart)
 
-        return items.filter { item in
-            guard item.dedupeKey == key else { return false }
+        if startDistance <= exactTol {
+            return .strong
+        }
 
-            let exactMatch = abs(item.startTimestamp - startTimestamp) <= exactTol
-            let directPlayedAtMatch = abs(item.startTimestamp - playedAt) <= playedTol
+        let playedAtDistance = abs(playedAtTimestamp(for: item) - candidatePlayedAt)
 
-            switch item.style {
-            case "history", "manual", "recentlyPlayed":
-                return exactMatch || directPlayedAtMatch
-            case "live":
-                guard let durationSeconds = item.durationSeconds else { return exactMatch || directPlayedAtMatch }
-                return exactMatch || abs((item.startTimestamp + durationSeconds) - playedAt) <= playedTol
-            default:
-                guard let durationSeconds = item.durationSeconds else { return exactMatch || directPlayedAtMatch }
-                return exactMatch || directPlayedAtMatch || abs((item.startTimestamp + durationSeconds) - playedAt) <= playedTol
-            }
-        }.count
+        if playedAtDistance <= playedTol {
+            return .strong
+        }
+
+        if weakTol > 0, startDistance <= weakTol {
+            return .weak
+        }
+
+        return .none
     }
 
-    let exactMinuteMatches = [
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: nil, style: "history"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_200, durationSeconds: nil, style: "history"),
-    ]
-    expectEqual(
-        "staggered playback-history timestamps are counted individually",
-        playbackHistoryImportMatchCount(items: exactMinuteMatches, key: "track-a", startTimestamp: 1_000, playedAt: 1_200, exactTolerance: 3, playedTolerance: 0),
-        2
-    )
-
-    let crossSourceMatches = [
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "live")
-    ]
-    let desiredImports = 3
-    let existingCrossSourceMatches = playbackHistoryImportMatchCount(
-        items: crossSourceMatches,
-        key: "track-a",
-        startTimestamp: 1_200,
-        playedAt: 1_200,
-        exactTolerance: 3,
-        playedTolerance: 0
-    )
-    expectEqual("live scrobble overlap counts as exactly one existing match", existingCrossSourceMatches, 1)
-    expectEqual("cross-source overlap suppresses only one recovered play", max(0, desiredImports - existingCrossSourceMatches), 2)
-
-    let sameTimestampLiveDeltaMatches = [
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "live")
-    ]
-    let sameTimestampLiveDeltaCandidates = [1_000]
-    let survivingSameTimestampLiveDeltaCandidates = sameTimestampLiveDeltaCandidates.filter { candidateStart in
-        playbackHistoryImportMatchCount(
-            items: sameTimestampLiveDeltaMatches,
-            key: "track-a",
-            startTimestamp: candidateStart,
-            playedAt: 1_200,
-            exactTolerance: 3,
-            playedTolerance: 0
-        ) == 0
+    func shouldSkipPlaybackHistoryCandidate(
+        ledgerContainsCandidate: Bool,
+        duplicateLevel: FakeRecoveryDuplicateLevel,
+        preventDuplicates: Bool
+    ) -> Bool {
+        guard preventDuplicates else { return false }
+        return ledgerContainsCandidate || duplicateLevel == .strong
     }
-    expectEqual("same-timestamp delta recovery is blocked by an existing live scrobble for that play", survivingSameTimestampLiveDeltaCandidates, [])
 
-    let alreadyImported = [
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 2_400, durationSeconds: nil, style: "history"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 2_700, durationSeconds: nil, style: "history"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 3_000, durationSeconds: nil, style: "history"),
-    ]
-    let regeneratedCandidateStarts = [2_400, 2_700, 3_000]
-    let existingCandidateMatches = regeneratedCandidateStarts.filter { candidateStart in
-        playbackHistoryImportMatchCount(
-            items: alreadyImported,
-            key: "track-a",
-            startTimestamp: candidateStart,
-            playedAt: candidateStart,
-            exactTolerance: 3,
-            playedTolerance: 0
-        ) > 0
-    }.count
-    expectEqual("re-running import sees every synthesized timestamp already present", existingCandidateMatches, 3)
-    expectEqual("re-running import does not enqueue more when counts already match", max(0, 3 - existingCandidateMatches), 0)
+    let recentThenHistory = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "recentlyPlayed")
+    expectEqual(
+        "recently-played imported first is a strong duplicate when the playedAt matches",
+        recoveryDuplicateLevel(item: recentThenHistory, key: "track-a", candidateStart: 1_015, candidatePlayedAt: 1_200, weakTolerance: 360),
+        .strong
+    )
 
-    let edgeOriginMatches = [
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_000, durationSeconds: 200, style: "manual"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_200, durationSeconds: 200, style: "manual"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_400, durationSeconds: 200, style: "recentlyPlayed"),
-        FakeHistoryMatch(dedupeKey: "track-b", startTimestamp: 4_000, durationSeconds: 200, style: "history"),
-        FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_600, durationSeconds: nil, style: "live")
-    ]
+    let historyThenRecent = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "history")
     expectEqual(
-        "manual and recently-played direct timestamp matches suppress playback-history imports",
-        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_200, playedAt: 4_200, exactTolerance: 3, playedTolerance: 0),
-        1
+        "listening-history imported first is a strong duplicate when the playedAt matches",
+        recoveryDuplicateLevel(item: historyThenRecent, key: "track-a", candidateStart: 1_015, candidatePlayedAt: 1_000, weakTolerance: 360),
+        .strong
     )
+
     expectEqual(
-        "dedupe key mismatch never suppresses a listening-history import",
-        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-b", startTimestamp: 4_200, playedAt: 4_200, exactTolerance: 3, playedTolerance: 0),
-        0
+        "same-track recovery start inside exact tolerance is a strong duplicate",
+        recoveryDuplicateLevel(item: historyThenRecent, key: "track-a", candidateStart: 1_008, candidatePlayedAt: 1_208, weakTolerance: 360),
+        .strong
     )
+
+    let exactRecoveryDuplicate = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "history")
     expectEqual(
-        "live items without duration do not end-match a playback-history playedAt timestamp",
-        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_410, playedAt: 4_610, exactTolerance: 3, playedTolerance: 0),
-        0
+        "exact same-track recovery start remains a strong duplicate",
+        recoveryDuplicateLevel(item: exactRecoveryDuplicate, key: "track-a", candidateStart: 1_000, candidatePlayedAt: 1_200, weakTolerance: 360),
+        .strong
     )
+
+    let weakOverlap = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_000, durationSeconds: 200, style: "history")
     expectEqual(
-        "negative duplicate tolerances behave as zero",
-        playbackHistoryImportMatchCount(items: edgeOriginMatches, key: "track-a", startTimestamp: 4_001, playedAt: 4_001, exactTolerance: -10, playedTolerance: -10),
-        0
+        "same track replayed a few minutes later is only a weak overlap, not a strong duplicate",
+        recoveryDuplicateLevel(item: weakOverlap, key: "track-a", candidateStart: 1_180, candidatePlayedAt: 1_380, weakTolerance: 360),
+        .weak
     )
+
     expectEqual(
-        "direct playedAt matching can be enabled for origin-less legacy backlog rows",
-        playbackHistoryImportMatchCount(
-            items: [FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 4_210, durationSeconds: nil, style: "legacy")],
-            key: "track-a",
-            startTimestamp: 4_000,
-            playedAt: 4_210,
-            exactTolerance: 3,
-            playedTolerance: 0
-        ),
-        1
+        "same track outside exact and playedAt tolerances is not a strong duplicate",
+        recoveryDuplicateLevel(item: weakOverlap, key: "track-a", candidateStart: 1_180, candidatePlayedAt: 1_380, weakTolerance: 0),
+        .none
+    )
+
+    let missingDuration = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 1_500, durationSeconds: nil, style: "recentlyPlayed")
+    expectEqual(
+        "missing duration falls back safely and does not over-suppress cross-source imports",
+        recoveryDuplicateLevel(item: missingDuration, key: "track-a", candidateStart: 1_600, candidatePlayedAt: 1_800, weakTolerance: 360),
+        .weak
+    )
+
+    let manualSameTimestamp = FakeHistoryMatch(dedupeKey: "track-a", startTimestamp: 2_200, durationSeconds: 180, style: "manual")
+    expectEqual(
+        "manual scrobbles still block exact same-timestamp recovery imports",
+        recoveryDuplicateLevel(item: manualSameTimestamp, key: "track-a", candidateStart: 2_200, candidatePlayedAt: 2_380, weakTolerance: 360),
+        .strong
+    )
+    expect("listening-history ledger blocks import when duplicate prevention is enabled",
+           shouldSkipPlaybackHistoryCandidate(ledgerContainsCandidate: true, duplicateLevel: .none, preventDuplicates: true))
+    expect("listening-history ledger does not block import when duplicate prevention is disabled",
+           !shouldSkipPlaybackHistoryCandidate(ledgerContainsCandidate: true, duplicateLevel: .none, preventDuplicates: false))
+    expect("listening-history strong duplicate blocks import when duplicate prevention is enabled",
+           shouldSkipPlaybackHistoryCandidate(ledgerContainsCandidate: false, duplicateLevel: .strong, preventDuplicates: true))
+    expect("listening-history strong duplicate does not block import when duplicate prevention is disabled",
+           !shouldSkipPlaybackHistoryCandidate(ledgerContainsCandidate: false, duplicateLevel: .strong, preventDuplicates: false))
+
+    let differentTrack = FakeHistoryMatch(dedupeKey: "track-b", startTimestamp: 2_200, durationSeconds: 180, style: "history")
+    expectEqual(
+        "dedupe key mismatches never suppress a recovery import",
+        recoveryDuplicateLevel(item: differentTrack, key: "track-a", candidateStart: 2_200, candidatePlayedAt: 2_380, weakTolerance: 360),
+        .none
     )
 
     // ─── Dedup nearest-match selection ────────────────────────────────────────────

@@ -173,6 +173,52 @@ func runAppleMusicRecentTracksImporterTests() {
         max(baseToleranceSeconds, max(0, durationSeconds) + durationPaddingSeconds)
     }
 
+    enum DuplicateMatchLevel: Equatable {
+        case none
+        case weak
+        case strong
+    }
+
+    func recoveryPlayedAtTimestamp(startTimestamp: Int, durationSeconds: Int?, style: String) -> Int {
+        if style == "manual" {
+            return startTimestamp
+        }
+        guard let durationSeconds else { return startTimestamp }
+        return startTimestamp + durationSeconds
+    }
+
+    func recoveryDuplicateLevel(
+        existingStart: Int,
+        existingDurationSeconds: Int?,
+        existingStyle: String,
+        candidateStart: Int,
+        candidatePlayedAt: Int,
+        exactTolerance: Int = 10,
+        playedTolerance: Int = 90,
+        weakTolerance: Int
+    ) -> DuplicateMatchLevel {
+        let weakTol = max(0, weakTolerance)
+        let exactTol = max(0, exactTolerance)
+        let playedTol = max(0, playedTolerance)
+        let startDistance = abs(existingStart - candidateStart)
+
+        if startDistance <= exactTol {
+            return .strong
+        }
+
+        let playedAtDistance = abs(recoveryPlayedAtTimestamp(startTimestamp: existingStart, durationSeconds: existingDurationSeconds, style: existingStyle) - candidatePlayedAt)
+
+        if playedAtDistance <= playedTol {
+            return .strong
+        }
+
+        if weakTol > 0, startDistance <= weakTol {
+            return .weak
+        }
+
+        return .none
+    }
+
     func statusAfterImport(
         resourcesCount: Int,
         importedCount: Int,
@@ -306,8 +352,80 @@ func runAppleMusicRecentTracksImporterTests() {
            wasPreviouslyImported(candidateStart: 10_060, candidateEnd: 10_220, record: priorImport))
     expect("same ID outside prior synthetic tolerance is not considered exact prior import reuse",
            !wasPreviouslyImported(candidateStart: 10_091, candidateEnd: 10_271, record: priorImport))
+    func shouldSkipRecentTrackCandidate(previouslyImported: Bool, duplicateLevel: DuplicateMatchLevel, preventDuplicates: Bool) -> Bool {
+        guard preventDuplicates else { return false }
+        return previouslyImported || duplicateLevel == .strong
+    }
+    expect("recent-track prior synthetic import blocks when duplicate prevention is enabled",
+           shouldSkipRecentTrackCandidate(previouslyImported: true, duplicateLevel: .none, preventDuplicates: true))
+    expect("recent-track prior synthetic import does not block when duplicate prevention is disabled",
+           !shouldSkipRecentTrackCandidate(previouslyImported: true, duplicateLevel: .none, preventDuplicates: false))
+    expect("recent-track strong duplicate blocks when duplicate prevention is enabled",
+           shouldSkipRecentTrackCandidate(previouslyImported: false, duplicateLevel: .strong, preventDuplicates: true))
+    expect("recent-track strong duplicate does not block when duplicate prevention is disabled",
+           !shouldSkipRecentTrackCandidate(previouslyImported: false, duplicateLevel: .strong, preventDuplicates: false))
     expectEqual("short tracks use a 6-minute duplicate floor", apiDuplicateToleranceSeconds(durationSeconds: 30), 360)
     expectEqual("tracks longer than the floor use duration plus 4 minutes", apiDuplicateToleranceSeconds(durationSeconds: 500), 740)
+    expectEqual(
+        "cross-source end-time overlap is strong when synthesized starts differ",
+        recoveryDuplicateLevel(
+            existingStart: 10_000,
+            existingDurationSeconds: 180,
+            existingStyle: "history",
+            candidateStart: 10_025,
+            candidatePlayedAt: 10_180,
+            weakTolerance: apiDuplicateToleranceSeconds(durationSeconds: 180)
+        ),
+        .strong
+    )
+    expectEqual(
+        "same-track recent-track start inside exact tolerance is strong",
+        recoveryDuplicateLevel(
+            existingStart: 10_000,
+            existingDurationSeconds: 180,
+            existingStyle: "history",
+            candidateStart: 10_008,
+            candidatePlayedAt: 10_188,
+            weakTolerance: apiDuplicateToleranceSeconds(durationSeconds: 180)
+        ),
+        .strong
+    )
+    expectEqual(
+        "exact same-track recent-track recovery start remains strong",
+        recoveryDuplicateLevel(
+            existingStart: 10_000,
+            existingDurationSeconds: 180,
+            existingStyle: "history",
+            candidateStart: 10_000,
+            candidatePlayedAt: 10_180,
+            weakTolerance: apiDuplicateToleranceSeconds(durationSeconds: 180)
+        ),
+        .strong
+    )
+    expectEqual(
+        "broad same-track overlap without end-time agreement is only weak and should not block balanced imports",
+        recoveryDuplicateLevel(
+            existingStart: 10_000,
+            existingDurationSeconds: 180,
+            existingStyle: "history",
+            candidateStart: 10_220,
+            candidatePlayedAt: 10_400,
+            weakTolerance: apiDuplicateToleranceSeconds(durationSeconds: 180)
+        ),
+        .weak
+    )
+    expectEqual(
+        "missing-duration cross-source matches fall back to the stored start and avoid false strong duplicates",
+        recoveryDuplicateLevel(
+            existingStart: 10_000,
+            existingDurationSeconds: nil,
+            existingStyle: "recentlyPlayed",
+            candidateStart: 10_150,
+            candidatePlayedAt: 10_330,
+            weakTolerance: apiDuplicateToleranceSeconds(durationSeconds: 180)
+        ),
+        .weak
+    )
 
     expectEqual(
         "lookback-rejected pass reports timestampConfidenceTooLow",

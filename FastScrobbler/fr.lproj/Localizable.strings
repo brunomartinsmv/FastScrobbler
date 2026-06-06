@@ -5,7 +5,7 @@
 "75%" = "75%";
 "Account" = "Compte";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Empêche d’envoyer la même session de lecture à Last.fm plus d’une fois dans un court laps de temps.";
-"Experimental feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "Fonction expérimentale : scrobble automatiquement jusqu’à 30 morceaux récemment écoutés via l’API Apple Music. Les morceaux sont enregistrés même lorsque FastScrobbler est en arrière-plan.\n\nRemarque : l’API ne fournit pas les horodatages de lecture, donc FastScrobbler attribue un horodatage estimé lorsque le scrobble est envoyé. Les morceaux sont enregistrés et scrobblés quelle que soit la durée d’écoute.";
+"Beta feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration." = "Fonction bêta : scrobble automatiquement jusqu’à 30 morceaux récemment écoutés via l’API Apple Music. Les morceaux sont enregistrés même lorsque FastScrobbler est en arrière-plan.\n\nRemarque : l’API ne fournit pas les horodatages de lecture, donc FastScrobbler attribue un horodatage estimé lorsque le scrobble est envoyé. Les morceaux sont enregistrés et scrobblés quelle que soit la durée d’écoute.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Fonction bêta : affiche l’état du scrobbling sur l’écran verrouillé et la Dynamic Island.";
 "Connected" = "Connecté";
 "Done" = "Terminé";
@@ -64,8 +64,10 @@
 "Scrobble at %@ of duration" = "Scrobbler à %@ de la durée";
 "Scrobble Controls" = "Contrôles de scrobble";
 "Scrobble from Apple Music API" = "Scrobbler depuis l’API Apple Music";
+"Need more plays?" = "Besoin de plus de lectures ?";
+"Turn on \"Scrobble from Apple Music API\" if you need to capture more plays, including non-library songs." = "Activez « Scrobbler depuis l’API Apple Music » si vous devez récupérer plus de lectures, y compris des morceaux hors bibliothèque.";
 "Only scrobble non-library songs" = "Scrobbler uniquement les morceaux hors bibliothèque";
-"Best-effort filter: FastScrobbler compares recent Apple Music API tracks against your local library and skips songs that appear to already be in it. If a match can't be confirmed, the song is still scrobbled." = "Filtre au mieux : FastScrobbler compare les morceaux récents de l’API Apple Music à votre bibliothèque locale et ignore les morceaux qui semblent déjà s’y trouver. Si une correspondance ne peut pas être confirmée, le morceau est quand même scrobblé.";
+"Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled. Recommended when \"Scrobble from Listening History\" is enabled." = "Filtre au mieux : FastScrobbler vérifie si les morceaux récemment lus via l’API sont présents dans votre bibliothèque, et les ignore si c’est le cas. Si FastScrobbler ne peut pas confirmer une correspondance, le morceau sera scrobblé. Recommandé lorsque « Scrobbler depuis l’historique d’écoute » est activé.";
 "Scrobble Now" = "Scrobbler maintenant";
 "Settings" = "Réglages";
 "Setup" = "Configuration";

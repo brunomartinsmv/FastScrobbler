@@ -223,6 +223,7 @@ struct SetupHelpView: View {
                         liveActivitiesDelayNote
                         listeningHistoryLibraryOnlyNoteRow
                         autoMixListeningHistoryNoteRow
+                        appleMusicAPINoteRow
                     }
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -452,6 +453,18 @@ struct SetupHelpView: View {
             subtitle: NSLocalizedString("Scrobbling from Listening History may be affected when AutoMix is on.", comment: ""),
             badgeText: NSLocalizedString("Note", comment: ""),
             badgeLevel: .warning,
+            actionTitle: nil,
+            action: nil
+        )
+    }
+
+    private var appleMusicAPINoteRow: some View {
+        SettingRow(
+            icon: "square.and.arrow.down.badge.clock",
+            title: NSLocalizedString("Need more plays?", comment: ""),
+            subtitle: NSLocalizedString("Turn on \"Scrobble from Apple Music API\" if you need to capture more plays, including non-library songs.", comment: ""),
+            badgeText: NSLocalizedString("Tip", comment: ""),
+            badgeLevel: .tip,
             actionTitle: nil,
             action: nil
         )
