@@ -18,10 +18,10 @@ PROJECT_COMPATIBILITY_VERSION = "Xcode 3.2"
 PROJECT_LAST_SWIFT_UPDATE_CHECK = "1600"
 PROJECT_LAST_UPGRADE_CHECK = "2640"
 SCHEME_LAST_UPGRADE_VERSION = "2640"
-IOS_APP_MARKETING_VERSION = "5.7"
-IOS_APP_CURRENT_PROJECT_VERSION = "5701"
-MAC_APP_MARKETING_VERSION = "5.7"
-MAC_APP_CURRENT_PROJECT_VERSION = "5701"
+IOS_APP_MARKETING_VERSION = "6.2"
+IOS_APP_CURRENT_PROJECT_VERSION = "6208"
+MAC_APP_MARKETING_VERSION = "6.2"
+MAC_APP_CURRENT_PROJECT_VERSION = "6208"
 EXTENSION_MARKETING_VERSION = "1.0"
 EXTENSION_CURRENT_PROJECT_VERSION = "1"
 
@@ -32,6 +32,48 @@ SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.scrobblecontrol"
 MANUAL_SCROBBLE_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.manualscrobblecontrol"
 LISTENING_HISTORY_CONTROL_BUNDLE_ID = "com.kevin.FastScrobbler.listeninghistorycontrol"
 MAC_APP_BUNDLE_ID = "com.kevin.FastScrobbler"
+
+FIREBASE_PACKAGE_REPOSITORY_URL = "https://github.com/firebase/firebase-ios-sdk.git"
+FIREBASE_PACKAGE_REQUIREMENT = {
+  "kind" => "upToNextMajorVersion",
+  "minimumVersion" => "12.13.0",
+}.freeze
+CRASHLYTICS_PACKAGE_PRODUCT = "FirebaseCrashlytics"
+CRASHLYTICS_SCRIPT_INPUT_PATHS = [
+  "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}",
+  "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}",
+  "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Resources/DWARF/${PRODUCT_NAME}.debug.dylib",
+  "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}/Contents/Info.plist",
+  "$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
+  "$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
+].freeze
+IOS_CRASHLYTICS_SCRIPT_INPUT_PATHS = [
+  "${DWARF_DSYM_FOLDER_PATH}",
+  *CRASHLYTICS_SCRIPT_INPUT_PATHS,
+].freeze
+CRASHLYTICS_SCRIPT = <<~SCRIPT.chomp
+  if [ ! -d "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}" ]; then
+    echo "Skipping Crashlytics symbol upload: dSYM not found for ${CONFIGURATION}."
+    exit 0
+  fi
+  "${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run"
+SCRIPT
+IOS_CRASHLYTICS_SCRIPT = <<~SCRIPT.chomp
+  if [ ! -d "${DWARF_DSYM_FOLDER_PATH}/${DWARF_DSYM_FILE_NAME}" ]; then
+    echo "Skipping Crashlytics symbol upload: dSYM not found for ${CONFIGURATION}."
+    exit 0
+  fi
+
+  crashlytics_dir="${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics"
+  if [ "${PLATFORM_NAME}" = "iphoneos" ]; then
+    "${crashlytics_dir}/upload-symbols" \
+      -gsp "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist" \
+      -p ios \
+      -- "${DWARF_DSYM_FOLDER_PATH}"
+  else
+    "${crashlytics_dir}/run"
+  fi
+SCRIPT
 
 IGNORED_DIRS = %w[DerivedData build].freeze
 IGNORED_FILES = [".DS_Store"].freeze
@@ -73,7 +115,8 @@ PROJECT_BUILD_SETTINGS = {
     "CLANG_WARN__DUPLICATE_METHOD_MATCH" => "YES",
     "COPY_PHASE_STRIP" => "NO",
     "DEAD_CODE_STRIPPING" => "YES",
-    "DEBUG_INFORMATION_FORMAT" => "dwarf",
+    "DEBUG_INFORMATION_FORMAT" => "dwarf-with-dsym",
+    "ENABLE_DEBUG_DYLIB" => "NO",
     "ENABLE_STRICT_OBJC_MSGSEND" => "YES",
     "ENABLE_TESTABILITY" => "YES",
     "ENABLE_USER_SCRIPT_SANDBOXING" => "YES",
@@ -317,6 +360,21 @@ TARGET_DEFINITIONS = [
     sdkroot: "iphoneos",
     ld_runpath_search_paths: ["$(inherited)", "@executable_path/Frameworks"],
     clang_enable_objc_weak: "NO",
+    package_products: [CRASHLYTICS_PACKAGE_PRODUCT],
+    build_settings_overrides: {
+      "Debug" => {
+        "DEBUG_INFORMATION_FORMAT" => "dwarf-with-dsym",
+      },
+    },
+    shell_script_build_phases: [
+      {
+        name: "Firebase Crashlytics",
+        always_out_of_date: "1",
+        input_paths: IOS_CRASHLYTICS_SCRIPT_INPUT_PATHS,
+        show_env_vars_in_log: "0",
+        shell_script: IOS_CRASHLYTICS_SCRIPT,
+      },
+    ],
     frameworks: %w[
       ActivityKit
       AppIntents
@@ -355,6 +413,21 @@ TARGET_DEFINITIONS = [
     combine_hidpi_images: "YES",
     dead_code_stripping: "YES",
     register_app_groups: "YES",
+    package_products: [CRASHLYTICS_PACKAGE_PRODUCT],
+    build_settings_overrides: {
+      "Debug" => {
+        "DEBUG_INFORMATION_FORMAT" => "dwarf-with-dsym",
+      },
+    },
+    shell_script_build_phases: [
+      {
+        name: "Firebase Crashlytics",
+        always_out_of_date: "1",
+        input_paths: CRASHLYTICS_SCRIPT_INPUT_PATHS,
+        show_env_vars_in_log: "0",
+        shell_script: CRASHLYTICS_SCRIPT,
+      },
+    ],
     frameworks: %w[
       AppKit
       AuthenticationServices
@@ -540,6 +613,7 @@ def apply_common_build_settings(target, definition)
   target.build_configurations.each do |config|
     settings = config.build_settings
     settings.merge!(PROJECT_BUILD_SETTINGS.fetch(config.name))
+    settings.merge!(definition.dig(:build_settings_overrides, config.name) || {})
     settings["PRODUCT_BUNDLE_IDENTIFIER"] = definition[:bundle_id]
     settings["PRODUCT_NAME"] = definition.fetch(:product_name, definition[:name])
     settings["PRODUCT_MODULE_NAME"] = definition[:product_module_name] if definition[:product_module_name]
@@ -568,6 +642,43 @@ def apply_common_build_settings(target, definition)
     settings["ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME"] = definition[:accent_color] if definition[:accent_color]
     settings["ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS"] = definition[:include_all_app_icon_assets] if definition[:include_all_app_icon_assets]
   end
+end
+
+def ensure_remote_package(project, repository_url, requirement)
+  existing_package = project.root_object.package_references.find do |package|
+    package.isa == "XCRemoteSwiftPackageReference" && package.repositoryURL == repository_url
+  end
+  return existing_package if existing_package
+
+  project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference).tap do |package|
+    package.repositoryURL = repository_url
+    package.requirement = requirement
+    project.root_object.package_references << package
+  end
+end
+
+def add_package_product_dependency(target, package, product_name)
+  product_dependency = target.project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
+  product_dependency.package = package
+  product_dependency.product_name = product_name
+  target.package_product_dependencies << product_dependency
+
+  build_file = target.project.new(Xcodeproj::Project::Object::PBXBuildFile)
+  build_file.product_ref = product_dependency
+  target.frameworks_build_phase.files << build_file
+end
+
+def add_shell_script_build_phase(target, definition)
+  phase = target.new_shell_script_build_phase(definition[:name])
+  phase.always_out_of_date = definition[:always_out_of_date] if definition[:always_out_of_date]
+  phase.input_paths = definition[:input_paths] if definition[:input_paths]
+  phase.input_file_list_paths = definition[:input_file_list_paths] if definition[:input_file_list_paths]
+  phase.output_paths = definition[:output_paths] if definition[:output_paths]
+  phase.output_file_list_paths = definition[:output_file_list_paths] if definition[:output_file_list_paths]
+  phase.shell_path = definition[:shell_path] if definition[:shell_path]
+  phase.shell_script = definition[:shell_script] if definition[:shell_script]
+  phase.show_env_vars_in_log = definition[:show_env_vars_in_log] if definition[:show_env_vars_in_log]
+  phase.run_only_for_deployment_postprocessing = definition[:run_only_for_deployment_postprocessing] if definition[:run_only_for_deployment_postprocessing]
 end
 
 def apply_project_settings(project)
@@ -611,6 +722,7 @@ ROOT_GROUP_PATHS.each do |root_path|
 end
 
 targets = {}
+firebase_package = ensure_remote_package(project, FIREBASE_PACKAGE_REPOSITORY_URL, FIREBASE_PACKAGE_REQUIREMENT)
 TARGET_DEFINITIONS.each do |definition|
   target = project.new_target(
     definition[:type],
@@ -623,6 +735,12 @@ TARGET_DEFINITIONS.each do |definition|
   target.add_file_references(source_refs(definition[:sources], refs_by_path))
   target.add_resources(source_refs(definition[:resources], refs_by_path))
   target.add_system_frameworks(definition[:frameworks])
+  Array(definition[:package_products]).each do |product_name|
+    add_package_product_dependency(target, firebase_package, product_name)
+  end
+  Array(definition[:shell_script_build_phases]).each do |phase_definition|
+    add_shell_script_build_phase(target, phase_definition)
+  end
   targets[definition[:name]] = target
 end
 
