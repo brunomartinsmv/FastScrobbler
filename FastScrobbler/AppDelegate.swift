@@ -18,6 +18,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
         AppSettings.migrateLegacyAppGroupSettingsIfNeeded()
         AppSettings.seedScrobbleOnlyNonLibraryAppleMusicAPITracksIfNeeded()
+        AppSettings.removeLegacyListeningHistoryScrobblingToggleIfNeeded()
         ProSettings.migrateLegacyAppGroupSettingsIfNeeded()
 
         // Ensure shared objects exist for background task launches (no UI scene).

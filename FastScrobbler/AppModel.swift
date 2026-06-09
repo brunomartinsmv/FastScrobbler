@@ -63,6 +63,7 @@ final class AppModel {
     private func performStart() async {
         AppSettings.migrateLegacyAppGroupSettingsIfNeeded()
         AppSettings.seedScrobbleOnlyNonLibraryAppleMusicAPITracksIfNeeded()
+        AppSettings.removeLegacyListeningHistoryScrobblingToggleIfNeeded()
         ProSettings.migrateLegacyAppGroupSettingsIfNeeded()
         await runStorageMaintenanceIfNeeded()
         await ICloudSyncCoordinator.shared.startIfNeeded()
@@ -87,7 +88,6 @@ final class AppModel {
         guard !Task.isCancelled else { return }
 
         await backlog.cleanupNow()
-        await purgePlaybackHistoryBacklogIfNeeded()
 
         if auth.sessionKey == nil {
             await LiveActivityManager.shared.update(
@@ -103,7 +103,7 @@ final class AppModel {
         if let sessionKey = auth.sessionKey {
             await auth.refreshUserInfoIfNeeded()
 
-            let shouldRunForegroundScan = !engine.isUserPaused
+            let shouldRunForegroundScan = !engine.isUserPaused && !AppSettings.listeningHistoryRequireConfirmationEnabled()
             if shouldRunForegroundScan {
                 await primeForegroundListeningHistoryScanIfNeeded()
             }
@@ -307,29 +307,37 @@ final class AppModel {
     // without resuming the live scrobble engine's in-memory session.
     func performScheduledBackgroundRecovery() async {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
+        let recoveryCutoffDate = AppSettings.listeningHistoryResumeRecoveryCutoffDate()
 
-        await purgePlaybackHistoryBacklogIfNeeded()
-        _ = await PlaybackHistoryImporter.shared.importIntoBacklog(backlog: backlog, scrobbleLog: scrobbleLog)
-        if !engine.isUserPaused {
-            _ = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+        if !AppSettings.listeningHistoryRequireConfirmationEnabled() {
+            _ = await PlaybackHistoryImporter.shared.importIntoBacklog(
                 backlog: backlog,
                 scrobbleLog: scrobbleLog,
-                allowAuthorizationPrompt: false
+                recoveryCutoffDate: recoveryCutoffDate
             )
-            if let sessionKey = auth.sessionKey {
-                let result = await backlog.flush(sessionKey: sessionKey)
-                let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
-                for item in result.sentItems {
-                    scrobbleLog.record(
-                        track: item.track,
-                        startTimestamp: item.startTimestamp,
-                        scrobbledAt: item.scrobbledAt,
-                        source: scrobbleLogSource(for: item.origin),
-                        lovedOnLastFM: item.lovedOnLastFM,
-                        allowExactDuplicates: !preventDuplicates
-                    )
-                    AppReviewManager.shared.recordSuccessfulScrobble()
-                }
+            if !engine.isUserPaused {
+                _ = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+                    backlog: backlog,
+                    scrobbleLog: scrobbleLog,
+                    allowAuthorizationPrompt: false,
+                    recoveryCutoffDate: recoveryCutoffDate
+                )
+            }
+        }
+
+        if !engine.isUserPaused, let sessionKey = auth.sessionKey {
+            let result = await backlog.flush(sessionKey: sessionKey)
+            let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
+            for item in result.sentItems {
+                scrobbleLog.record(
+                    track: item.track,
+                    startTimestamp: item.startTimestamp,
+                    scrobbledAt: item.scrobbledAt,
+                    source: scrobbleLogSource(for: item.origin),
+                    lovedOnLastFM: item.lovedOnLastFM,
+                    allowExactDuplicates: !preventDuplicates
+                )
+                AppReviewManager.shared.recordSuccessfulScrobble()
             }
         }
     }
@@ -352,6 +360,7 @@ final class AppModel {
             allowExtendedLookback: allowExtendedLookback,
             allowSubmissionWhilePaused: allowSubmissionWhilePaused,
             bypassRecentTrackCooldown: bypassRecentTrackCooldown,
+            deliveryMode: AppSettings.listeningHistoryRequireConfirmationEnabled() ? .queueForConfirmation : .autoSubmit,
             retryEmptyPlaybackHistoryImportOnce: true,
             beforePlaybackHistoryRetry: shouldPrimeForegroundScan ? { [weak self] in
                 await self?.primeForegroundListeningHistoryScanIfNeeded()
@@ -382,6 +391,7 @@ final class AppModel {
         allowExtendedLookback: Bool,
         allowSubmissionWhilePaused: Bool,
         bypassRecentTrackCooldown: Bool,
+        deliveryMode: ListeningHistoryScanService.DeliveryMode = .autoSubmit,
         retryEmptyPlaybackHistoryImportOnce: Bool,
         beforePlaybackHistoryRetry: (() async -> Void)?
     ) async -> ListeningHistoryScanResult {
@@ -392,8 +402,10 @@ final class AppModel {
             maxItems: maxItems,
             allowExtendedLookback: allowExtendedLookback,
             bypassRecentTrackCooldown: bypassRecentTrackCooldown,
+            recoveryCutoffDate: AppSettings.listeningHistoryResumeRecoveryCutoffDate(),
             isUserPaused: engine.isUserPaused,
             pauseBehavior: allowSubmissionWhilePaused ? .allowSubmissionWhilePaused : .respectPause,
+            deliveryMode: deliveryMode,
             retryEmptyPlaybackHistoryImportOnce: retryEmptyPlaybackHistoryImportOnce,
             beforePlaybackHistoryRetry: beforePlaybackHistoryRetry
         ) {
@@ -411,9 +423,9 @@ final class AppModel {
         await engine.tickAsync()
     }
 
-    func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
+    func handleListeningHistoryRequireConfirmationChanged(isEnabled: Bool) async {
         guard !isEnabled else { return }
-        await backlog.removeAll(origin: .playbackHistory)
+        ListeningHistoryReviewStore.shared.clear()
     }
 
     func handleAppleMusicAPIScrobblingChanged(isEnabled: Bool) async {
@@ -425,6 +437,43 @@ final class AppModel {
     func periodicFlush() async {
         guard let sessionKey = auth.sessionKey else { return }
         await flushBacklogIfNeeded(sessionKey: sessionKey)
+    }
+
+    @discardableResult
+    func submitPendingListeningHistoryReviewItems(ids: Set<UUID>? = nil) async -> Int {
+        guard let sessionKey = auth.sessionKey else { return 0 }
+
+        let pendingEntries: [ListeningHistoryReviewStore.Entry]
+        if let ids, !ids.isEmpty {
+            pendingEntries = ListeningHistoryReviewStore.shared.dequeueForSubmission(ids: ids)
+        } else {
+            pendingEntries = ListeningHistoryReviewStore.shared.dequeueAllForSubmission()
+        }
+        guard !pendingEntries.isEmpty else { return 0 }
+
+        let preventDuplicates = ProSettings.preventDuplicateScrobblesEnabled()
+        var enqueuedCount = 0
+
+        for entry in pendingEntries {
+            if preventDuplicates, await reviewEntryWouldDuplicateExistingScrobble(entry) {
+                continue
+            }
+
+            await backlog.enqueue(
+                track: entry.track,
+                startTimestamp: entry.startTimestamp,
+                origin: entry.origin,
+                wasAppleMusicFavorite: entry.wasAppleMusicFavorite,
+                allowExactDuplicates: !preventDuplicates
+            )
+            enqueuedCount += 1
+        }
+
+        if enqueuedCount > 0 {
+            await flushBacklogIfNeeded(sessionKey: sessionKey, force: true)
+        }
+
+        return enqueuedCount
     }
 
     func runStorageMaintenanceNow() async {
@@ -493,11 +542,6 @@ final class AppModel {
         return result
     }
 
-    private func purgePlaybackHistoryBacklogIfNeeded() async {
-        guard !AppSettings.scrobbleListeningHistoryEnabled() else { return }
-        await backlog.removeAll(origin: .playbackHistory)
-    }
-
     private func runStorageMaintenanceIfNeeded() async {
         let currentMigrationVersion = 1
         let storedVersion = AppGroup.userDefaults.integer(forKey: Keys.storageMigrationVersion)
@@ -517,6 +561,37 @@ final class AppModel {
         case .live, .none:
             return .backlog
         }
+    }
+
+    private func reviewEntryWouldDuplicateExistingScrobble(_ entry: ListeningHistoryReviewStore.Entry) async -> Bool {
+        let weakStartToleranceSeconds: Int
+        switch entry.origin {
+        case .recentlyPlayed:
+            let durationSeconds = entry.track.durationSeconds.map { max(0, Int($0.rounded(.up))) } ?? 0
+            weakStartToleranceSeconds = max(6 * 60, durationSeconds + 4 * 60)
+        case .live, .manual, .playbackHistory:
+            weakStartToleranceSeconds = 0
+        }
+
+        let backlogDuplicateLevel = await backlog.recoveryDuplicateMatch(
+            track: entry.track,
+            startTimestamp: entry.startTimestamp,
+            playedAt: entry.playedAt,
+            exactStartToleranceSeconds: RecoveryDuplicateMatcher.balancedExactStartToleranceSeconds,
+            playedAtToleranceSeconds: RecoveryDuplicateMatcher.balancedPlayedAtToleranceSeconds,
+            weakStartToleranceSeconds: weakStartToleranceSeconds
+        )?.level ?? .none
+
+        let logDuplicateLevel = scrobbleLog.recoveryDuplicateMatch(
+            track: entry.track,
+            startTimestamp: entry.startTimestamp,
+            playedAt: entry.playedAt,
+            exactStartToleranceSeconds: RecoveryDuplicateMatcher.balancedExactStartToleranceSeconds,
+            playedAtToleranceSeconds: RecoveryDuplicateMatcher.balancedPlayedAtToleranceSeconds,
+            weakStartToleranceSeconds: weakStartToleranceSeconds
+        )?.level ?? .none
+
+        return max(backlogDuplicateLevel, logDuplicateLevel) == .strongDuplicate
     }
 }
 

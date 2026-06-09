@@ -6,7 +6,7 @@ struct SetupHelpView: View {
     private static let redditSubmitURL = URL(string: "https://www.reddit.com/r/FastScrobbler/submit/")!
 
     enum Mode {
-        case onboarding
+        case setup
         case help
     }
 
@@ -189,16 +189,15 @@ struct SetupHelpView: View {
     }
 
     let mode: Mode
-    let hideTitle: Bool
     let onDone: () -> Void
 
-    init(mode: Mode, hideTitle: Bool = false, onDone: @escaping () -> Void) {
+    init(mode: Mode, onDone: @escaping () -> Void) {
         self.mode = mode
-        self.hideTitle = hideTitle
         self.onDone = onDone
     }
 
     @EnvironmentObject private var auth: LastFMAuthManager
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
 
@@ -208,67 +207,21 @@ struct SetupHelpView: View {
     @State private var lastFMErrorText: String?
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    header
-                        .padding(.top, mode == .help ? 12 : 30)
-
-                    VStack(spacing: 12) {
-                        lastFMRow
-                        mediaLibraryRow
-                        backgroundRefreshRow
-                        shortcutsAndControlCenterRow
-                        liveActivitiesRow
-                        liveActivitiesDelayNote
-                        listeningHistoryLibraryOnlyNoteRow
-                        autoMixListeningHistoryNoteRow
-                        appleMusicAPINoteRow
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Help")
-                            .font(.headline.weight(.semibold))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 4)
-
-                        scrobblingIssuesNoteRow
-                        questionsOrBugReportsRow
-                    }
-
-                    Button {
-                        onDone()
-                    } label: {
-                        Label(mode == .onboarding ? NSLocalizedString("Continue", comment: "") : NSLocalizedString("Done", comment: ""), systemImage: "checkmark.circle.fill")
-                            .font(.headline.weight(mode == .help ? .bold : .semibold))
-                            .frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                    .disabled(auth.sessionKey == nil || (mode == .onboarding && mediaStatus != .authorized))
-                    .padding(.top, 2)
+        Group {
+            if mode == .setup {
+                NavigationStack {
+                    screenContent
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-            }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if mode == .help {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(role: .cancel) {
-                            onDone()
-                        } label: {
-                            IOSCloseButtonLabel(style: .plain)
-                        }
-                        .accessibilityLabel("Close")
-                    }
-                }
+                .toolbar(.hidden, for: .navigationBar)
+                .interactiveDismissDisabled(true)
+            } else {
+                screenContent
+                    .navigationTitle("Help")
+                    .navigationBarTitleDisplayMode(.inline)
             }
         }
-        .toolbar(mode == .help ? .visible : .hidden, for: .navigationBar)
-        .interactiveDismissDisabled(mode == .onboarding)
         .alert(
             NSLocalizedString("Last.fm Sign-in", comment: ""),
             isPresented: Binding(
@@ -288,9 +241,62 @@ struct SetupHelpView: View {
         }
     }
 
+    private var screenContent: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                header
+                    .padding(.top, mode == .help ? 12 : 30)
+
+                VStack(spacing: 12) {
+                    lastFMRow
+                    mediaLibraryRow
+                    backgroundRefreshRow
+                    shortcutsAndControlCenterRow
+                }
+
+                if mode == .help {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Help")
+                            .font(.headline.weight(.semibold))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 4)
+
+                        listeningHistoryLibraryOnlyNoteRow
+                        autoMixListeningHistoryNoteRow
+                        appleMusicAPINoteRow
+                        confirmationReviewNoteRow
+                        scrobblingIssuesNoteRow
+                        questionsOrBugReportsRow
+                    }
+                }
+
+                if mode == .setup {
+                    Button {
+                        handlePrimaryAction()
+                    } label: {
+                        Label(NSLocalizedString("Continue", comment: ""), systemImage: "checkmark.circle.fill")
+                            .font(.headline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.blue)
+                    .disabled(auth.sessionKey == nil || mediaStatus != .authorized)
+                    .padding(.top, 2)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+    }
+
+    private func handlePrimaryAction() {
+        onDone()
+    }
+
     private var header: some View {
         VStack(spacing: 8) {
-            if !hideTitle {
+            if mode == .setup {
                 Text("Setup")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(.primary)
@@ -307,7 +313,7 @@ struct SetupHelpView: View {
 
     private var lastFMRow: some View {
         let isConnected = (auth.sessionKey != nil)
-        let badgeText = isConnected ? NSLocalizedString("Connected", comment: "") : NSLocalizedString("Required", comment: "")
+        let badgeText = isConnected ? NSLocalizedString("Signed in", comment: "") : NSLocalizedString("Required", comment: "")
         let badgeLevel: StatusLevel = isConnected ? .good : .bad
 
         return SettingRow(
@@ -401,27 +407,6 @@ struct SetupHelpView: View {
         )
     }
 
-    private var liveActivitiesRow: some View {
-        return SettingRow(
-            icon: "bolt.horizontal.circle",
-            title: NSLocalizedString("Live Activities", comment: ""),
-            subtitle: NSLocalizedString("Optional, but recommended so you can see scrobbling status on the Lock Screen.", comment: ""),
-            badgeText: NSLocalizedString("Tip", comment: ""),
-            badgeLevel: .tip,
-            actionTitle: nil,
-            action: nil
-        )
-    }
-
-    private var liveActivitiesDelayNote: some View {
-        Text("Note: The Live Activity will not update immediately after you run a Shortcut action or use a Control Center button.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.top, -4)
-    }
-
     private var shortcutsAndControlCenterRow: some View {
         SettingRow(
             icon: "memories.badge.plus",
@@ -462,7 +447,19 @@ struct SetupHelpView: View {
         SettingRow(
             icon: "square.and.arrow.down.badge.clock",
             title: NSLocalizedString("Need more plays?", comment: ""),
-            subtitle: NSLocalizedString("Turn on \"Scrobble from Apple Music API\" if you need to capture more plays, including non-library songs.", comment: ""),
+            subtitle: NSLocalizedString("Turn on \"Scrobble Recently Played from Apple Music API\" if you need to capture more plays, including non-library songs.", comment: ""),
+            badgeText: NSLocalizedString("Tip", comment: ""),
+            badgeLevel: .tip,
+            actionTitle: nil,
+            action: nil
+        )
+    }
+
+    private var confirmationReviewNoteRow: some View {
+        SettingRow(
+            icon: "checklist",
+            title: NSLocalizedString("Don't want auto-scrobbles?", comment: ""),
+            subtitle: NSLocalizedString("Turn off \"Auto-scrobble Listening History\" to review items before submitting them.", comment: ""),
             badgeText: NSLocalizedString("Tip", comment: ""),
             badgeLevel: .tip,
             actionTitle: nil,

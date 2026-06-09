@@ -3,16 +3,25 @@ import OSLog
 
 @MainActor
 enum ListeningHistoryScanService {
+    enum DeliveryMode: Sendable, Equatable {
+        case autoSubmit
+        case queueForConfirmation
+    }
+
     enum PauseBehavior {
         case respectPause
         case allowSubmissionWhilePaused
     }
 
     struct Result {
+        let deliveryMode: DeliveryMode
         let importedCount: Int
         let importedRecentTrackCount: Int
         let flushedPlaybackHistoryCount: Int
         let flushedRecentTrackCount: Int
+        let queuedPlaybackHistoryCount: Int
+        let queuedRecentTrackCount: Int
+        let pendingReviewCount: Int
         let skippedDuplicateCount: Int
         let recentTracksAuthorizationUnavailable: Bool
         let recentTracksStatus: AppleMusicRecentTracksImporter.ImportStatus
@@ -23,6 +32,14 @@ enum ListeningHistoryScanService {
 
         var totalFlushedCount: Int {
             flushedPlaybackHistoryCount + flushedRecentTrackCount
+        }
+
+        var totalQueuedCount: Int {
+            queuedPlaybackHistoryCount + queuedRecentTrackCount
+        }
+
+        var requiresConfirmation: Bool {
+            deliveryMode == .queueForConfirmation
         }
     }
 
@@ -40,6 +57,7 @@ enum ListeningHistoryScanService {
         let importedCount: Int
         let skippedDuplicateCount: Int
         let newestObservedPlayedAt: Date?
+        let reviewEntries: [ListeningHistoryReviewStore.Entry]
     }
 
     private static let logger = Logger(subsystem: "FastScrobbler", category: "ListeningHistoryScanService")
@@ -52,27 +70,31 @@ enum ListeningHistoryScanService {
         maxItems: Int = 200,
         allowExtendedLookback: Bool = false,
         bypassRecentTrackCooldown: Bool = false,
+        recoveryCutoffDate: Date? = nil,
         isUserPaused: Bool = false,
         pauseBehavior: PauseBehavior = .respectPause,
+        deliveryMode: DeliveryMode = .autoSubmit,
+        reviewStore: ListeningHistoryReviewStore? = nil,
         retryEmptyPlaybackHistoryImportOnce: Bool = false,
         beforePlaybackHistoryRetry: (() async -> Void)? = nil,
         recordSuccessfulScrobble: (() -> Void)? = nil
     ) async -> Result {
-        if !AppSettings.scrobbleListeningHistoryEnabled() {
-            await backlog.removeAll(origin: .playbackHistory)
-        }
+        let reviewStore = reviewStore ?? ListeningHistoryReviewStore.shared
 
         let extendedLookback = allowExtendedLookback && AppSettings.extendedListeningHistoryScanEnabled()
         let playbackHistorySummary = await importPlaybackHistory(
             backlog: backlog,
             scrobbleLog: scrobbleLog,
             maxItems: maxItems,
-            extendedLookback: extendedLookback
+            extendedLookback: extendedLookback,
+            deliveryMode: deliveryMode,
+            recoveryCutoffDate: recoveryCutoffDate
         )
         var totalImported = playbackHistorySummary.importedCount
         var totalSkippedDuplicates = playbackHistorySummary.skippedDuplicateCount
         var playbackHistoryRetryRan = false
         var newestObservedPlayedAt = playbackHistorySummary.newestObservedPlayedAt
+        var playbackHistoryReviewEntries = playbackHistorySummary.reviewEntries
 
         logger.info(
             "listening-history playback scan first pass: imported=\(playbackHistorySummary.importedCount, privacy: .public) skippedDuplicates=\(playbackHistorySummary.skippedDuplicateCount, privacy: .public) newestObservedPlayedAt=\(String(describing: playbackHistorySummary.newestObservedPlayedAt), privacy: .public)"
@@ -95,11 +117,14 @@ enum ListeningHistoryScanService {
                     backlog: backlog,
                     scrobbleLog: scrobbleLog,
                     maxItems: maxItems,
-                    extendedLookback: extendedLookback
+                    extendedLookback: extendedLookback,
+                    deliveryMode: deliveryMode,
+                    recoveryCutoffDate: recoveryCutoffDate
                 )
                 totalImported += retrySummary.importedCount
                 totalSkippedDuplicates += retrySummary.skippedDuplicateCount
                 newestObservedPlayedAt = maxOptionalDate(newestObservedPlayedAt, retrySummary.newestObservedPlayedAt)
+                playbackHistoryReviewEntries.append(contentsOf: retrySummary.reviewEntries)
 
                 logger.info(
                     "listening-history playback scan retry: imported=\(retrySummary.importedCount, privacy: .public) skippedDuplicates=\(retrySummary.skippedDuplicateCount, privacy: .public) newestObservedPlayedAt=\(String(describing: retrySummary.newestObservedPlayedAt), privacy: .public)"
@@ -107,25 +132,72 @@ enum ListeningHistoryScanService {
             }
         }
 
-        let recentImportResult = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
-            backlog: backlog,
-            scrobbleLog: scrobbleLog,
-            maxItems: maxItems > 0 ? min(maxItems, 30) : 0,
-            bypassCooldown: bypassRecentTrackCooldown
-        )
+        let recentImportResult: AppleMusicRecentTracksImporter.ImportResult
+        switch deliveryMode {
+        case .autoSubmit:
+            recentImportResult = await AppleMusicRecentTracksImporter.shared.importIntoBacklog(
+                backlog: backlog,
+                scrobbleLog: scrobbleLog,
+                maxItems: maxItems > 0 ? min(maxItems, 30) : 0,
+                bypassCooldown: bypassRecentTrackCooldown,
+                recoveryCutoffDate: recoveryCutoffDate
+            )
+        case .queueForConfirmation:
+            recentImportResult = await AppleMusicRecentTracksImporter.shared.collectReviewEntries(
+                backlog: backlog,
+                scrobbleLog: scrobbleLog,
+                maxItems: maxItems > 0 ? min(maxItems, 30) : 0,
+                bypassCooldown: bypassRecentTrackCooldown,
+                recoveryCutoffDate: recoveryCutoffDate
+            )
+        }
         totalSkippedDuplicates += recentImportResult.skippedDuplicateCount
+        let queuedPlaybackHistoryCount: Int
+        let queuedRecentTrackCount: Int
+        let pendingReviewCount: Int
+
+        switch deliveryMode {
+        case .autoSubmit:
+            queuedPlaybackHistoryCount = 0
+            queuedRecentTrackCount = 0
+            pendingReviewCount = reviewStore.pendingCount()
+        case .queueForConfirmation:
+            queuedPlaybackHistoryCount = reviewStore.upsert(playbackHistoryReviewEntries)
+            queuedRecentTrackCount = reviewStore.upsert(recentImportResult.reviewEntries)
+            pendingReviewCount = reviewStore.pendingCount()
+        }
 
         logger.info(
-            "listening-history scan complete: playbackImported=\(totalImported, privacy: .public) recentImported=\(recentImportResult.importedCount, privacy: .public) skippedDuplicates=\(totalSkippedDuplicates, privacy: .public) retryRan=\(playbackHistoryRetryRan, privacy: .public) newestObservedPlayedAt=\(String(describing: newestObservedPlayedAt), privacy: .public)"
+            "listening-history scan complete: deliveryMode=\(String(describing: deliveryMode), privacy: .public) playbackImported=\(totalImported, privacy: .public) recentImported=\(recentImportResult.importedCount, privacy: .public) queuedPlayback=\(queuedPlaybackHistoryCount, privacy: .public) queuedRecent=\(queuedRecentTrackCount, privacy: .public) skippedDuplicates=\(totalSkippedDuplicates, privacy: .public) retryRan=\(playbackHistoryRetryRan, privacy: .public) newestObservedPlayedAt=\(String(describing: newestObservedPlayedAt), privacy: .public)"
         )
 
-        let shouldSuppressFlushWhilePaused = isUserPaused && pauseBehavior == .respectPause
-        guard let sessionKey, !shouldSuppressFlushWhilePaused else {
+        if deliveryMode == .queueForConfirmation {
             return Result(
+                deliveryMode: deliveryMode,
                 importedCount: totalImported,
                 importedRecentTrackCount: recentImportResult.importedCount,
                 flushedPlaybackHistoryCount: 0,
                 flushedRecentTrackCount: 0,
+                queuedPlaybackHistoryCount: queuedPlaybackHistoryCount,
+                queuedRecentTrackCount: queuedRecentTrackCount,
+                pendingReviewCount: pendingReviewCount,
+                skippedDuplicateCount: totalSkippedDuplicates,
+                recentTracksAuthorizationUnavailable: recentImportResult.isAuthorizationUnavailable,
+                recentTracksStatus: recentImportResult.status
+            )
+        }
+
+        let shouldSuppressFlushWhilePaused = isUserPaused && pauseBehavior == .respectPause
+        guard let sessionKey, !shouldSuppressFlushWhilePaused else {
+            return Result(
+                deliveryMode: deliveryMode,
+                importedCount: totalImported,
+                importedRecentTrackCount: recentImportResult.importedCount,
+                flushedPlaybackHistoryCount: 0,
+                flushedRecentTrackCount: 0,
+                queuedPlaybackHistoryCount: queuedPlaybackHistoryCount,
+                queuedRecentTrackCount: queuedRecentTrackCount,
+                pendingReviewCount: pendingReviewCount,
                 skippedDuplicateCount: totalSkippedDuplicates,
                 recentTracksAuthorizationUnavailable: recentImportResult.isAuthorizationUnavailable,
                 recentTracksStatus: recentImportResult.status
@@ -160,10 +232,14 @@ enum ListeningHistoryScanService {
         }
 
         return Result(
+            deliveryMode: deliveryMode,
             importedCount: totalImported,
             importedRecentTrackCount: recentImportResult.importedCount,
             flushedPlaybackHistoryCount: totalFlushedPlaybackHistoryCount,
             flushedRecentTrackCount: totalFlushedRecentTrackCount,
+            queuedPlaybackHistoryCount: queuedPlaybackHistoryCount,
+            queuedRecentTrackCount: queuedRecentTrackCount,
+            pendingReviewCount: pendingReviewCount,
             skippedDuplicateCount: totalSkippedDuplicates,
             recentTracksAuthorizationUnavailable: recentImportResult.isAuthorizationUnavailable,
             recentTracksStatus: recentImportResult.status
@@ -216,29 +292,46 @@ enum ListeningHistoryScanService {
         backlog: ScrobbleBacklog,
         scrobbleLog: ScrobbleLogStore,
         maxItems: Int,
-        extendedLookback: Bool
+        extendedLookback: Bool,
+        deliveryMode: DeliveryMode,
+        recoveryCutoffDate: Date?
     ) async -> PlaybackHistoryImportSummary {
-        guard maxItems > 0, AppSettings.scrobbleListeningHistoryEnabled() else {
-            return PlaybackHistoryImportSummary(importedCount: 0, skippedDuplicateCount: 0, newestObservedPlayedAt: nil)
+        guard maxItems > 0 else {
+            return PlaybackHistoryImportSummary(importedCount: 0, skippedDuplicateCount: 0, newestObservedPlayedAt: nil, reviewEntries: [])
         }
 
         var totalImported = 0
         var totalSkippedDuplicates = 0
         var newestObservedPlayedAt: Date?
+        var reviewEntries: [ListeningHistoryReviewStore.Entry] = []
 
         while totalImported < Limits.maxImports {
             if Task.isCancelled { break }
 
             let batchLimit = min(maxItems, Limits.maxImports - totalImported)
-            let importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
-                backlog: backlog,
-                scrobbleLog: scrobbleLog,
-                maxItems: batchLimit,
-                mode: .recentBackfill(extendedLookback: extendedLookback)
-            )
+            let importResult: PlaybackHistoryImporter.ImportResult
+            switch deliveryMode {
+            case .autoSubmit:
+                importResult = await PlaybackHistoryImporter.shared.importIntoBacklogDetailed(
+                    backlog: backlog,
+                    scrobbleLog: scrobbleLog,
+                    maxItems: batchLimit,
+                    mode: .recentBackfill(extendedLookback: extendedLookback),
+                    recoveryCutoffDate: recoveryCutoffDate
+                )
+            case .queueForConfirmation:
+                importResult = await PlaybackHistoryImporter.shared.collectReviewEntries(
+                    backlog: backlog,
+                    scrobbleLog: scrobbleLog,
+                    maxItems: batchLimit,
+                    mode: .recentBackfill(extendedLookback: extendedLookback),
+                    recoveryCutoffDate: recoveryCutoffDate
+                )
+            }
             let imported = importResult.importedCount
             totalSkippedDuplicates += importResult.skippedDuplicateCount
             newestObservedPlayedAt = maxOptionalDate(newestObservedPlayedAt, importResult.newestObservedPlayedAt)
+            reviewEntries.append(contentsOf: importResult.reviewEntries)
 
             guard imported > 0 else { break }
             totalImported += imported
@@ -247,7 +340,8 @@ enum ListeningHistoryScanService {
         return PlaybackHistoryImportSummary(
             importedCount: totalImported,
             skippedDuplicateCount: totalSkippedDuplicates,
-            newestObservedPlayedAt: newestObservedPlayedAt
+            newestObservedPlayedAt: newestObservedPlayedAt,
+            reviewEntries: reviewEntries
         )
     }
 

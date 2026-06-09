@@ -276,7 +276,7 @@ struct ContentView: View {
             Text("Last.fm")
                 .font(.title2.weight(.semibold))
             if auth.sessionKey != nil {
-                Text("Connected")
+                Text("Signed in")
                     .font(.footnote)
                     .foregroundColor(.green)
             } else {

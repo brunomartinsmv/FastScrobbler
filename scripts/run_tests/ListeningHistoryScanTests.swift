@@ -216,6 +216,339 @@ func runListeningHistoryScanTests() {
         )
     }
 
+    section("Listening History scan · confirmation mode")
+
+    func foregroundStartupActions(
+        isUserPaused: Bool,
+        requireConfirmation: Bool
+    ) -> [ForegroundAction] {
+        var actions: [ForegroundAction] = []
+
+        if !isUserPaused, !requireConfirmation {
+            actions.append(.startEngine)
+            actions.append(.tickEngine)
+            actions.append(.scanListeningHistory)
+        }
+
+        if !isUserPaused {
+            actions.append(.flushBacklog)
+        }
+
+        actions.append(.scheduleBackgroundProcessing)
+
+        if !isUserPaused {
+            actions.append(.startEngine)
+            actions.append(.tickEngine)
+        }
+
+        return actions
+    }
+
+    let confirmationForegroundStart = foregroundStartupActions(isUserPaused: false, requireConfirmation: true)
+    expect(
+        "confirmation mode skips automatic foreground listening-history scans",
+        !confirmationForegroundStart.contains(.scanListeningHistory)
+    )
+    expect(
+        "confirmation mode still flushes existing backlog on foreground start",
+        confirmationForegroundStart.contains(.flushBacklog)
+    )
+
+    enum ScheduledRecoveryAction: Equatable {
+        case importPlaybackHistory
+        case importRecentTracks
+        case flushBacklog
+    }
+
+    func scheduledRecoveryActions(
+        isUserPaused: Bool,
+        requireConfirmation: Bool,
+        signedIn: Bool
+    ) -> [ScheduledRecoveryAction] {
+        var actions: [ScheduledRecoveryAction] = []
+
+        if !requireConfirmation {
+            actions.append(.importPlaybackHistory)
+            if !isUserPaused {
+                actions.append(.importRecentTracks)
+            }
+        }
+
+        if !isUserPaused, signedIn {
+            actions.append(.flushBacklog)
+        }
+
+        return actions
+    }
+
+    expectEqual(
+        "scheduled recovery skips both listening-history sources in confirmation mode",
+        scheduledRecoveryActions(isUserPaused: false, requireConfirmation: true, signedIn: true),
+        [.flushBacklog]
+    )
+    expectEqual(
+        "scheduled recovery keeps current import behavior when confirmation is off",
+        scheduledRecoveryActions(isUserPaused: false, requireConfirmation: false, signedIn: true),
+        [.importPlaybackHistory, .importRecentTracks, .flushBacklog]
+    )
+
+    func confirmationQueueResult(
+        playbackQueued: Int,
+        recentQueued: Int,
+        existingPending: Int,
+        skippedDuplicates: Int
+    ) -> (queuedTotal: Int, pendingTotal: Int, flushedTotal: Int, skippedDuplicates: Int) {
+        (
+            queuedTotal: playbackQueued + recentQueued,
+            pendingTotal: existingPending + playbackQueued + recentQueued,
+            flushedTotal: 0,
+            skippedDuplicates: skippedDuplicates
+        )
+    }
+
+    let confirmationQueue = confirmationQueueResult(
+        playbackQueued: 3,
+        recentQueued: 2,
+        existingPending: 4,
+        skippedDuplicates: 1
+    )
+    expectEqual("confirmation mode reports newly queued items", confirmationQueue.queuedTotal, 5)
+    expectEqual("confirmation mode preserves existing pending items in the queue", confirmationQueue.pendingTotal, 9)
+    expectEqual("confirmation mode does not auto-submit queued items", confirmationQueue.flushedTotal, 0)
+    expectEqual("confirmation mode still reports duplicate skips", confirmationQueue.skippedDuplicates, 1)
+
+    func shortcutScanOpensApp(requireConfirmation: Bool) -> Bool {
+        let _ = requireConfirmation
+        return true
+    }
+
+    expect("shortcut scan opens the app when confirmation mode is on", shortcutScanOpensApp(requireConfirmation: true))
+    expect("shortcut scan opens the app when confirmation mode is off", shortcutScanOpensApp(requireConfirmation: false))
+
+    enum ShortcutScanPresentation: Equatable {
+        case openHomeAlert
+        case openHomeReview
+    }
+
+    func shortcutScanPresentation(requireConfirmation: Bool) -> ShortcutScanPresentation {
+        requireConfirmation ? .openHomeReview : .openHomeAlert
+    }
+
+    expectEqual(
+        "shortcut scan opens the Home review list when confirmation mode is on",
+        shortcutScanPresentation(requireConfirmation: true),
+        .openHomeReview
+    )
+    expectEqual(
+        "shortcut scan opens Home and shows the result alert when confirmation mode is off",
+        shortcutScanPresentation(requireConfirmation: false),
+        .openHomeAlert
+    )
+
+    enum SimHomeTab: Equatable {
+        case home
+        case settings
+    }
+
+    enum PendingLaunchRequest: Equatable {
+        case openReviewOnly
+        case scanAndOpenReview
+        case scanAndShowResult
+    }
+
+    struct PendingLaunchRequestState: Equatable {
+        let requestConsumed: Bool
+        let selectedTab: SimHomeTab
+        let isShowingReview: Bool
+        let isShowingResultAlert: Bool
+    }
+
+    func consumePendingLaunchRequest(
+        request: PendingLaunchRequest?,
+        pendingReviewCount: Int = 0,
+        hasSeenSetup: Bool,
+        isShowingSetup: Bool,
+        isShowingWhatsNew: Bool,
+        currentTab: SimHomeTab,
+        isShowingReview: Bool,
+        isShowingResultAlert: Bool
+    ) -> PendingLaunchRequestState {
+        guard let request else {
+            return PendingLaunchRequestState(
+                requestConsumed: false,
+                selectedTab: currentTab,
+                isShowingReview: isShowingReview,
+                isShowingResultAlert: isShowingResultAlert
+            )
+        }
+        guard hasSeenSetup, !isShowingSetup, !isShowingWhatsNew else {
+            return PendingLaunchRequestState(
+                requestConsumed: false,
+                selectedTab: currentTab,
+                isShowingReview: isShowingReview,
+                isShowingResultAlert: isShowingResultAlert
+            )
+        }
+
+        return PendingLaunchRequestState(
+            requestConsumed: true,
+            selectedTab: .home,
+            isShowingReview: request == .openReviewOnly || (request == .scanAndOpenReview && pendingReviewCount > 0),
+            isShowingResultAlert: request == .scanAndShowResult || (request == .scanAndOpenReview && pendingReviewCount == 0)
+        )
+    }
+
+    expectEqual(
+        "pending scan-and-open-review request switches back to Home and presents the review sheet",
+        consumePendingLaunchRequest(
+            request: .scanAndOpenReview,
+            pendingReviewCount: 3,
+            hasSeenSetup: true,
+            isShowingSetup: false,
+            isShowingWhatsNew: false,
+            currentTab: .settings,
+            isShowingReview: false,
+            isShowingResultAlert: true
+        ),
+        PendingLaunchRequestState(
+            requestConsumed: true,
+            selectedTab: .home,
+            isShowingReview: true,
+            isShowingResultAlert: false
+        )
+    )
+    expectEqual(
+        "pending listening-history launch request waits until setup and Whats New are out of the way",
+        consumePendingLaunchRequest(
+            request: .scanAndShowResult,
+            pendingReviewCount: 0,
+            hasSeenSetup: true,
+            isShowingSetup: false,
+            isShowingWhatsNew: true,
+            currentTab: .settings,
+            isShowingReview: false,
+            isShowingResultAlert: false
+        ),
+        PendingLaunchRequestState(
+            requestConsumed: false,
+            selectedTab: .settings,
+            isShowingReview: false,
+            isShowingResultAlert: false
+        )
+    )
+    expectEqual(
+        "pending scan-and-show-result request clears stale alerts and shows the new result on Home",
+        consumePendingLaunchRequest(
+            request: .scanAndShowResult,
+            pendingReviewCount: 0,
+            hasSeenSetup: true,
+            isShowingSetup: false,
+            isShowingWhatsNew: false,
+            currentTab: .settings,
+            isShowingReview: true,
+            isShowingResultAlert: true
+        ),
+        PendingLaunchRequestState(
+            requestConsumed: true,
+            selectedTab: .home,
+            isShowingReview: false,
+            isShowingResultAlert: true
+        )
+    )
+    expectEqual(
+        "pending scan-and-open-review request falls back to the existing no-new-plays alert when nothing is queued",
+        consumePendingLaunchRequest(
+            request: .scanAndOpenReview,
+            pendingReviewCount: 0,
+            hasSeenSetup: true,
+            isShowingSetup: false,
+            isShowingWhatsNew: false,
+            currentTab: .settings,
+            isShowingReview: true,
+            isShowingResultAlert: false
+        ),
+        PendingLaunchRequestState(
+            requestConsumed: true,
+            selectedTab: .home,
+            isShowingReview: false,
+            isShowingResultAlert: true
+        )
+    )
+    expectEqual(
+        "consumed listening-history launch request does not reopen on later checks",
+        consumePendingLaunchRequest(
+            request: nil,
+            pendingReviewCount: 0,
+            hasSeenSetup: true,
+            isShowingSetup: false,
+            isShowingWhatsNew: false,
+            currentTab: .home,
+            isShowingReview: false,
+            isShowingResultAlert: false
+        ),
+        PendingLaunchRequestState(
+            requestConsumed: false,
+            selectedTab: .home,
+            isShowingReview: false,
+            isShowingResultAlert: false
+        )
+    )
+
+    enum ReviewLeadingAction: Equatable {
+        case close
+        case selectAll
+        case deselectAll
+    }
+
+    func reviewLeadingAction(selectedCount: Int, totalCount: Int) -> ReviewLeadingAction {
+        if selectedCount == 0 { return .close }
+        if totalCount > 0, selectedCount == totalCount { return .deselectAll }
+        return .selectAll
+    }
+
+    expectEqual("review screen shows Close with no selection", reviewLeadingAction(selectedCount: 0, totalCount: 5), .close)
+    expectEqual("review screen shows Select All with a partial selection", reviewLeadingAction(selectedCount: 2, totalCount: 5), .selectAll)
+    expectEqual("review screen shows Deselect All when everything is selected", reviewLeadingAction(selectedCount: 5, totalCount: 5), .deselectAll)
+
+    func reviewDeleteButtonTitle(selectedCount: Int) -> String {
+        selectedCount > 0 ? "Delete Selected (\(selectedCount))" : "Delete Selected"
+    }
+
+    func reviewSubmitButtonTitle(selectedCount: Int) -> String {
+        selectedCount > 0 ? "Submit Selected (\(selectedCount))" : "Submit All"
+    }
+
+    func reviewCanDelete(selectedCount: Int) -> Bool {
+        selectedCount > 0
+    }
+
+    expectEqual("review screen shows Delete Selected with no selection", reviewDeleteButtonTitle(selectedCount: 0), "Delete Selected")
+    expectEqual("review screen shows Submit All with no selection", reviewSubmitButtonTitle(selectedCount: 0), "Submit All")
+    expectEqual("review screen shows Delete Selected count for partial selection", reviewDeleteButtonTitle(selectedCount: 2), "Delete Selected (2)")
+    expectEqual("review screen shows Submit Selected count for partial selection", reviewSubmitButtonTitle(selectedCount: 2), "Submit Selected (2)")
+    expect("review screen disables delete with no selection", !reviewCanDelete(selectedCount: 0))
+    expect("review screen enables delete for partial selection", reviewCanDelete(selectedCount: 2))
+
+    func pendingQueueAfterDelete(totalCount: Int, selectedCount: Int) -> Int {
+        max(0, totalCount - selectedCount)
+    }
+
+    expectEqual("deleting selected items removes only those items from the pending queue", pendingQueueAfterDelete(totalCount: 6, selectedCount: 2), 4)
+
+    func pendingQueueAfterSubmit(totalCount: Int, selectedCount: Int) -> Int {
+        selectedCount > 0 ? max(0, totalCount - selectedCount) : 0
+    }
+
+    expectEqual("submitting selected items leaves unselected rows pending", pendingQueueAfterSubmit(totalCount: 6, selectedCount: 2), 4)
+    expectEqual("submitting all items drains the pending queue", pendingQueueAfterSubmit(totalCount: 6, selectedCount: 0), 0)
+
+    func queueClearedWhenConfirmationTurnsOff(existingPending: Int, isEnabled: Bool) -> Int {
+        isEnabled ? existingPending : 0
+    }
+
+    expectEqual("turning confirmation off clears the pending review queue", queueClearedWhenConfirmationTurnsOff(existingPending: 5, isEnabled: false), 0)
+    expectEqual("keeping confirmation on preserves the pending review queue", queueClearedWhenConfirmationTurnsOff(existingPending: 5, isEnabled: true), 5)
+
     section("Listening History scan · empty-result retry")
 
     func simulateRetryablePlaybackHistoryScan(
@@ -359,6 +692,73 @@ func runListeningHistoryScanTests() {
     expect(
         "manual first scan remains an explicit recent-history backfill",
         !shouldInitializeCursorWithoutImport(lastImportAt: nil, mode: .recentBackfill)
+    )
+
+    section("Listening History scan · Resume cutoff")
+
+    enum ResumeCutoffEntryPoint: CaseIterable {
+        case homeRefresh
+        case settingsScan
+        case shortcutScan
+    }
+
+    func filteredPlaybackHistoryPlayedAts(
+        playedAts: [Int],
+        recoveryCutoff: Int?
+    ) -> [Int] {
+        playedAts.filter { playedAt in
+            guard let recoveryCutoff else { return true }
+            return playedAt > recoveryCutoff
+        }
+    }
+
+    func filteredRecentTrackPlayedAts(
+        playedAts: [Int],
+        recoveryCutoff: Int?
+    ) -> [Int] {
+        playedAts.filter { playedAt in
+            guard let recoveryCutoff else { return true }
+            return playedAt > recoveryCutoff
+        }
+    }
+
+    func persistedPlaybackHistoryCursor(
+        priorLastImportAt: Int?,
+        newestImportedPlayedAt: Int?,
+        recoveryCutoff: Int?
+    ) -> Int? {
+        if let newestImportedPlayedAt {
+            return [priorLastImportAt, newestImportedPlayedAt, recoveryCutoff].compactMap { $0 }.max()
+        }
+        if let recoveryCutoff {
+            return max(priorLastImportAt ?? recoveryCutoff, recoveryCutoff)
+        }
+        return priorLastImportAt
+    }
+
+    expectEqual(
+        "resume cutoff filters playback-history plays at or before resume",
+        filteredPlaybackHistoryPlayedAts(playedAts: [90, 100, 110], recoveryCutoff: 100),
+        [110]
+    )
+    expectEqual(
+        "resume cutoff filters recently played candidates at or before resume",
+        filteredRecentTrackPlayedAts(playedAts: [95, 100, 105], recoveryCutoff: 100),
+        [105]
+    )
+
+    for entryPoint in ResumeCutoffEntryPoint.allCases {
+        expectEqual(
+            "resume cutoff applies to \(entryPoint) scans",
+            filteredPlaybackHistoryPlayedAts(playedAts: [80, 100, 120], recoveryCutoff: 100),
+            [120]
+        )
+    }
+
+    expectEqual(
+        "playback-history cursor advances to the resume cutoff even with no post-resume imports",
+        persistedPlaybackHistoryCursor(priorLastImportAt: 70, newestImportedPlayedAt: nil, recoveryCutoff: 100),
+        100
     )
 
     // ─── Listening History scan dialog summary ───────────────────────────────────

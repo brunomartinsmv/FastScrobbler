@@ -11,10 +11,29 @@ struct WhatsNewView: View {
         var id: String { title }
         let systemImage: String
         let title: String
+        let boldPrefix: String?
         let showsProBadge: Bool
     }
 
     private let currentSections: [VersionSection] = [
+        VersionSection(
+            id: "6.2",
+            version: "6.2",
+            features: [
+                Feature(
+                    systemImage: "checkmark.circle",
+                    title: "\nPlays detected from Listening History now require confirmation before they are scrobbled.",
+                    boldPrefix: "Auto-scrobbling for Listening History is now OFF by default.",
+                    showsProBadge: false
+                ),
+                Feature(
+                    systemImage: "checkmark.circle",
+                    title: "To restore the previous behavior, turn on the new \"Auto-scrobble Listening History\" toggle.",
+                    boldPrefix: nil,
+                    showsProBadge: false
+                )
+            ]
+        ),
         VersionSection(
             id: "6.0",
             version: "6.0",
@@ -22,11 +41,13 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "music.note.tv",
                     title: "Tap the \"Now Playing\" card to open a full-screen view",
+                    boldPrefix: nil,
                     showsProBadge: false
                 ),
                 Feature(
                     systemImage: "paintpalette",
                     title: "Choose between colourful and monochrome button themes",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -41,11 +62,13 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "icloud",
                     title: "Option to sync stored app data to iCloud (under \"App Storage\")",
+                    boldPrefix: nil,
                     showsProBadge: false
                 ),
                 Feature(
                     systemImage: "music.note.square.stack",
-                    title: "\"Only scrobble non-library songs\" toggle for the \"Scrobble from Apple Music API\" feature",
+                    title: "\"Only scrobble non-library songs\" toggle for the \"Scrobble Recently Played from Apple Music API\" feature",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -56,12 +79,14 @@ struct WhatsNewView: View {
             features: [
                 Feature(
                     systemImage: "square.and.arrow.down.badge.clock",
-                    title: "\"Scrobble from Apple Music API\" feature",
+                    title: "\"Scrobble Recently Played from Apple Music API\" feature",
+                    boldPrefix: nil,
                     showsProBadge: false
                 ),
                 Feature(
                     systemImage: "person.crop.rectangle",
                     title: "\"Scrobble only the first credited artist\" feature",
+                    boldPrefix: nil,
                     showsProBadge: true
                 )
             ]
@@ -73,16 +98,19 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "textformat.abc",
                     title: "Text replacement feature: Find and replace keywords when scrobbling",
+                    boldPrefix: nil,
                     showsProBadge: true
                 ),
                 Feature(
                     systemImage: "plus.circle",
                     title: "Manual scrobbling feature",
+                    boldPrefix: nil,
                     showsProBadge: false
                 ),
                 Feature(
                     systemImage: "hand.tap",
                     title: "Tap and hold on a scrobbled song to scrobble it again",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -94,6 +122,7 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "person.2.wave.2",
                     title: "Added links to the r/FastScrobbler subreddit in the Settings page.\n\nFor any questions or bug reports, submit a post to r/FastScrobbler and FastScrobbler will respond to you.",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -105,6 +134,7 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "parentheses",
                     title: "\"Remove brackets in album titles\" feature",
+                    boldPrefix: nil,
                     showsProBadge: true
                 )
             ]
@@ -116,11 +146,13 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "parentheses",
                     title: "\"Remove brackets in song titles\" feature",
+                    boldPrefix: nil,
                     showsProBadge: true
                 ),
                 Feature(
                     systemImage: "clock.arrow.circlepath",
                     title: "Toggle to disable the \"Scrobble from Listening History\" functionality",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -132,11 +164,13 @@ struct WhatsNewView: View {
                 Feature(
                     systemImage: "globe",
                     title: "Support for Chinese (Simplified), French, Japanese, and Spanish",
+                    boldPrefix: nil,
                     showsProBadge: false
                 ),
                 Feature(
                     systemImage: "person.2",
                     title: "Album artist scrobbling support",
+                    boldPrefix: nil,
                     showsProBadge: false
                 )
             ]
@@ -217,6 +251,7 @@ struct WhatsNewView: View {
                             ForEach(section.features) { feature in
                                 WhatsNewFeatureCard(
                                     systemImage: feature.systemImage,
+                                    boldPrefix: feature.boldPrefix,
                                     title: feature.title,
                                     showsProBadge: feature.showsProBadge
                                 )
@@ -246,6 +281,7 @@ private struct WhatsNewPreviousVersionsView: View {
 
 private struct WhatsNewFeatureCard: View {
     let systemImage: String
+    let boldPrefix: String?
     let title: String
     let showsProBadge: Bool
 
@@ -258,7 +294,7 @@ private struct WhatsNewFeatureCard: View {
                 .background(Color(.tertiarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            Text(title)
+            featureText
                 .font(.body)
                 .multilineTextAlignment(.leading)
                 .lineLimit(nil)
@@ -278,5 +314,13 @@ private struct WhatsNewFeatureCard: View {
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var featureText: Text {
+        guard let boldPrefix else {
+            return Text(title)
+        }
+
+        return Text(boldPrefix).bold() + Text(title)
     }
 }

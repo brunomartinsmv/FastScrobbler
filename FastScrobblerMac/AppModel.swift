@@ -85,8 +85,6 @@ final class AppModel {
         }
         guard !Task.isCancelled else { return }
 
-        await purgePlaybackHistoryBacklogIfNeeded()
-
         if auth.sessionKey == nil {
             await LiveActivityManager.shared.update(
                 status: NSLocalizedString("Connect Last.fm to scrobble.", comment: ""),
@@ -124,7 +122,6 @@ final class AppModel {
         guard UserDefaults.standard.bool(forKey: Keys.hasSeenSetup) else { return }
 
         observer.refreshOnceIfAuthorized()
-        await purgePlaybackHistoryBacklogIfNeeded()
         if let sessionKey = auth.sessionKey {
             let result = await backlog.flush(sessionKey: sessionKey)
             for item in result.sentItems {
@@ -138,11 +135,6 @@ final class AppModel {
             }
         }
         await engine.tickAsync()
-    }
-
-    func handleListeningHistoryScrobblingChanged(isEnabled: Bool) async {
-        guard !isEnabled else { return }
-        await backlog.removeAll(origin: .playbackHistory)
     }
 
     func periodicFlush() async {
@@ -199,11 +191,6 @@ final class AppModel {
             )
         }
         return result
-    }
-
-    private func purgePlaybackHistoryBacklogIfNeeded() async {
-        guard !AppSettings.scrobbleListeningHistoryEnabled() else { return }
-        await backlog.removeAll(origin: .playbackHistory)
     }
 
     private func runStorageMaintenanceIfNeeded() async {

@@ -8,7 +8,7 @@
 "Allow Music Control" = "Permitir controlar Música";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "Evita enviar la misma sesión de reproducción a Last.fm más de una vez dentro de un corto intervalo de tiempo.";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Función beta: muestra el estado del scrobbling en la pantalla de bloqueo y en Dynamic Island.";
-"Connected" = "Conectado";
+"Signed in" = "Conectado";
 "Done" = "Listo";
 "Duration: %@s | Playback: %@s" = "Duración: %1$@ s | Reproducción: %2$@ s";
 "Enabled" = "Activado";

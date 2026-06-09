@@ -117,12 +117,6 @@ private enum SyncedSettingsStore {
 
     private static let definitions: [Definition] = [
         Definition(
-            key: AppSettings.Keys.scrobbleListeningHistoryEnabled,
-            storage: .appGroup,
-            read: { .bool(AppSettings.scrobbleListeningHistoryEnabled()) },
-            apply: { if case .bool(let value) = $0 { AppGroup.userDefaults.set(value, forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled) } }
-        ),
-        Definition(
             key: AppSettings.Keys.scrobbleAppleMusicAPIEnabled,
             storage: .appGroup,
             read: { .bool(AppSettings.scrobbleAppleMusicAPIEnabled()) },
@@ -139,6 +133,12 @@ private enum SyncedSettingsStore {
             storage: .appGroup,
             read: { .bool(AppSettings.extendedListeningHistoryScanEnabled()) },
             apply: { if case .bool(let value) = $0 { AppGroup.userDefaults.set(value, forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled) } }
+        ),
+        Definition(
+            key: AppSettings.Keys.listeningHistoryRequireConfirmationEnabled,
+            storage: .appGroup,
+            read: { .bool(AppSettings.listeningHistoryRequireConfirmationEnabled()) },
+            apply: { if case .bool(let value) = $0 { AppGroup.userDefaults.set(value, forKey: AppSettings.Keys.listeningHistoryRequireConfirmationEnabled) } }
         ),
         Definition(
             key: AppSettings.Keys.themeSelection,

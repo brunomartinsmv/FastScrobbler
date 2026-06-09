@@ -8,6 +8,9 @@ import WebKit
 #endif
 
 struct ContentView: View {
+    fileprivate static let homeListeningHistoryButtonHeight: CGFloat = 44
+    fileprivate static let listeningHistoryConfirmationButtonHeight: CGFloat = 50
+
     private enum Keys {
         static let hasSeenSetup = "FastScrobbler.Setup.hasSeen"
     }
@@ -129,17 +132,22 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
+    @AppStorage(AppSettings.Keys.listeningHistoryRequireConfirmationEnabled, store: AppGroup.userDefaults) private var listeningHistoryRequireConfirmationEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
     @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
     @State private var lastScrobbleLogRefreshDate: Date = .distantPast
     @State private var errorText: String?
+    @State private var listeningHistoryAlertMessage: String?
     @State private var isShowingSetup = false
     @State private var isShowingWhatsNew = false
-    @State private var isShowingHelp = false
     @State private var isShowingSettings = false
     @State private var isShowingManualScrobble = false
+    @State private var isShowingListeningHistoryReview = false
     @State private var isShowingFullscreenNowPlaying = false
+    @State private var isScanningListeningHistory = false
+    @State private var isHandlingPendingListeningHistoryLaunchRequest = false
+    @State private var settingsScrollRequest: SettingsScrollRequest?
 
     @State private var inAppBrowserURL: URL?
     @State private var prevBounce = 0
@@ -148,6 +156,19 @@ struct ContentView: View {
     private enum Tab { case home, settings }
     @State private var selectedTab: Tab = .home
 
+    private var autoScrobbleListeningHistoryBinding: Binding<Bool> {
+        Binding(
+            get: { !listeningHistoryRequireConfirmationEnabled },
+            set: { isEnabled in
+                let requireConfirmation = !isEnabled
+                guard listeningHistoryRequireConfirmationEnabled != requireConfirmation else { return }
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    listeningHistoryRequireConfirmationEnabled = requireConfirmation
+                }
+                Task { await AppModel.shared.handleListeningHistoryRequireConfirmationChanged(isEnabled: requireConfirmation) }
+            }
+        )
+    }
 
     var body: some View {
         Group {
@@ -170,6 +191,7 @@ struct ContentView: View {
             refreshMediaLibraryStatusIfNeeded()
             presentSetupIfNeeded()
             presentWhatsNewIfNeeded()
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
         .onValueChange(of: scenePhase) { phase in
             guard phase == .active else { return }
@@ -180,39 +202,39 @@ struct ContentView: View {
             if hasSeenSetup {
                 AppModel.shared.startIfNeeded()
             }
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
         .onValueChange(of: observer.authorizationStatus) { _ in
             refreshMediaLibraryStatusIfNeeded()
             presentSetupIfNeeded()
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
         .onValueChange(of: auth.sessionKey) { _ in
             presentSetupIfNeeded()
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
             guard hasSeenSetup else { return }
             presentWhatsNewIfNeeded()
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openManualScrobble)) { _ in
             isShowingManualScrobble = true
         }
         .fullScreenCover(isPresented: $isShowingSetup) {
-            SetupHelpView(mode: .onboarding) {
+            SetupHelpView(mode: .setup) {
                 guard MPMediaLibrary.authorizationStatus() == .authorized else { return }
                 guard auth.sessionKey != nil else { return }
                 hasSeenSetup = true
                 isShowingSetup = false
                 presentWhatsNewIfNeeded()
                 AppModel.shared.startIfNeeded()
+                handlePendingListeningHistoryLaunchRequestIfNeeded()
             }
         }
         .fullScreenCover(isPresented: $isShowingWhatsNew) {
             WhatsNewView {
                 dismissWhatsNew()
-            }
-        }
-        .fullScreenCover(isPresented: $isShowingHelp) {
-            SetupHelpView(mode: .help, hideTitle: true) {
-                isShowingHelp = false
             }
         }
 #if os(iOS)
@@ -239,6 +261,27 @@ struct ContentView: View {
                 InAppSafariView(url: url)
                     .ignoresSafeArea()
             }
+        }
+        .sheet(isPresented: $isShowingListeningHistoryReview) {
+            ListeningHistoryReviewView {
+                scrobbleLog.reload()
+                lastScrobbleLogRefreshDate = .now
+                engine.start()
+            }
+            .environmentObject(auth)
+            .environmentObject(scrobbleLog)
+        }
+        .alert("Listening History", isPresented: Binding(
+            get: { listeningHistoryAlertMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    listeningHistoryAlertMessage = nil
+                }
+            }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(listeningHistoryAlertMessage ?? "")
         }
         .preferredColorScheme(selectedAppTheme.preferredColorScheme)
     }
@@ -274,7 +317,7 @@ struct ContentView: View {
         if usesMonochromeButtons {
             return ActionButtonPalette.monochromeForeground.opacity(disabled ? 0.35 : 0.85)
         }
-        return defaultColor
+        return disabled ? .secondary.opacity(0.35) : defaultColor
     }
 
     private var mainContent: some View {
@@ -325,7 +368,7 @@ struct ContentView: View {
     }
 
     private var settingsTabContent: some View {
-        SettingsView(isShowingHelp: $isShowingHelp)
+        SettingsView(isShowingSetup: $isShowingSetup, scrollRequest: $settingsScrollRequest)
             .environment(\.isEmbeddedInTab, true)
     }
 
@@ -357,7 +400,7 @@ struct ContentView: View {
             Text("Last.fm")
                 .font(.title2.weight(.semibold))
             if auth.sessionKey != nil {
-                Text("Connected")
+                Text("Signed in")
                     .font(.footnote)
                     .foregroundColor(.green)
             } else {
@@ -498,6 +541,9 @@ struct ContentView: View {
 
             HStack(spacing: actionButtonSpacing) {
                 Button {
+                    if engine.isUserPaused {
+                        AppSettings.noteListeningHistoryRecoveryResumeNow()
+                    }
                     engine.setUserPaused(!engine.isUserPaused)
                 } label: {
                     HStack(spacing: 8) {
@@ -597,30 +643,85 @@ struct ContentView: View {
     }
 
     private var scrobbleLogCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let recentScrobblesTopPadding: CGFloat = 6
+
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text("Recent Scrobbles")
                     .font(.title2.weight(.semibold))
                 Spacer()
+                Button {
+                    settingsScrollRequest = SettingsScrollRequest(target: .listeningHistory)
+                    selectedTab = .settings
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.title2.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.primary)
+                .accessibilityLabel(Text("Listening History"))
+                .accessibilityHint(Text("Settings"))
             }
+
+            if listeningHistoryRequireConfirmationEnabled {
+                let isListeningHistoryScanDisabled = engine.isUserPaused || !canRunListeningHistoryScan || isScanningListeningHistory
+
+                Button {
+                    Task { await runListeningHistoryScanFromHome(showsResultAlert: true) }
+                } label: {
+                    HStack(alignment: .center, spacing: 8) {
+                        Image(systemName: "clock.arrow.circlepath")
+                        Text(isScanningListeningHistory ? NSLocalizedString("Scanning…", comment: "") : NSLocalizedString("Scan Listening History", comment: ""))
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.6)
+                            .allowsTightening(true)
+                    }
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(actionButtonForeground(ActionButtonPalette.scrobbleNowForeground))
+                    .frame(maxWidth: .infinity, minHeight: Self.homeListeningHistoryButtonHeight, alignment: .center)
+                }
+                .buttonStyle(.bordered)
+                .pillButtonBorder()
+                .tint(actionButtonTint(ActionButtonPalette.scrobbleNow))
+                .prominentButtonBackground(actionButtonFill(ActionButtonPalette.scrobbleNowFill, disabled: isListeningHistoryScanDisabled))
+                .brightButtonBorder(actionButtonBorder(ActionButtonPalette.scrobbleNowBorder, disabled: isListeningHistoryScanDisabled))
+                .buttonGlow(actionButtonTint(ActionButtonPalette.scrobbleNow))
+                .padding(.top, 6)
+                .disabled(isListeningHistoryScanDisabled)
+                .transition(.opacity)
+            }
+
+            Toggle(isOn: autoScrobbleListeningHistoryBinding) {
+                Text("Auto-scrobble Listening History")
+                    .font(.body.weight(.semibold))
+            }
+                .tint(.red)
+                .padding(.vertical, 10)
+
+            Divider()
 
             if scrobbleLog.entries.isEmpty {
                 Text("No scrobbles yet.")
                     .foregroundColor(.secondary)
+                    .padding(.top, recentScrobblesTopPadding)
             } else {
-                let entries = scrobbleLog.recentEntries()
+                let entries = groupedRecentScrobbleEntries(scrobbleLog.recentEntries())
                 VStack(spacing: 10) {
                     ForEach(entries) { entry in
                         ScrobbleLogRowView(
-                            entry: entry,
+                            entry: entry.representativeEntry,
+                            consecutivePlayCount: entry.count,
                             isLast: entry.id == entries.last?.id,
                             engine: engine
                         )
                     }
                 }
+                .padding(.top, recentScrobblesTopPadding)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeInOut(duration: 0.25), value: listeningHistoryRequireConfirmationEnabled)
         .padding()
         .background(contentCardBackground)
     }
@@ -638,9 +739,52 @@ struct ContentView: View {
 
     @MainActor
     private func refreshHome() async {
-        await AppModel.shared.runUserInitiatedListeningHistoryScan(bypassRecentTrackCooldown: true)
-        scrobbleLog.reload()
-        lastScrobbleLogRefreshDate = .now
+        if listeningHistoryRequireConfirmationEnabled {
+            await runListeningHistoryScanFromHome(showsResultAlert: false)
+            return
+        }
+
+        let result = await AppModel.shared.runUserInitiatedListeningHistoryScan(bypassRecentTrackCooldown: true)
+        if result.totalFlushedCount > 0 {
+            scrobbleLog.reload()
+            lastScrobbleLogRefreshDate = .now
+        }
+    }
+
+    private var canRunListeningHistoryScan: Bool {
+        auth.sessionKey != nil
+    }
+
+    @MainActor
+    private func runListeningHistoryScanFromHome(showsResultAlert: Bool) async {
+        guard canRunListeningHistoryScan else { return }
+        guard !isScanningListeningHistory else { return }
+        isScanningListeningHistory = true
+        defer { isScanningListeningHistory = false }
+
+        let result = await AppModel.shared.runUserInitiatedListeningHistoryScan(
+            allowExtendedLookback: true,
+            allowSubmissionWhilePaused: true,
+            bypassRecentTrackCooldown: true
+        )
+
+        if result.requiresConfirmation {
+            if result.pendingReviewCount > 0 {
+                isShowingListeningHistoryReview = true
+            } else if showsResultAlert {
+                listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
+            }
+            return
+        }
+
+        if result.totalFlushedCount > 0 {
+            scrobbleLog.reload()
+            lastScrobbleLogRefreshDate = .now
+        }
+
+        if showsResultAlert {
+            listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
+        }
     }
 
     private func refreshScrobbleLogDisplay(now: Date, forceReload: Bool = false) {
@@ -680,7 +824,6 @@ struct ContentView: View {
         let shouldShow = (!hasSeenSetup || !mediaAuthorized || auth.sessionKey == nil)
         guard shouldShow else { return }
 
-        isShowingHelp = false
         if !isShowingSetup {
             isShowingSetup = true
         }
@@ -690,7 +833,7 @@ struct ContentView: View {
 
     private func presentWhatsNewIfNeeded() {
         guard hasSeenSetup else { return }
-        guard !isShowingSetup && !isShowingWhatsNew && !isShowingHelp else { return }
+        guard !isShowingSetup && !isShowingWhatsNew else { return }
         guard inAppBrowserURL == nil else { return }
         if WhatsNewRelease.shouldPresent() {
             isShowingWhatsNew = true
@@ -700,6 +843,450 @@ struct ContentView: View {
     private func dismissWhatsNew() {
         WhatsNewRelease.markSeen()
         isShowingWhatsNew = false
+        handlePendingListeningHistoryLaunchRequestIfNeeded()
+    }
+
+    private func handlePendingListeningHistoryLaunchRequestIfNeeded() {
+        guard hasSeenSetup else { return }
+        guard !isShowingSetup && !isShowingWhatsNew else { return }
+        guard inAppBrowserURL == nil else { return }
+        guard !isHandlingPendingListeningHistoryLaunchRequest else { return }
+        guard let request = AppSettings.consumePendingListeningHistoryLaunchRequest() else { return }
+
+        isHandlingPendingListeningHistoryLaunchRequest = true
+        selectedTab = .home
+        listeningHistoryAlertMessage = nil
+        Task { @MainActor in
+            defer { isHandlingPendingListeningHistoryLaunchRequest = false }
+
+            guard request != .openReviewOnly else {
+                isShowingListeningHistoryReview = true
+                return
+            }
+
+            guard canRunListeningHistoryScan else {
+                if request == .scanAndOpenReview {
+                    isShowingListeningHistoryReview = true
+                }
+                return
+            }
+
+            let result = await AppModel.shared.runUserInitiatedListeningHistoryScan(
+                allowExtendedLookback: true,
+                allowSubmissionWhilePaused: true,
+                bypassRecentTrackCooldown: true
+            )
+
+            if result.totalFlushedCount > 0 {
+                scrobbleLog.reload()
+                lastScrobbleLogRefreshDate = .now
+            }
+
+            switch request {
+            case .openReviewOnly:
+                isShowingListeningHistoryReview = true
+            case .scanAndOpenReview:
+                if result.pendingReviewCount > 0 {
+                    isShowingListeningHistoryReview = true
+                } else {
+                    isShowingListeningHistoryReview = false
+                    listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
+                }
+            case .scanAndShowResult:
+                isShowingListeningHistoryReview = false
+                listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
+            }
+        }
+    }
+}
+
+func listeningHistoryScanMessage(for result: ListeningHistoryScanService.Result) -> String {
+    if result.requiresConfirmation {
+        if result.totalQueuedCount > 0 || result.skippedDuplicateCount > 0 {
+            return String.localizedStringWithFormat(
+                NSLocalizedString("Found %lld new library play(s) and %lld new Apple Music recent track(s).\nAdded %lld item(s) to the review list.\nSkipped %lld already imported play(s).", comment: ""),
+                Int64(result.importedCount),
+                Int64(result.importedRecentTrackCount),
+                Int64(result.totalQueuedCount),
+                Int64(result.skippedDuplicateCount)
+            )
+        } else if result.recentTracksAuthorizationUnavailable {
+            return NSLocalizedString(
+                "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled.",
+                comment: ""
+            )
+        } else if result.recentTracksStatus == .seeded {
+            return NSLocalizedString(
+                "Apple Music recent tracks were initialized from your current history. Future scans will only add newer plays to the review list.",
+                comment: ""
+            )
+        } else if result.recentTracksStatus == .fetchFailed {
+            return NSLocalizedString(
+                "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed.",
+                comment: ""
+            )
+        } else {
+            return NSLocalizedString(
+                "No new plays found. Scrobbling from Listening History only works for songs added to your Library.",
+                comment: ""
+            )
+        }
+    }
+
+    if result.totalImportedCount > 0 || result.totalFlushedCount > 0 || result.skippedDuplicateCount > 0 {
+        return String.localizedStringWithFormat(
+            NSLocalizedString("Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
+            Int64(result.importedCount),
+            Int64(result.importedRecentTrackCount),
+            Int64(result.totalFlushedCount),
+            Int64(result.skippedDuplicateCount)
+        )
+    } else if result.recentTracksAuthorizationUnavailable {
+        return NSLocalizedString(
+            "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled.",
+            comment: ""
+        )
+    } else if result.recentTracksStatus == .seeded {
+        return NSLocalizedString(
+            "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays.",
+            comment: ""
+        )
+    } else if result.recentTracksStatus == .fetchFailed {
+        return NSLocalizedString(
+            "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed.",
+            comment: ""
+        )
+    } else {
+        return NSLocalizedString(
+            "No new plays found. Scrobbling from Listening History only works for songs added to your Library.",
+            comment: ""
+        )
+    }
+}
+
+private struct GroupedRecentScrobbleEntry: Identifiable {
+    let representativeEntry: ScrobbleLogStore.Entry
+    let count: Int
+    let memberIDs: [UUID]
+
+    var id: UUID {
+        representativeEntry.id
+    }
+}
+
+private struct GroupedListeningHistoryReviewEntry: Identifiable {
+    let representativeEntry: ListeningHistoryReviewStore.Entry
+    let count: Int
+    let memberIDs: [UUID]
+
+    var id: UUID {
+        representativeEntry.id
+    }
+}
+
+private struct ConsecutivePlayCountBadge: View {
+    let count: Int
+
+    var body: some View {
+        Text("x\(count)")
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
+            .background(Color.secondary.opacity(0.15))
+            .clipShape(Capsule())
+    }
+}
+
+private func groupedRecentScrobbleEntries(_ entries: [ScrobbleLogStore.Entry]) -> [GroupedRecentScrobbleEntry] {
+    ConsecutivePlayGrouper.groups(
+        from: entries,
+        shouldGroup: { $0.source == .playbackHistory },
+        dedupeKey: { $0.track.dedupeKey },
+        memberID: \.id
+    )
+    .map {
+        GroupedRecentScrobbleEntry(
+            representativeEntry: $0.representative,
+            count: $0.count,
+            memberIDs: $0.memberIDs
+        )
+    }
+}
+
+private func groupedListeningHistoryReviewEntries(
+    _ entries: [ListeningHistoryReviewStore.Entry]
+) -> [GroupedListeningHistoryReviewEntry] {
+    ConsecutivePlayGrouper.groups(
+        from: entries,
+        shouldGroup: { $0.origin == .playbackHistory },
+        dedupeKey: { $0.track.dedupeKey },
+        memberID: \.id
+    )
+    .map {
+        GroupedListeningHistoryReviewEntry(
+            representativeEntry: $0.representative,
+            count: $0.count,
+            memberIDs: $0.memberIDs
+        )
+    }
+}
+
+struct ListeningHistoryReviewView: View {
+    var onSubmitted: (() -> Void)? = nil
+
+    private let deleteButtonHeight: CGFloat = 40
+    private let submitButtonHeight = ContentView.listeningHistoryConfirmationButtonHeight
+
+    @EnvironmentObject private var auth: LastFMAuthManager
+    @EnvironmentObject private var scrobbleLog: ScrobbleLogStore
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var reviewStore = ListeningHistoryReviewStore.shared
+
+    @State private var selectedIDs: Set<UUID> = []
+    @State private var isSubmitting = false
+    @State private var now = Date()
+
+    private var entries: [ListeningHistoryReviewStore.Entry] {
+        reviewStore.pendingEntries()
+    }
+
+    private var groupedEntries: [GroupedListeningHistoryReviewEntry] {
+        groupedListeningHistoryReviewEntries(entries)
+    }
+
+    private var selectedEntryIDs: Set<UUID> {
+        Set(entries.map(\.id)).intersection(selectedIDs)
+    }
+
+    private var selectedEntryCount: Int {
+        selectedEntryIDs.count
+    }
+
+    private var isSelectingEntries: Bool {
+        selectedEntryCount > 0
+    }
+
+    private var allSelected: Bool {
+        !entries.isEmpty && selectedEntryCount == entries.count
+    }
+
+    private var showingCloseButton: Bool {
+        !isSelectingEntries
+    }
+
+    private var topLeadingTitle: String {
+        return allSelected
+            ? NSLocalizedString("Deselect All", comment: "")
+            : NSLocalizedString("Select All", comment: "")
+    }
+
+    private var navigationTitle: String {
+        showingCloseButton ? NSLocalizedString("Listening History", comment: "") : ""
+    }
+
+    private var deleteButtonTitle: String {
+        if isSelectingEntries {
+            return String(
+                format: NSLocalizedString("Delete Selected (%lld)", comment: ""),
+                selectedEntryCount
+            )
+        }
+        return NSLocalizedString("Delete Selected", comment: "")
+    }
+
+    private var submitButtonTitle: String {
+        if isSelectingEntries {
+            return String(
+                format: NSLocalizedString("Submit Selected (%lld)", comment: ""),
+                selectedEntryCount
+            )
+        }
+        return NSLocalizedString("Submit All", comment: "")
+    }
+
+    private var canDelete: Bool {
+        isSelectingEntries && !isSubmitting
+    }
+
+    private var canSubmit: Bool {
+        auth.sessionKey != nil && !entries.isEmpty && !isSubmitting
+    }
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if entries.isEmpty {
+                    VStack(spacing: 18) {
+                        Text("No pending plays from Listening History.")
+                            .font(.headline)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(18)
+                } else {
+                    List {
+                        ForEach(groupedEntries) { entry in
+                            let isSelected = ConsecutivePlayGrouper.isFullySelected(
+                                memberIDs: entry.memberIDs,
+                                selectedIDs: selectedIDs
+                            )
+                            Button {
+                                toggleSelection(for: entry.memberIDs)
+                            } label: {
+                                HStack(alignment: .center, spacing: 12) {
+                                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                                        .font(.title3)
+                                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(alignment: .top, spacing: 8) {
+                                            Text("\(entry.representativeEntry.track.artist) — \(entry.representativeEntry.track.title)")
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(.primary)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                            if entry.count > 1 {
+                                                ConsecutivePlayCountBadge(count: entry.count)
+                                            }
+                                        }
+                                        if let album = entry.representativeEntry.track.album, !album.isEmpty {
+                                            Text(album)
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        HStack(spacing: 8) {
+                                            Text(RelativeScrobbleTimeFormatter.string(from: entry.representativeEntry.playedAt, to: now))
+                                            if let sourceLabel = visibleSourceLabel(for: entry.representativeEntry.origin) {
+                                                Text(sourceLabel)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.secondary.opacity(0.15))
+                                                    .clipShape(Capsule())
+                                            }
+                                        }
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.plain)
+                }
+            }
+            .navigationTitle(navigationTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        handleTopLeadingTap()
+                    } label: {
+                        if showingCloseButton {
+                            IOSCloseButtonLabel(style: .plain)
+                        } else {
+                            Text(topLeadingTitle)
+                        }
+                    }
+                    .accessibilityLabel(showingCloseButton ? NSLocalizedString("Close", comment: "") : topLeadingTitle)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 10) {
+                    Button(role: .destructive) {
+                        handleDeleteTapped()
+                    } label: {
+                        Text(deleteButtonTitle)
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: deleteButtonHeight)
+                    }
+                    .buttonStyle(.bordered)
+                    .pillButtonBorder()
+                    .tint(.red)
+                    .disabled(!canDelete)
+
+                    Button {
+                        Task { await submitPendingItems() }
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isSubmitting {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Text(submitButtonTitle)
+                                    .font(.body.weight(.semibold))
+                            }
+                            Spacer()
+                        }
+                        .frame(minHeight: submitButtonHeight)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .pillButtonBorder()
+                    .disabled(!canSubmit)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+                .background(.ultraThinMaterial)
+            }
+        }
+        .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { date in
+            now = date
+        }
+        .onValueChange(of: entries.map(\.id)) { ids in
+            let validIDs = Set(ids)
+            selectedIDs = selectedIDs.intersection(validIDs)
+        }
+    }
+
+    private func handleTopLeadingTap() {
+        if !isSelectingEntries {
+            dismiss()
+        } else if allSelected {
+            selectedIDs.removeAll()
+        } else {
+            selectedIDs = Set(entries.map(\.id))
+        }
+    }
+
+    private func handleDeleteTapped() {
+        reviewStore.remove(ids: selectedEntryIDs)
+        selectedIDs.removeAll()
+    }
+
+    private func toggleSelection(for ids: [UUID]) {
+        selectedIDs = ConsecutivePlayGrouper.toggleSelection(for: ids, in: selectedIDs)
+    }
+
+    private func visibleSourceLabel(for origin: ScrobbleBacklog.Origin) -> String? {
+        switch origin {
+        case .playbackHistory:
+            return nil
+        case .recentlyPlayed:
+            return NSLocalizedString("Recently Played API", comment: "")
+        case .live:
+            return NSLocalizedString("Live", comment: "")
+        case .manual:
+            return NSLocalizedString("Manual", comment: "")
+        }
+    }
+
+    @MainActor
+    private func submitPendingItems() async {
+        guard canSubmit else { return }
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        let submissionIDs = isSelectingEntries ? selectedEntryIDs : nil
+        _ = await AppModel.shared.submitPendingListeningHistoryReviewItems(ids: submissionIDs)
+        scrobbleLog.reload()
+        onSubmitted?()
+        selectedIDs.removeAll()
+
+        if reviewStore.pendingEntries().isEmpty {
+            dismiss()
+        }
     }
 }
 
@@ -727,6 +1314,7 @@ extension EnvironmentValues {
 
 private struct ScrobbleLogRowView: View {
     let entry: ScrobbleLogStore.Entry
+    let consecutivePlayCount: Int
     let isLast: Bool
     let engine: ScrobbleEngine
 
@@ -763,10 +1351,16 @@ private struct ScrobbleLogRowView: View {
     private var rowContent: some View {
         VStack(alignment: .leading, spacing: 4) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(entry.track.title)
-                    .font(.subheadline.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .multilineTextAlignment(.leading)
+                HStack(alignment: .top, spacing: 8) {
+                    Text(entry.track.title)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if consecutivePlayCount > 1 {
+                        ConsecutivePlayCountBadge(count: consecutivePlayCount)
+                    }
+                }
 
                 HStack(spacing: 6) {
                     Text(entry.track.artist)

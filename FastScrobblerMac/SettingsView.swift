@@ -72,7 +72,6 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
-    @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
     @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
     @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
@@ -335,7 +334,7 @@ struct SettingsView: View {
                 Text(localized("Account"))
                     .font(.title3.weight(.semibold))
                 Spacer()
-                Text(auth.sessionKey != nil ? NSLocalizedString("Connected", comment: "") : NSLocalizedString("Not connected", comment: ""))
+                Text(auth.sessionKey != nil ? NSLocalizedString("Signed in", comment: "") : NSLocalizedString("Not connected", comment: ""))
                     .foregroundStyle(auth.sessionKey != nil ? .green : .secondary)
             }
 
@@ -452,7 +451,6 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromAlbumTitleKeywords)
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
-        defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.buttonThemeSelection)
@@ -467,7 +465,6 @@ struct SettingsView: View {
         removeAllBracketsFromSongTitlesEnabled = false
         removeBracketsFromAlbumTitlesEnabled = false
         removeAllBracketsFromAlbumTitlesEnabled = false
-        scrobbleListeningHistoryEnabled = true
         sendNowPlayingAutomaticallyEnabled = true
         buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 

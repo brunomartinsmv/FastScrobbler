@@ -34,11 +34,22 @@ enum ICloudSyncLocalChangeNotifier {
 }
 
 enum AppSettings {
+    enum PendingListeningHistoryLaunchRequest: String {
+        case openReviewOnly
+        case scanAndOpenReview
+        case scanAndShowResult
+    }
+
     enum Keys {
+        // Retired in favor of Listening History confirmation mode. Kept only for legacy key cleanup.
         static let scrobbleListeningHistoryEnabled = "FastScrobbler.App.scrobbleListeningHistoryEnabled"
         static let scrobbleAppleMusicAPIEnabled = "FastScrobbler.App.scrobbleAppleMusicAPIEnabled"
         static let scrobbleOnlyNonLibraryAppleMusicAPITracks = "FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks"
         static let extendedListeningHistoryScanEnabled = "FastScrobbler.App.extendedListeningHistoryScanEnabled"
+        static let listeningHistoryRequireConfirmationEnabled = "FastScrobbler.App.listeningHistoryRequireConfirmationEnabled"
+        static let listeningHistoryResumeRecoveryCutoffDate = "FastScrobbler.App.listeningHistoryResumeRecoveryCutoffDate"
+        static let pendingListeningHistoryLaunchRequest = "FastScrobbler.App.pendingListeningHistoryLaunchRequest"
+        static let pendingListeningHistoryReviewOpenRequestToken = "FastScrobbler.App.pendingListeningHistoryReviewOpenRequestToken"
         static let sendNowPlayingAutomaticallyEnabled = "FastScrobbler.App.sendNowPlayingAutomaticallyEnabled"
         static let themeSelection = "FastScrobbler.App.themeSelection"
         static let buttonThemeSelection = "FastScrobbler.App.buttonThemeSelection"
@@ -50,20 +61,71 @@ enum AppSettings {
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleAppleMusicAPIEnabled)
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.extendedListeningHistoryScanEnabled)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.listeningHistoryRequireConfirmationEnabled)
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.listeningHistoryResumeRecoveryCutoffDate)
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.sendNowPlayingAutomaticallyEnabled)
-    }
-
-    static func scrobbleListeningHistoryEnabled() -> Bool {
-        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleListeningHistoryEnabled)
-        // nil means the key was never written; default to enabled.
-        if AppGroup.userDefaults.object(forKey: Keys.scrobbleListeningHistoryEnabled) == nil { return true }
-        return AppGroup.userDefaults.bool(forKey: Keys.scrobbleListeningHistoryEnabled)
     }
 
     static func extendedListeningHistoryScanEnabled() -> Bool {
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.extendedListeningHistoryScanEnabled)
         if AppGroup.userDefaults.object(forKey: Keys.extendedListeningHistoryScanEnabled) == nil { return false }
         return AppGroup.userDefaults.bool(forKey: Keys.extendedListeningHistoryScanEnabled)
+    }
+
+    static func listeningHistoryRequireConfirmationEnabled() -> Bool {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.listeningHistoryRequireConfirmationEnabled)
+        if AppGroup.userDefaults.object(forKey: Keys.listeningHistoryRequireConfirmationEnabled) == nil {
+#if os(iOS)
+            return true
+#else
+            return false
+#endif
+        }
+        return AppGroup.userDefaults.bool(forKey: Keys.listeningHistoryRequireConfirmationEnabled)
+    }
+
+    static func listeningHistoryResumeRecoveryCutoffDate() -> Date? {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.listeningHistoryResumeRecoveryCutoffDate)
+        return AppGroup.userDefaults.object(forKey: Keys.listeningHistoryResumeRecoveryCutoffDate) as? Date
+    }
+
+    static func setListeningHistoryResumeRecoveryCutoffDate(_ date: Date?) {
+        if let date {
+            AppGroup.userDefaults.set(date, forKey: Keys.listeningHistoryResumeRecoveryCutoffDate)
+        } else {
+            AppGroup.userDefaults.removeObject(forKey: Keys.listeningHistoryResumeRecoveryCutoffDate)
+        }
+    }
+
+    static func noteListeningHistoryRecoveryResumeNow() {
+        setListeningHistoryResumeRecoveryCutoffDate(Date())
+    }
+
+    static func requestPendingListeningHistoryLaunch(_ request: PendingListeningHistoryLaunchRequest) {
+        AppGroup.userDefaults.set(request.rawValue, forKey: Keys.pendingListeningHistoryLaunchRequest)
+    }
+
+    static func consumePendingListeningHistoryLaunchRequest() -> PendingListeningHistoryLaunchRequest? {
+        if let rawValue = AppGroup.userDefaults.string(forKey: Keys.pendingListeningHistoryLaunchRequest) {
+            AppGroup.userDefaults.removeObject(forKey: Keys.pendingListeningHistoryLaunchRequest)
+            if let request = PendingListeningHistoryLaunchRequest(rawValue: rawValue) {
+                return request
+            }
+        }
+
+        guard AppGroup.userDefaults.object(forKey: Keys.pendingListeningHistoryReviewOpenRequestToken) != nil else {
+            return nil
+        }
+        AppGroup.userDefaults.removeObject(forKey: Keys.pendingListeningHistoryReviewOpenRequestToken)
+        return .openReviewOnly
+    }
+
+    static func requestOpeningListeningHistoryReview() {
+        requestPendingListeningHistoryLaunch(.openReviewOnly)
+    }
+
+    static func consumePendingListeningHistoryReviewOpenRequest() -> Bool {
+        consumePendingListeningHistoryLaunchRequest() == .openReviewOnly
     }
 
     static func scrobbleAppleMusicAPIEnabled() -> Bool {
@@ -82,6 +144,12 @@ enum AppSettings {
         migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
         guard AppGroup.userDefaults.object(forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks) == nil else { return }
         AppGroup.userDefaults.set(true, forKey: Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
+    }
+
+    static func removeLegacyListeningHistoryScrobblingToggleIfNeeded() {
+        migrateLegacyAppGroupValueIfNeeded(forKey: Keys.scrobbleListeningHistoryEnabled)
+        AppGroup.userDefaults.removeObject(forKey: Keys.scrobbleListeningHistoryEnabled)
+        UserDefaults.standard.removeObject(forKey: Keys.scrobbleListeningHistoryEnabled)
     }
 
     static func sendNowPlayingAutomaticallyEnabled() -> Bool {

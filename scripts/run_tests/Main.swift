@@ -30,6 +30,7 @@ struct RunTestsMain {
         runBacklogCleanupTests()
         runStorageMaintenanceTests()
         runListeningHistoryScanTests()
+        runConsecutivePlayGroupingTests()
         finishTests()
     }
 }

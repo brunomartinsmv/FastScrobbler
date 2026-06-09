@@ -11,6 +11,226 @@ enum RecoveryDuplicateMatchLevel: Int, Comparable, Sendable {
     }
 }
 
+@MainActor
+final class ListeningHistoryReviewStore: ObservableObject {
+    struct Entry: Identifiable, Codable, Hashable, Sendable {
+        var id: UUID
+        var track: Track
+        var startTimestamp: Int
+        var playedAt: Date
+        var origin: ScrobbleBacklog.Origin
+        var wasAppleMusicFavorite: Bool?
+        var queuedAt: Date
+    }
+
+    static let shared = ListeningHistoryReviewStore()
+
+    @Published private(set) var entries: [Entry] = []
+
+    private let logger = Logger(subsystem: "FastScrobbler", category: "ListeningHistoryReviewStore")
+
+    private init() {
+        load()
+    }
+
+    func pendingEntries() -> [Entry] {
+        entries
+    }
+
+    func pendingCount() -> Int {
+        entries.count
+    }
+
+    @discardableResult
+    func upsert(_ incomingEntries: [Entry]) -> Int {
+        guard !incomingEntries.isEmpty else { return 0 }
+
+        var entriesByIdentity = Dictionary(uniqueKeysWithValues: entries.map { (mergeIdentity(for: $0), $0) })
+        var insertedCount = 0
+
+        for entry in incomingEntries {
+            let identity = mergeIdentity(for: entry)
+            if let existing = entriesByIdentity[identity] {
+                var updated = existing
+                updated.track = entry.track
+                updated.wasAppleMusicFavorite = entry.wasAppleMusicFavorite
+                updated.queuedAt = max(existing.queuedAt, entry.queuedAt)
+                entriesByIdentity[identity] = updated
+            } else {
+                entriesByIdentity[identity] = entry
+                insertedCount += 1
+            }
+        }
+
+        entries = normalizedEntries(Array(entriesByIdentity.values))
+        save()
+        return insertedCount
+    }
+
+    func remove(ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let originalCount = entries.count
+        entries.removeAll { ids.contains($0.id) }
+        guard entries.count != originalCount else { return }
+        save()
+    }
+
+    func clear() {
+        guard !entries.isEmpty else { return }
+        entries = []
+        save()
+    }
+
+    func dequeueAllForSubmission() -> [Entry] {
+        let snapshot = submissionOrder(entries)
+        entries = []
+        save()
+        return snapshot
+    }
+
+    func dequeueForSubmission(ids: Set<UUID>) -> [Entry] {
+        guard !ids.isEmpty else { return [] }
+
+        let selectedEntries = entries.filter { ids.contains($0.id) }
+        guard !selectedEntries.isEmpty else { return [] }
+
+        entries.removeAll { ids.contains($0.id) }
+        save()
+        return submissionOrder(selectedEntries)
+    }
+
+    func reload() {
+        load()
+    }
+
+    private func normalizedEntries(_ entries: [Entry]) -> [Entry] {
+        entries.sorted {
+            if $0.startTimestamp == $1.startTimestamp {
+                if $0.queuedAt == $1.queuedAt {
+                    return $0.id.uuidString < $1.id.uuidString
+                }
+                return $0.queuedAt > $1.queuedAt
+            }
+            return $0.startTimestamp > $1.startTimestamp
+        }
+    }
+
+    private func submissionOrder(_ entries: [Entry]) -> [Entry] {
+        entries.sorted {
+            if $0.startTimestamp == $1.startTimestamp {
+                return $0.queuedAt < $1.queuedAt
+            }
+            return $0.startTimestamp < $1.startTimestamp
+        }
+    }
+
+    private func mergeIdentity(for entry: Entry) -> String {
+        "\(entry.origin.rawValue)|\(entry.track.dedupeKey)|\(entry.startTimestamp)"
+    }
+
+    private func load() {
+        let legacyURL = legacyFileURL()
+        let sharedURL = sharedFileURL()
+
+        func readEntries(from url: URL) -> [Entry] {
+            do {
+                let data = try Data(contentsOf: url)
+                return try JSONDecoder().decode([Entry].self, from: data)
+            } catch {
+                return []
+            }
+        }
+
+        if let sharedURL {
+            let sharedEntries = readEntries(from: sharedURL)
+            let legacyEntries = readEntries(from: legacyURL)
+            var map = Dictionary(uniqueKeysWithValues: sharedEntries.map { (mergeIdentity(for: $0), $0) })
+
+            for entry in legacyEntries {
+                let identity = mergeIdentity(for: entry)
+                if let existing = map[identity] {
+                    if entry.queuedAt > existing.queuedAt {
+                        map[identity] = entry
+                    }
+                } else {
+                    map[identity] = entry
+                }
+            }
+
+            entries = normalizedEntries(Array(map.values))
+
+            do {
+                try persist(entries, preferredURL: sharedURL, fallbackURL: legacyURL)
+            } catch {
+                logger.warning("failed to persist merged review queue: \(error.localizedDescription, privacy: .public)")
+            }
+        } else {
+            entries = normalizedEntries(readEntries(from: legacyURL))
+        }
+    }
+
+    private func save() {
+        entries = normalizedEntries(entries)
+        do {
+            try persist(entries, preferredURL: sharedFileURL(), fallbackURL: legacyFileURL())
+        } catch {
+            logger.warning("failed to persist review queue: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func fileURL() -> URL {
+        sharedFileURL() ?? legacyFileURL()
+    }
+
+    private func sharedFileURL() -> URL? {
+        AppGroup.sharedDataDirectoryURL()?
+            .appendingPathComponent("listening_history_review_queue.json")
+    }
+
+    private func legacyFileURL() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? {
+            logger.warning("applicationSupportDirectory unavailable; falling back to temporaryDirectory")
+            return FileManager.default.temporaryDirectory
+        }()
+        let bundleID = Bundle.main.bundleIdentifier ?? "FastScrobbler"
+        return base
+            .appendingPathComponent(bundleID, isDirectory: true)
+            .appendingPathComponent("listening_history_review_queue.json")
+    }
+
+    private func persist(_ entries: [Entry], preferredURL: URL?, fallbackURL: URL) throws {
+        let data = try JSONEncoder().encode(entries)
+
+        if let preferredURL {
+            do {
+                try write(data, to: preferredURL)
+                deleteLegacyFileIfRedundant(sharedURL: preferredURL, legacyURL: fallbackURL)
+                return
+            } catch {
+                logger.warning("shared review queue write failed; falling back to Application Support: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+
+        try write(data, to: fallbackURL)
+    }
+
+    private func write(_ data: Data, to url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+        try data.write(to: url, options: [.atomic])
+    }
+
+    private func deleteLegacyFileIfRedundant(sharedURL: URL, legacyURL: URL) {
+        guard sharedURL.path != legacyURL.path else { return }
+        guard FileManager.default.fileExists(atPath: sharedURL.path) else { return }
+        guard FileManager.default.fileExists(atPath: legacyURL.path) else { return }
+        try? FileManager.default.removeItem(at: legacyURL)
+    }
+}
+
 struct RecoveryDuplicateMatch<Matched: Sendable>: Sendable {
     let level: RecoveryDuplicateMatchLevel
     let matched: Matched

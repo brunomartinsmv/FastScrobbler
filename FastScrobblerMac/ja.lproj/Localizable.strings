@@ -8,7 +8,7 @@
 "Allow Music Control" = "ミュージックの操作を許可";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "同じ再生セッションを短時間に複数回Last.fmへ送信しないようにします。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "ベータ機能: ロック画面とDynamic Islandにスクロブル状況を表示します。";
-"Connected" = "接続済み";
+"Signed in" = "接続済み";
 "Done" = "完了";
 "Duration: %@s | Playback: %@s" = "再生時間: %1$@秒 | 再生位置: %2$@秒";
 "Enabled" = "有効";

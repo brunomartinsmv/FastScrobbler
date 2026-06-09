@@ -13,7 +13,7 @@ struct AppleMusicAPISettingsPage: View {
             Section {
                 VStack(alignment: .leading, spacing: 0) {
                     VStack(alignment: .leading, spacing: 0) {
-                        Toggle("Scrobble from Apple Music API", isOn: $scrobbleAppleMusicAPIEnabled)
+                        Toggle("Scrobble Recently Played from Apple Music API", isOn: $scrobbleAppleMusicAPIEnabled)
                             .onValueChange(of: scrobbleAppleMusicAPIEnabled) { isEnabled in
                                 Task {
                                     await AppModel.shared.handleAppleMusicAPIScrobblingChanged(isEnabled: isEnabled)
@@ -25,7 +25,7 @@ struct AppleMusicAPISettingsPage: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(localized("Beta feature: Automatically scrobbles up to 30 recently played songs via the Apple Music API. Songs are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded and scrobbled regardless of playback duration."))
+                        Text(localized("Retrieves up to 30 recently played songs via the Apple Music API, then adds them to the Listening History review list. Plays are recorded even when FastScrobbler is in the background.\n\nNote: playback timestamps aren’t provided by the API, so FastScrobbler assigns an estimated timestamp when the scrobble is submitted. Songs are recorded regardless of playback duration.\n\nWhen \"Auto-scrobble Listening History\" is off, Recently Played API songs are added to the Listening History review list instead of being submitted automatically."))
                             .font(.footnote)
                             .foregroundStyle(.primary)
                     }
@@ -46,7 +46,7 @@ struct AppleMusicAPISettingsPage: View {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(localized("Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled. Recommended when \"Scrobble from Listening History\" is enabled."))
+                        Text(localized("Best-effort filter: FastScrobbler checks for recently played API songs that are present in your library, and skips them. If FastScrobbler can't confirm a match, the song will be scrobbled.\n\nRecommended to reduce duplicates between Listening History and Recently Played API scans."))
                             .font(.footnote)
                             .foregroundStyle(.primary)
                     }
@@ -54,7 +54,7 @@ struct AppleMusicAPISettingsPage: View {
                 }
             }
         }
-        .navigationTitle(localized("Scrobble from Apple Music API"))
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

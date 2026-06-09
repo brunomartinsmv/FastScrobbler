@@ -8,7 +8,7 @@
 "Allow Music Control" = "允许控制\"音乐\"";
 "Avoids sending the same playback session to Last.fm more than once within a short time window." = "避免在短时间内向 Last.fm 重复发送同一播放会话。";
 "Beta feature: shows scrobbling status on your Lock Screen and Dynamic Island." = "Beta 功能：在锁定屏幕和灵动岛上显示 scrobble 状态。";
-"Connected" = "已连接";
+"Signed in" = "已连接";
 "Done" = "完成";
 "Duration: %@s | Playback: %@s" = "时长：%1$@ 秒 | 播放：%2$@ 秒";
 "Enabled" = "已启用";

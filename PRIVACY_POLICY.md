@@ -9,7 +9,7 @@ FastScrobbler is an iOS and macOS app for scrobbling Apple Music / Music app pla
 - FastScrobbler does **not** run a developer-owned backend service.
 - The app sends track metadata to **Last.fm** only after you connect your Last.fm account and use scrobbling features, including Shortcuts and Control Center widgets.
 - If you enable **iCloud Sync**, FastScrobbler stores certain app data in your iCloud account so it can sync across your devices.
-- If you enable **Scrobble from Apple Music API** on iOS, FastScrobbler requests your recently played tracks from Apple Music.
+- If you enable **Scrobble Recently Played from Apple Music API** on iOS, FastScrobbler requests your recently played tracks from Apple Music.
 - FastScrobbler uses **Firebase Crashlytics** to receive basic crash diagnostics and stability data from the app.
 - FastScrobbler does **not**:
   -  collect your listening data or your Last.fm session key
@@ -32,7 +32,7 @@ FastScrobbler uses this information to determine what to submit to Last.fm. Loca
 
 ### Apple Music API recent tracks (optional, iOS)
 
-If you enable the optional "Scrobble from Apple Music API" feature, FastScrobbler uses Apple Music / MusicKit APIs to request your recently played Apple Music tracks from Apple. This can include:
+If you enable the optional "Scrobble Recently Played from Apple Music API" feature, FastScrobbler uses Apple Music / MusicKit APIs to request your recently played Apple Music tracks from Apple. This can include:
 
 - Track metadata (artist, title, album)
 - Apple Music catalog identifiers
@@ -101,7 +101,7 @@ Last.fm also receives standard network information, such as your IP address, as 
 
 FastScrobbler uses Apple system frameworks and services, including AuthenticationServices, MusicKit / Apple Music APIs, Background Tasks, Widgets, Live Activities, StoreKit, and optional iCloud Sync. Apple may receive standard device, account, purchase, and service information as part of operating iOS/macOS and these services.
 
-If you enable Scrobble from Apple Music API, Apple receives the request for your recent Apple Music plays.
+If you enable Scrobble Recently Played from Apple Music API, Apple receives the request for your recent Apple Music plays.
 
 If you enable iCloud Sync, Apple stores the synced FastScrobbler data in your iCloud account.
 

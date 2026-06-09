@@ -137,7 +137,7 @@ struct ManualScrobbleView: View {
             .navigationTitle("Manual Scrobble")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
                     } label: {

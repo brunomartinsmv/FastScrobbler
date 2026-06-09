@@ -57,14 +57,71 @@ func runBackgroundGracePeriodTests() {
 
     section("Background live auto-scrobble gate")
 
-    func liveAutoScrobbleAllowed(applicationState: String, isGracePeriodActive: Bool) -> Bool {
-        applicationState != "background" || isGracePeriodActive
+    func liveAutoScrobbleAllowed(
+        applicationState: String,
+        isGracePeriodActive: Bool,
+        preventDuplicates: Bool
+    ) -> Bool {
+        applicationState != "background" || isGracePeriodActive || !preventDuplicates
     }
 
-    expect("active app allows live auto-scrobble", liveAutoScrobbleAllowed(applicationState: "active", isGracePeriodActive: false))
-    expect("inactive app state still allows live auto-scrobble", liveAutoScrobbleAllowed(applicationState: "inactive", isGracePeriodActive: false))
-    expect("background app blocks live auto-scrobble outside grace period", !liveAutoScrobbleAllowed(applicationState: "background", isGracePeriodActive: false))
-    expect("background app allows live auto-scrobble during grace period", liveAutoScrobbleAllowed(applicationState: "background", isGracePeriodActive: true))
+    expect("active app allows live auto-scrobble", liveAutoScrobbleAllowed(applicationState: "active", isGracePeriodActive: false, preventDuplicates: true))
+    expect("inactive app state still allows live auto-scrobble", liveAutoScrobbleAllowed(applicationState: "inactive", isGracePeriodActive: false, preventDuplicates: true))
+    expect("background app blocks live auto-scrobble outside grace period when duplicate prevention is on", !liveAutoScrobbleAllowed(applicationState: "background", isGracePeriodActive: false, preventDuplicates: true))
+    expect("background app allows live auto-scrobble during grace period", liveAutoScrobbleAllowed(applicationState: "background", isGracePeriodActive: true, preventDuplicates: true))
+    expect("background app allows live auto-scrobble outside grace period when duplicate prevention is off", liveAutoScrobbleAllowed(applicationState: "background", isGracePeriodActive: false, preventDuplicates: false))
+
+    section("Projected background now playing separation")
+
+    struct SimProjectedBackgroundOutcome {
+        let didSendNowPlaying: Bool
+        let didAttemptLiveScrobble: Bool
+    }
+
+    func projectedBackgroundOutcome(
+        applicationState: String,
+        isGracePeriodActive: Bool,
+        preventDuplicates: Bool,
+        sendNowPlayingAutomatically: Bool,
+        hasSentNowPlaying: Bool,
+        playbackState: String
+    ) -> SimProjectedBackgroundOutcome {
+        let didSendNowPlaying =
+            sendNowPlayingAutomatically &&
+            !hasSentNowPlaying &&
+            playbackState == "playing"
+        let didAttemptLiveScrobble = liveAutoScrobbleAllowed(
+            applicationState: applicationState,
+            isGracePeriodActive: isGracePeriodActive,
+            preventDuplicates: preventDuplicates
+        )
+        return SimProjectedBackgroundOutcome(
+            didSendNowPlaying: didSendNowPlaying,
+            didAttemptLiveScrobble: didAttemptLiveScrobble
+        )
+    }
+
+    let backgroundBlockedScrobble = projectedBackgroundOutcome(
+        applicationState: "background",
+        isGracePeriodActive: false,
+        preventDuplicates: true,
+        sendNowPlayingAutomatically: true,
+        hasSentNowPlaying: false,
+        playbackState: "playing"
+    )
+    expect("projected background path still sends now playing when duplicate prevention blocks the live scrobble", backgroundBlockedScrobble.didSendNowPlaying)
+    expect("projected background path blocks live scrobble outside grace period when duplicate prevention is on", !backgroundBlockedScrobble.didAttemptLiveScrobble)
+
+    let backgroundAllowedScrobble = projectedBackgroundOutcome(
+        applicationState: "background",
+        isGracePeriodActive: false,
+        preventDuplicates: false,
+        sendNowPlayingAutomatically: true,
+        hasSentNowPlaying: false,
+        playbackState: "playing"
+    )
+    expect("projected background path still sends now playing when duplicate prevention is off", backgroundAllowedScrobble.didSendNowPlaying)
+    expect("projected background path allows live scrobble outside grace period when duplicate prevention is off", backgroundAllowedScrobble.didAttemptLiveScrobble)
 }
 
 func runScheduledBackgroundRecoveryTests() {
@@ -149,10 +206,11 @@ func runSettingsDefaultsTests() {
         "FastScrobbler.Pro.removeBracketsFromAlbumTitleKeywords",
         "FastScrobbler.Pro.preventDuplicateScrobblesEnabled",
         "FastScrobbler.Pro.scrobbleLoopedTracksEnabled",
-        "FastScrobbler.App.scrobbleListeningHistoryEnabled",
         "FastScrobbler.App.scrobbleAppleMusicAPIEnabled",
         "FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks",
         "FastScrobbler.App.extendedListeningHistoryScanEnabled",
+        "FastScrobbler.App.listeningHistoryRequireConfirmationEnabled",
+        "FastScrobbler.App.listeningHistoryResumeRecoveryCutoffDate",
         "FastScrobbler.App.themeSelection",
         "FastScrobbler.App.buttonThemeSelection",
         "FastScrobbler.Pro.textReplacementRules",
@@ -162,6 +220,8 @@ func runSettingsDefaultsTests() {
     expect("reset clears scrobbleAppleMusicAPIEnabled", resetClearedKeys.contains("FastScrobbler.App.scrobbleAppleMusicAPIEnabled"))
     expect("reset clears non-library Apple Music API filter", resetClearedKeys.contains("FastScrobbler.App.scrobbleOnlyNonLibraryAppleMusicAPITracks"))
     expect("reset clears extendedListeningHistoryScanEnabled", resetClearedKeys.contains("FastScrobbler.App.extendedListeningHistoryScanEnabled"))
+    expect("reset clears listeningHistoryRequireConfirmationEnabled", resetClearedKeys.contains("FastScrobbler.App.listeningHistoryRequireConfirmationEnabled"))
+    expect("reset clears listeningHistoryResumeRecoveryCutoffDate", resetClearedKeys.contains("FastScrobbler.App.listeningHistoryResumeRecoveryCutoffDate"))
     expect("reset clears themeSelection", resetClearedKeys.contains("FastScrobbler.App.themeSelection"))
     expect("reset clears buttonThemeSelection", resetClearedKeys.contains("FastScrobbler.App.buttonThemeSelection"))
     expect("reset clears textReplacementRules", resetClearedKeys.contains("FastScrobbler.Pro.textReplacementRules"))
@@ -174,6 +234,14 @@ func runSettingsDefaultsTests() {
         existingValue ?? true
     }
 
+    func removeLegacyListeningHistoryScrobblingToggle(
+        legacyListeningHistoryEnabled: Bool?,
+        requireConfirmation: Bool?
+    ) -> (legacyListeningHistoryEnabled: Bool?, requireConfirmation: Bool?) {
+        let _ = legacyListeningHistoryEnabled
+        return (legacyListeningHistoryEnabled: nil, requireConfirmation: requireConfirmation)
+    }
+
     func migrateLegacyAppGroupValue<T: Equatable>(appGroupValue: T?, standardValue: T?) -> T? {
         guard appGroupValue == nil else { return appGroupValue }
         return standardValue
@@ -181,6 +249,8 @@ func runSettingsDefaultsTests() {
 
     let extendedListeningHistoryScanDefault = false
     let iOSExtendedListeningHistoryScanAfterReset = false
+    let listeningHistoryRequireConfirmationDefault = true
+    let iOSListeningHistoryRequireConfirmationAfterReset = true
     let appleMusicAPIScrobblingDefault = false
     let iOSAppleMusicAPIScrobblingAfterReset = false
     let nonLibraryAppleMusicAPIFilterDefault = true
@@ -200,6 +270,26 @@ func runSettingsDefaultsTests() {
     expectEqual("seed preserves explicit on for non-library Apple Music API filter", seedNonLibraryAppleMusicAPIFilterIfNeeded(existingValue: true), true)
     expectEqual("seed writes on when the key is missing and setup is complete", seedNonLibraryAppleMusicAPIFilterIfNeeded(existingValue: nil), true)
     expectEqual("seed writes on when the key is missing and setup is incomplete", seedNonLibraryAppleMusicAPIFilterIfNeeded(existingValue: nil), true)
+    expectEqual(
+        "removing legacy listening-history off leaves confirmation unchanged",
+        removeLegacyListeningHistoryScrobblingToggle(legacyListeningHistoryEnabled: false, requireConfirmation: false).requireConfirmation,
+        false
+    )
+    expectEqual(
+        "removing legacy listening-history on leaves confirmation unchanged",
+        removeLegacyListeningHistoryScrobblingToggle(legacyListeningHistoryEnabled: true, requireConfirmation: false).requireConfirmation,
+        false
+    )
+    expectEqual(
+        "removing missing listening-history toggle leaves confirmation unchanged",
+        removeLegacyListeningHistoryScrobblingToggle(legacyListeningHistoryEnabled: nil, requireConfirmation: nil).requireConfirmation,
+        nil
+    )
+    expectEqual(
+        "removing listening-history toggle clears the legacy key",
+        removeLegacyListeningHistoryScrobblingToggle(legacyListeningHistoryEnabled: false, requireConfirmation: false).legacyListeningHistoryEnabled,
+        nil
+    )
     expectEqual("App Group migration preserves explicit legacy bool off", migrateLegacyAppGroupValue(appGroupValue: nil, standardValue: false), false)
     expectEqual("App Group migration preserves explicit app-group bool off", migrateLegacyAppGroupValue(appGroupValue: false, standardValue: true), false)
     expectEqual("App Group migration leaves missing bool unset for runtime default", migrateLegacyAppGroupValue(appGroupValue: Optional<Bool>.none, standardValue: nil), nil)
@@ -208,6 +298,39 @@ func runSettingsDefaultsTests() {
     expectEqual("App Group migration does not overwrite existing custom values", migrateLegacyAppGroupValue(appGroupValue: 1, standardValue: 3), 1)
     expectEqual("extended Listening History scan defaults off", extendedListeningHistoryScanDefault, false)
     expectEqual("iOS reset restores extended Listening History scan default", iOSExtendedListeningHistoryScanAfterReset, extendedListeningHistoryScanDefault)
+    expectEqual("listening History require confirmation defaults on", listeningHistoryRequireConfirmationDefault, true)
+    expectEqual("iOS reset restores listening History require confirmation default", iOSListeningHistoryRequireConfirmationAfterReset, listeningHistoryRequireConfirmationDefault)
+
+    struct SimAutoScrobbleListeningHistoryToggle {
+        var storedRequireConfirmation: Bool
+        var callbackValues: [Bool] = []
+
+        var displayedAutoScrobbleValue: Bool {
+            !storedRequireConfirmation
+        }
+
+        mutating func setDisplayedAutoScrobbleValue(_ isEnabled: Bool) {
+            let newStoredRequireConfirmation = !isEnabled
+            guard storedRequireConfirmation != newStoredRequireConfirmation else { return }
+            storedRequireConfirmation = newStoredRequireConfirmation
+            callbackValues.append(newStoredRequireConfirmation)
+        }
+    }
+
+    var reviewModePresentation = SimAutoScrobbleListeningHistoryToggle(storedRequireConfirmation: true)
+    expectEqual("stored confirmation on renders auto-scrobble off", reviewModePresentation.displayedAutoScrobbleValue, false)
+    reviewModePresentation.setDisplayedAutoScrobbleValue(true)
+    expectEqual("enabling auto-scrobble stores confirmation off", reviewModePresentation.storedRequireConfirmation, false)
+    expectEqual("enabling auto-scrobble reports confirmation off to the callback", reviewModePresentation.callbackValues, [false])
+
+    var autoScrobblePresentation = SimAutoScrobbleListeningHistoryToggle(storedRequireConfirmation: false)
+    expectEqual("stored confirmation off renders auto-scrobble on", autoScrobblePresentation.displayedAutoScrobbleValue, true)
+    autoScrobblePresentation.setDisplayedAutoScrobbleValue(false)
+    expectEqual("disabling auto-scrobble stores confirmation on", autoScrobblePresentation.storedRequireConfirmation, true)
+    expectEqual("disabling auto-scrobble reports confirmation on to the callback", autoScrobblePresentation.callbackValues, [true])
+    autoScrobblePresentation.setDisplayedAutoScrobbleValue(false)
+    expectEqual("setting the same auto-scrobble value twice does not fire a duplicate callback", autoScrobblePresentation.callbackValues, [true])
+
     expectEqual("first-artist-only scrobbling defaults off", firstArtistOnlyDefault, false)
     expectEqual("iOS reset restores first-artist-only scrobbling default", iOSFirstArtistOnlyAfterReset, firstArtistOnlyDefault)
     expectEqual("theme selection defaults to system", themeSelectionDefault, "system")

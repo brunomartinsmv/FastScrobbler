@@ -1,6 +1,53 @@
 import Foundation
 
 func runICloudSyncTests() {
+    section("iCloud Sync · Shared toggle registry")
+
+    func syncedSettingsKeysFromSource() -> Set<String> {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("FastScrobbler/ICloudSyncCoordinator.swift")
+
+        guard let source = try? String(contentsOf: sourceURL, encoding: .utf8) else {
+            return []
+        }
+
+        let pattern = #"key:\s+((?:AppSettings|ProSettings)\.Keys\.[A-Za-z0-9_]+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+
+        let nsSource = source as NSString
+        let range = NSRange(location: 0, length: nsSource.length)
+        return Set(regex.matches(in: source, range: range).compactMap { match in
+            guard match.numberOfRanges > 1 else { return nil }
+            return nsSource.substring(with: match.range(at: 1))
+        })
+    }
+
+    let syncedKeys = syncedSettingsKeysFromSource()
+    let expectedSharedToggleKeys: Set<String> = [
+        "AppSettings.Keys.scrobbleAppleMusicAPIEnabled",
+        "AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks",
+        "AppSettings.Keys.extendedListeningHistoryScanEnabled",
+        "AppSettings.Keys.listeningHistoryRequireConfirmationEnabled",
+        "AppSettings.Keys.sendNowPlayingAutomaticallyEnabled",
+        "ProSettings.Keys.loveOnFavoriteEnabled",
+        "ProSettings.Keys.useAlbumArtistForScrobbling",
+        "ProSettings.Keys.useFirstArtistOnlyForScrobbling",
+        "ProSettings.Keys.stripEpAndSingleSuffixFromAlbum",
+        "ProSettings.Keys.removeBracketsFromSongTitlesEnabled",
+        "ProSettings.Keys.removeAllBracketsFromSongTitlesEnabled",
+        "ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled",
+        "ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled",
+        "ProSettings.Keys.preventDuplicateScrobblesEnabled",
+    ]
+
+    let missingSharedToggleKeys = expectedSharedToggleKeys.subtracting(syncedKeys).sorted()
+    expectEqual("shared toggle keys are included in the iCloud sync registry", missingSharedToggleKeys, [])
+
     section("iCloud Sync · Settings payload merge")
 
     enum SyncValue: Equatable {

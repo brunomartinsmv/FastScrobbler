@@ -3,6 +3,19 @@ import ActivityKit
 
 let proYellow = Color(red: 0.89, green: 0.71, blue: 0.16)
 
+enum SettingsScrollTarget: String {
+    case listeningHistory
+
+    var anchorID: String {
+        rawValue
+    }
+}
+
+struct SettingsScrollRequest: Equatable {
+    let target: SettingsScrollTarget
+    let token = UUID()
+}
+
 struct SettingsView: View {
     private static let repositoryURL = URL(string: "https://github.com/kevinlim512/FastScrobbler")!
     private static let redditURL = URL(string: "https://www.reddit.com/r/FastScrobbler/")!
@@ -28,16 +41,16 @@ struct SettingsView: View {
     @AppStorage(ProSettings.Keys.removeBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled, store: AppGroup.userDefaults) private var removeAllBracketsFromAlbumTitlesEnabled = false
     @AppStorage(ProSettings.Keys.preventDuplicateScrobblesEnabled, store: AppGroup.userDefaults) private var preventDuplicateScrobblesEnabled = true
-    @AppStorage(AppSettings.Keys.scrobbleListeningHistoryEnabled, store: AppGroup.userDefaults) private var scrobbleListeningHistoryEnabled = true
-    @AppStorage(AppSettings.Keys.scrobbleAppleMusicAPIEnabled, store: AppGroup.userDefaults) private var scrobbleAppleMusicAPIEnabled = false
     @AppStorage(AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks, store: AppGroup.userDefaults) private var scrobbleOnlyNonLibraryAppleMusicAPITracks = true
     @AppStorage(AppSettings.Keys.extendedListeningHistoryScanEnabled, store: AppGroup.userDefaults) private var extendedListeningHistoryScanEnabled = false
+    @AppStorage(AppSettings.Keys.listeningHistoryRequireConfirmationEnabled, store: AppGroup.userDefaults) private var listeningHistoryRequireConfirmationEnabled = true
     @AppStorage(AppSettings.Keys.sendNowPlayingAutomaticallyEnabled, store: AppGroup.userDefaults) private var sendNowPlayingAutomaticallyEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
     @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
 
     @EnvironmentObject private var auth: LastFMAuthManager
     @EnvironmentObject private var engine: ScrobbleEngine
+    @EnvironmentObject private var scrobbleLog: ScrobbleLogStore
     @EnvironmentObject private var pro: ProPurchaseManager
     @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
@@ -64,6 +77,7 @@ struct SettingsView: View {
         case appStorage
         case appleMusicAPI
         case debug
+        case help
         case removeBracketsFromSongTitles
         case removeBracketsFromAlbumTitles
         case textReplacement
@@ -74,50 +88,80 @@ struct SettingsView: View {
     @State private var isSigningInToLastFM = false
     @State private var lastFMLoginErrorText: String?
     @State private var isScanningListeningHistory = false
-    @State private var isShowingWhatsNew = false
-    @State private var navigationPath = NavigationPath()
-    var isShowingHelp: Binding<Bool>?
 
-    init(isShowingHelp: Binding<Bool>? = nil) {
-        self.isShowingHelp = isShowingHelp
+    private var autoScrobbleListeningHistoryBinding: Binding<Bool> {
+        Binding(
+            get: { !listeningHistoryRequireConfirmationEnabled },
+            set: { isEnabled in
+                let requireConfirmation = !isEnabled
+                guard listeningHistoryRequireConfirmationEnabled != requireConfirmation else { return }
+                listeningHistoryRequireConfirmationEnabled = requireConfirmation
+                Task { await AppModel.shared.handleListeningHistoryRequireConfirmationChanged(isEnabled: requireConfirmation) }
+            }
+        )
+    }
+    @State private var isShowingWhatsNew = false
+    @State private var isShowingListeningHistoryReview = false
+    @State private var navigationPath = NavigationPath()
+    var isShowingSetup: Binding<Bool>?
+    let scrollRequest: Binding<SettingsScrollRequest?>
+
+    init(
+        isShowingSetup: Binding<Bool>? = nil,
+        scrollRequest: Binding<SettingsScrollRequest?> = .constant(nil)
+    ) {
+        self.isShowingSetup = isShowingSetup
+        self.scrollRequest = scrollRequest
     }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            settingsRootContent
-                .navigationDestination(for: SettingsRoute.self) { route in
-                    switch route {
-                    case .appStorage:
-                        AppStorageSettingsPage()
-                    case .appleMusicAPI:
-                        AppleMusicAPISettingsPage()
-                    case .debug:
-                        DebugSettingsPage()
-                    case .removeBracketsFromSongTitles:
-                        RemoveBracketsSettingsPage(target: .songTitles)
-                    case .removeBracketsFromAlbumTitles:
-                        RemoveBracketsSettingsPage(target: .albumTitles)
-                    case .textReplacement:
-                        TextReplacementSettingsPage()
-                    case .proUpgrade:
-                        ProUpgradeView()
-                    }
-                }
-                .navigationTitle("Settings")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    if !isEmbeddedInTab {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button {
-                                dismiss()
-                            } label: {
-                                IOSCloseButtonLabel(style: .plain)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Close")
+            ScrollViewReader { proxy in
+                settingsRootContent
+                    .navigationDestination(for: SettingsRoute.self) { route in
+                        switch route {
+                        case .appStorage:
+                            AppStorageSettingsPage()
+                        case .appleMusicAPI:
+                            AppleMusicAPISettingsPage()
+                        case .debug:
+                            DebugSettingsPage(isShowingSetup: isShowingSetup)
+                        case .help:
+                            SetupHelpView(mode: .help) {}
+                        case .removeBracketsFromSongTitles:
+                            RemoveBracketsSettingsPage(target: .songTitles)
+                        case .removeBracketsFromAlbumTitles:
+                            RemoveBracketsSettingsPage(target: .albumTitles)
+                        case .textReplacement:
+                            TextReplacementSettingsPage()
+                        case .proUpgrade:
+                            ProUpgradeView()
                         }
                     }
-                }
+                    .navigationTitle("Settings")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        if !isEmbeddedInTab {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    dismiss()
+                                } label: {
+                                    IOSCloseButtonLabel(style: .plain)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Close")
+                            }
+                        }
+                    }
+                    .task(id: scrollRequest.wrappedValue?.token) {
+                        guard let scrollRequest = scrollRequest.wrappedValue else { return }
+                        await Task.yield()
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            proxy.scrollTo(scrollRequest.target.anchorID, anchor: .top)
+                        }
+                        self.scrollRequest.wrappedValue = nil
+                    }
+            }
         }
         .task {
             await auth.refreshUserInfoIfNeeded()
@@ -163,6 +207,14 @@ struct SettingsView: View {
                 isShowingWhatsNew = false
             }
         }
+        .sheet(isPresented: $isShowingListeningHistoryReview) {
+            ListeningHistoryReviewView {
+                scrobbleLog.reload()
+                engine.start()
+            }
+            .environmentObject(auth)
+            .environmentObject(scrobbleLog)
+        }
     }
 
     @ViewBuilder
@@ -172,27 +224,18 @@ struct SettingsView: View {
                 proUpgradeNavigationRow
             }
 
-            if let isShowingHelp {
-                Section {
-                    Button {
-                        isShowingHelp.wrappedValue = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "questionmark.circle")
-                            Text("Help")
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.footnote.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                        }
-                        .foregroundStyle(.primary)
+            Section {
+                NavigationLink(value: SettingsRoute.help) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "questionmark.circle")
+                        Text("Help")
+                            .fontWeight(.bold)
                     }
                 }
-                .listSectionSpacing(.compact)
             }
+            .listSectionSpacing(.compact)
 
             Section("Scrobble Controls") {
-                appleMusicAPINavigationLink
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Prevent duplicate scrobbles", isOn: $preventDuplicateScrobblesEnabled)
                     Text("Avoids sending the same playback session to Last.fm more than once within a short time window.")
@@ -264,46 +307,45 @@ struct SettingsView: View {
                         isScanningListeningHistory ? NSLocalizedString("Scanning…", comment: "") : NSLocalizedString("Scan Listening History", comment: ""),
                         systemImage: "clock.arrow.circlepath"
                     )
-                    .foregroundStyle(auth.sessionKey != nil && (scrobbleListeningHistoryEnabled || scrobbleAppleMusicAPIEnabled) ? .primary : .secondary)
+                    .foregroundStyle(auth.sessionKey != nil ? .primary : .secondary)
                 }
                 .padding(.vertical, 8)
-                .disabled(auth.sessionKey == nil || isScanningListeningHistory || (!scrobbleListeningHistoryEnabled && !scrobbleAppleMusicAPIEnabled))
+                .disabled(auth.sessionKey == nil || isScanningListeningHistory)
 
                 Text(
-                    scrobbleListeningHistoryEnabled
+                    listeningHistoryRequireConfirmationEnabled
                         ? (
+                            extendedListeningHistoryScanEnabled
+                                ? NSLocalizedString("Scan Listening History will add plays from the past 7 days to the review list.", comment: "")
+                                : NSLocalizedString("Scan Listening History will add plays from the past 36 hours to the review list.", comment: "")
+                        )
+                        : (
                             extendedListeningHistoryScanEnabled
                                 ? NSLocalizedString("Scan Listening History will import plays from the past 7 days.", comment: "")
                                 : NSLocalizedString("Scan Listening History will import plays from the past 36 hours.", comment: "")
-                        )
-                        : (
-                            scrobbleAppleMusicAPIEnabled
-                                ? NSLocalizedString("Scan Listening History will import up to 30 most recently played Apple Music songs.", comment: "")
-                                : NSLocalizedString("Listening History scrobbling is turned off.", comment: "")
                         )
                 )
                     .font(.footnote)
                     .foregroundStyle(.secondary)
 
+                appleMusicAPINavigationLink
+
                 VStack(alignment: .leading, spacing: 6) {
-                    Toggle("Scrobble from Listening History", isOn: $scrobbleListeningHistoryEnabled)
-                        .onValueChange(of: scrobbleListeningHistoryEnabled) { isEnabled in
-                            Task { await AppModel.shared.handleListeningHistoryScrobblingChanged(isEnabled: isEnabled) }
-                        }
-                    Text("When off, FastScrobbler won’t import or scrobble plays from your Music app Listening History.")
+                    Toggle("Auto-scrobble Listening History", isOn: autoScrobbleListeningHistoryBinding)
+                        .tint(.red)
+                    Text("When on, scans submit plays automatically. When off, scans add items to a review list in Home instead. This also applies to Recently Played API songs.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Toggle("Extended History Scan", isOn: $extendedListeningHistoryScanEnabled)
-                        .disabled(!scrobbleListeningHistoryEnabled)
-                        .foregroundStyle(scrobbleListeningHistoryEnabled ? .primary : .secondary)
-                    Text("When off, \"Scan Listening History\" checks the past 36 hours. When on, \"Scan Listening History\" checks the past 7 days. Automatic scans still use 36 hours.")
+                    Text("When off, \"Scan Listening History\" checks the past 36 hours. When on, \"Scan Listening History\" checks the past 7 days.\n\nAutomatic scans always check the past 36 hours and only run when \"Auto-scrobble Listening History\" is on.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
+            .id(SettingsScrollTarget.listeningHistory.anchorID)
 
             Section("Theme") {
                 Picker("App Theme", selection: $themeSelectionRawValue) {
@@ -348,7 +390,7 @@ struct SettingsView: View {
                     Text("Last.fm")
                     Spacer()
                     if auth.sessionKey != nil {
-                        Text("Connected")
+                        Text("Signed in")
                             .foregroundColor(.green)
                     } else {
                         Text("Not connected")
@@ -460,13 +502,15 @@ struct SettingsView: View {
         defaults.removeObject(forKey: ProSettings.Keys.removeAllBracketsFromAlbumTitlesEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.removeBracketsFromAlbumTitleKeywords)
         defaults.removeObject(forKey: ProSettings.Keys.preventDuplicateScrobblesEnabled)
-        defaults.removeObject(forKey: AppSettings.Keys.scrobbleListeningHistoryEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleAppleMusicAPIEnabled)
         defaults.removeObject(forKey: AppSettings.Keys.scrobbleOnlyNonLibraryAppleMusicAPITracks)
         defaults.removeObject(forKey: AppSettings.Keys.extendedListeningHistoryScanEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.listeningHistoryRequireConfirmationEnabled)
+        defaults.removeObject(forKey: AppSettings.Keys.listeningHistoryResumeRecoveryCutoffDate)
         defaults.removeObject(forKey: AppSettings.Keys.sendNowPlayingAutomaticallyEnabled)
         defaults.removeObject(forKey: ProSettings.Keys.textReplacementRules)
         AppleMusicRecentTracksImporter.shared.resetState()
+        ListeningHistoryReviewStore.shared.clear()
 
         loveOnFavoriteEnabled = false
         scrobbleThresholdIndex = ProSettings.defaultScrobbleThresholdIndex
@@ -477,10 +521,9 @@ struct SettingsView: View {
         removeAllBracketsFromSongTitlesEnabled = false
         removeBracketsFromAlbumTitlesEnabled = false
         removeAllBracketsFromAlbumTitlesEnabled = false
-        scrobbleListeningHistoryEnabled = true
-        scrobbleAppleMusicAPIEnabled = false
         scrobbleOnlyNonLibraryAppleMusicAPITracks = true
         extendedListeningHistoryScanEnabled = false
+        listeningHistoryRequireConfirmationEnabled = true
         sendNowPlayingAutomaticallyEnabled = true
     }
 
@@ -496,43 +539,11 @@ struct SettingsView: View {
             allowSubmissionWhilePaused: true,
             bypassRecentTrackCooldown: true
         )
-        if result.totalImportedCount > 0 || result.totalFlushedCount > 0 || result.skippedDuplicateCount > 0 {
-            activeAlert = .listeningHistoryScanResult(
-                message: String.localizedStringWithFormat(
-                    NSLocalizedString("Found %lld new library play(s) and %lld new Apple Music recent track(s).\nSubmitted %lld scrobble(s).\nSkipped %lld already imported play(s).", comment: ""),
-                    Int64(result.importedCount),
-                    Int64(result.importedRecentTrackCount),
-                    Int64(result.totalFlushedCount),
-                    Int64(result.skippedDuplicateCount)
-                )
-            )
-        } else if result.recentTracksAuthorizationUnavailable {
-            activeAlert = .listeningHistoryScanResult(
-                message: NSLocalizedString(
-                    "No new library plays found. Apple Music recent tracks could not be checked because Music access is disabled.",
-                    comment: ""
-                )
-            )
-        } else if result.recentTracksStatus == .seeded {
-            activeAlert = .listeningHistoryScanResult(
-                message: NSLocalizedString(
-                    "Apple Music recent tracks were initialized from your current history. Future scans will only import newer plays.",
-                    comment: ""
-                )
-            )
-        } else if result.recentTracksStatus == .fetchFailed {
-            activeAlert = .listeningHistoryScanResult(
-                message: NSLocalizedString(
-                    "No new library plays found. Apple Music recent tracks could not be checked because the Apple Music API request failed.",
-                    comment: ""
-                )
-            )
+        if result.requiresConfirmation, result.pendingReviewCount > 0 {
+            isShowingListeningHistoryReview = true
         } else {
             activeAlert = .listeningHistoryScanResult(
-                message: NSLocalizedString(
-                    "No new plays found. Scrobbling from Listening History only works for songs added to your Library.",
-                    comment: ""
-                )
+                message: listeningHistoryScanMessage(for: result)
             )
         }
     }
@@ -642,7 +653,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var appleMusicAPINavigationLink: some View {
         NavigationLink(value: SettingsRoute.appleMusicAPI) {
-            Text(localized("Scrobble from Apple Music API"))
+            Text(localized("Scrobble Recently Played from Apple Music API"))
         }
     }
 
@@ -917,13 +928,22 @@ private struct AppStorageSettingsPage: View {
 }
 
 private struct DebugSettingsPage: View {
+    let isShowingSetup: Binding<Bool>?
+
     var body: some View {
         Form {
             Section {
+                if let isShowingSetup {
+                    Button("Show Setup") {
+                        isShowingSetup.wrappedValue = true
+                    }
+                }
+
                 Button(role: .destructive) {
                     fatalError("Crashlytics test crash")
-                } label: {
-                    Label("Test Crashlytics", systemImage: "exclamationmark.triangle")
+                }
+                label: {
+                    Text("Test Crashlytics")
                 }
             }
         }
