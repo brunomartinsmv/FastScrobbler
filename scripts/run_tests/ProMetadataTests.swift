@@ -83,7 +83,6 @@ func runProMetadataTests() {
         guard let trimmed = albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
         }
-        guard isCompilation != true else { return nil }
         guard trimmed.compare("Various Artists", options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame else {
             return nil
         }
@@ -93,7 +92,7 @@ func runProMetadataTests() {
     expect("uses albumArtist when available",    usableAlbumArtist("The Band", isCompilation: nil) == "The Band")
     expect("returns nil for nil albumArtist",    usableAlbumArtist(nil, isCompilation: nil) == nil)
     expect("returns nil for empty albumArtist",  usableAlbumArtist("   ", isCompilation: nil) == nil)
-    expect("returns nil for compilations",       usableAlbumArtist("The Band", isCompilation: true) == nil)
+    expect("compilations use albumArtist",       usableAlbumArtist("The Band", isCompilation: true) == "The Band")
     expect("'Various Artists' is nil",           usableAlbumArtist("Various Artists", isCompilation: nil) == nil)
     expect("'various artists' (lowercase) nil",  usableAlbumArtist("various artists", isCompilation: nil) == nil)
     expect("non-compilation uses albumArtist",   usableAlbumArtist("The Band", isCompilation: false) == "The Band")

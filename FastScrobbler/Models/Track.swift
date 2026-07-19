@@ -604,17 +604,14 @@ extension Track {
     }
 
     // Returns the album artist only if it's suitable to substitute for the track artist.
-    // Rejects "Various Artists" and, by default, compilation tracks to avoid scrobbling under a generic name.
+    // Rejects "Various Artists" to avoid scrobbling under a generic name.
     static func usableAlbumArtistForArtistSubstitution(
         _ albumArtist: String?,
-        isCompilation: Bool?,
-        respectsCompilationFlag: Bool = true
+        isCompilation: Bool? = nil,
+        respectsCompilationFlag: Bool = false
     ) -> String? {
         guard let trimmed = albumArtist?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else {
             return nil
-        }
-        if respectsCompilationFlag {
-            guard isCompilation != true else { return nil }
         }
         guard trimmed.compare("Various Artists", options: [.caseInsensitive, .diacriticInsensitive]) != .orderedSame else {
             return nil

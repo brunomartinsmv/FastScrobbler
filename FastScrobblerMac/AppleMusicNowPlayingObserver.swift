@@ -100,9 +100,11 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
     }
 
     private func refreshFromMusic() async {
-        let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: false)
-        applyAutomationAuthorization(status)
-        guard status == .authorized else { return }
+        if authorizationStatus != .authorized {
+            let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: false)
+            applyAutomationAuthorization(status)
+        }
+        guard authorizationStatus == .authorized else { return }
 
         do {
             let snapshot = try await Self.readMusicSnapshotAsync()

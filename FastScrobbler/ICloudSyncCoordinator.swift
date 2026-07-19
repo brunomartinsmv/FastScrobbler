@@ -167,12 +167,6 @@ private enum SyncedSettingsStore {
             }
         ),
         Definition(
-            key: AppSettings.Keys.iCloudSyncEnabled,
-            storage: .standard,
-            read: { .bool(AppSettings.iCloudSyncEnabled()) },
-            apply: { if case .bool(let value) = $0 { AppSettings.setICloudSyncEnabled(value) } }
-        ),
-        Definition(
             key: ProSettings.Keys.loveOnFavoriteEnabled,
             storage: .appGroup,
             read: { .bool(AppGroup.userDefaults.object(forKey: ProSettings.Keys.loveOnFavoriteEnabled) as? Bool ?? false) },
@@ -261,7 +255,9 @@ private enum SyncedSettingsStore {
     private static let definitionsByKey = Dictionary(uniqueKeysWithValues: definitions.map { ($0.key, $0) })
 
     static func captureLocalPayload(now: Date = Date()) -> Payload {
-        var existingByKey = Dictionary(uniqueKeysWithValues: loadLocalMetadata().entries.map { ($0.key, $0) })
+        let localMetadata = loadLocalMetadata()
+        let isFirstCapture = localMetadata.entries.isEmpty
+        var existingByKey = Dictionary(uniqueKeysWithValues: localMetadata.entries.map { ($0.key, $0) })
 
         for definition in definitions {
             let currentValue = definition.read()
@@ -273,7 +269,7 @@ private enum SyncedSettingsStore {
                 key: definition.key,
                 storage: definition.storage,
                 value: currentValue,
-                updatedAt: now
+                updatedAt: isFirstCapture ? Date.distantPast : now
             )
         }
 
@@ -287,24 +283,6 @@ private enum SyncedSettingsStore {
             definitionsByKey[entry.key]?.apply(entry.value)
         }
         saveLocalMetadata(payload)
-    }
-
-    @discardableResult
-    static func applyRemoteEntryIfNewer(forKey key: String, from payload: Payload) -> Bool {
-        guard let remoteEntry = payload.entries.first(where: { $0.key == key }),
-              let definition = definitionsByKey[key] else {
-            return false
-        }
-
-        var metadataByKey = Dictionary(uniqueKeysWithValues: loadLocalMetadata().entries.map { ($0.key, $0) })
-        if let localEntry = metadataByKey[key], localEntry.updatedAt > remoteEntry.updatedAt {
-            return false
-        }
-
-        definition.apply(remoteEntry.value)
-        metadataByKey[key] = remoteEntry
-        saveLocalMetadata(Payload(entries: sortedEntries(Array(metadataByKey.values))))
-        return true
     }
 
     static func merged(local: Payload, remote: Payload?) -> Payload {
@@ -404,8 +382,6 @@ final class ICloudSyncCoordinator: NSObject, ObservableObject {
     private var lastWrittenDataByFile: [String: Data] = [:]
 
     func startIfNeeded() async {
-        await refreshStatus()
-        await applyRemoteSyncPreferenceIfNeeded()
         await refreshStatus()
         guard isSyncEnabled else { return }
 
@@ -517,20 +493,6 @@ final class ICloudSyncCoordinator: NSObject, ObservableObject {
 
         await pullMergeAndPersist(reason: reason)
         await refreshStatus()
-    }
-
-    private func applyRemoteSyncPreferenceIfNeeded() async {
-        guard syncDirectoryURL() != nil else { return }
-        guard let cloudSettings: SyncedSettingsStore.Payload = readPayload(fileName: FileName.settings) else { return }
-
-        let didApplyRemotePreference = SyncedSettingsStore.applyRemoteEntryIfNewer(
-            forKey: AppSettings.Keys.iCloudSyncEnabled,
-            from: cloudSettings
-        )
-
-        guard didApplyRemotePreference else { return }
-        isSyncEnabled = AppSettings.iCloudSyncEnabled()
-        logger.info("applied remote iCloud sync preference before startup")
     }
 
     private func stopSyncInfrastructure() {
@@ -673,15 +635,6 @@ final class ICloudSyncCoordinator: NSObject, ObservableObject {
         ScrobbleLogStore.shared.replaceEntriesForSync(mergedScrobbleLogEntries)
         PlaybackHistoryImporter.shared.mergeSyncState(mergedPlaybackHistoryState)
         isApplyingCloudState = false
-
-        if !AppSettings.iCloudSyncEnabled() {
-            isSyncEnabled = false
-            await writePayload(mergedSettings, fileName: FileName.settings, reason: reason)
-            hasCloudData = cloudDataExists()
-            stopSyncInfrastructure()
-            logger.info("stopped sync after applying remote disabled state")
-            return
-        }
 
         logger.info("applied merged iCloud state (\(reason, privacy: .public))")
 

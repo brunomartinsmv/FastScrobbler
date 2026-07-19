@@ -5,6 +5,8 @@ import OSLog
 
 extension Notification.Name {
     static let openManualScrobble = Notification.Name("FastScrobbler.openManualScrobble")
+    static let triggerPendingScan = Notification.Name("FastScrobbler.triggerPendingScan")
+    static let triggerScrobbleSong = Notification.Name("FastScrobbler.triggerScrobbleSong")
 }
 
 enum ShortcutsIntentError: Error, LocalizedError {

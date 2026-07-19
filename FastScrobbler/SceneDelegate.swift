@@ -5,6 +5,10 @@ import UIKit
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
+#if os(iOS)
+    private var pendingShortcutItem: UIApplicationShortcutItem?
+#endif
+
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
@@ -25,6 +29,12 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController = UIHostingController(rootView: contentView)
         self.window = window
         window.makeKeyAndVisible()
+
+#if os(iOS)
+        if let shortcutItem = connectionOptions.shortcutItem {
+            pendingShortcutItem = shortcutItem
+        }
+#endif
 
         Task { @MainActor in
             _ = await model.observer.requestMediaLibraryAuthorizationIfNeeded()
@@ -48,7 +58,85 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         Task { @MainActor in
             await AppModel.shared.handleSceneDidBecomeActive()
             AppReviewManager.shared.recordAppDidBecomeActive(in: windowScene)
+            
+            setupDynamicShortcutItems()
+            if let shortcutItem = pendingShortcutItem {
+                _ = handleShortcutItem(shortcutItem)
+                pendingShortcutItem = nil
+            }
         }
 #endif
     }
+
+#if os(iOS)
+    func windowScene(
+        _ windowScene: UIWindowScene,
+        performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        let handled = handleShortcutItem(shortcutItem)
+        completionHandler(handled)
+    }
+
+    private func setupDynamicShortcutItems() {
+        var items: [UIApplicationShortcutItem] = []
+        
+        let sessionKey = LastFMSessionStore.readSessionKey()
+        let hasSeenSetup = UserDefaults.standard.bool(forKey: "FastScrobbler.Setup.hasSeen")
+        
+        if hasSeenSetup && sessionKey != nil {
+            items.append(
+                UIApplicationShortcutItem(
+                    type: "com.fastscrobbler.scrobbleSong",
+                    localizedTitle: NSLocalizedString("Scrobble Song", comment: ""),
+                    localizedSubtitle: nil,
+                    icon: UIApplicationShortcutIcon(systemImageName: "arrow.triangle.2.circlepath"),
+                    userInfo: nil
+                )
+            )
+            items.append(
+                UIApplicationShortcutItem(
+                    type: "com.fastscrobbler.scanHistory",
+                    localizedTitle: NSLocalizedString("Scan History", comment: ""),
+                    localizedSubtitle: nil,
+                    icon: UIApplicationShortcutIcon(systemImageName: "clock.arrow.circlepath"),
+                    userInfo: nil
+                )
+            )
+        }
+        
+        if sessionKey != nil {
+            items.append(
+                UIApplicationShortcutItem(
+                    type: "com.fastscrobbler.manualScrobble",
+                    localizedTitle: NSLocalizedString("Manual Scrobble", comment: ""),
+                    localizedSubtitle: nil,
+                    icon: UIApplicationShortcutIcon(systemImageName: "plus.circle"),
+                    userInfo: nil
+                )
+            )
+        }
+        
+        UIApplication.shared.shortcutItems = items
+    }
+
+    private func handleShortcutItem(_ shortcutItem: UIApplicationShortcutItem) -> Bool {
+        switch shortcutItem.type {
+        case "com.fastscrobbler.manualScrobble":
+            NotificationCenter.default.post(name: .openManualScrobble, object: nil)
+            return true
+        case "com.fastscrobbler.scanHistory":
+            let request: AppSettings.PendingListeningHistoryLaunchRequest =
+                AppSettings.listeningHistoryRequireConfirmationEnabled() ? .scanAndOpenReview : .scanAndShowResult
+            AppSettings.requestPendingListeningHistoryLaunch(request)
+            NotificationCenter.default.post(name: .triggerPendingScan, object: nil)
+            return true
+        case "com.fastscrobbler.scrobbleSong":
+            NotificationCenter.default.post(name: .triggerScrobbleSong, object: nil)
+            return true
+        default:
+            return false
+        }
+    }
+#endif
 }

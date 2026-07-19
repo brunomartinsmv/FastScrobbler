@@ -495,7 +495,7 @@ struct FullscreenNowPlayingView: View {
     private func fullscreenLayout(in size: CGSize) -> (artworkSide: CGFloat, verticalSpacing: CGFloat, topContentInset: CGFloat, titleTopPadding: CGFloat, titleFontSize: CGFloat, bottomPadding: CGFloat, showsArtwork: Bool) {
         let showsArtwork = !isFourPointSevenInchPhone(size)
         let availableWidth = size.width - (horizontalPadding * 2)
-        let bottomPadding: CGFloat = 48
+        let bottomPadding: CGFloat = 40
         let bottomControlsHeight: CGFloat = 374
         let availableHeight = size.height - 14 - bottomPadding - bottomControlsHeight
         let artworkSide = min(max(0, availableWidth), max(180, availableHeight))

@@ -221,6 +221,14 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openManualScrobble)) { _ in
             isShowingManualScrobble = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .triggerPendingScan)) { _ in
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .triggerScrobbleSong)) { _ in
+            Task {
+                await engine.scrobbleNow(force: true)
+            }
+        }
         .fullScreenCover(isPresented: $isShowingSetup) {
             SetupHelpView(mode: .setup) {
                 guard MPMediaLibrary.authorizationStatus() == .authorized else { return }
@@ -886,12 +894,7 @@ struct ContentView: View {
             case .openReviewOnly:
                 isShowingListeningHistoryReview = true
             case .scanAndOpenReview:
-                if result.pendingReviewCount > 0 {
-                    isShowingListeningHistoryReview = true
-                } else {
-                    isShowingListeningHistoryReview = false
-                    listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
-                }
+                isShowingListeningHistoryReview = true
             case .scanAndShowResult:
                 isShowingListeningHistoryReview = false
                 listeningHistoryAlertMessage = listeningHistoryScanMessage(for: result)
