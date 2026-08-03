@@ -45,14 +45,10 @@ private extension FastScrobblerMacApp {
 @MainActor
 final class MacAppDelegate: NSObject, NSApplicationDelegate {
     private let model = AppModel.shared
-    private var activityToken: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Prevent App Nap to keep scrobble engine ticking reliably in background
-        activityToken = ProcessInfo.processInfo.beginActivity(
-            options: [.userInitiated, .latencyCritical],
-            reason: "FastScrobbler Scrobble Engine tracking"
-        )
+        // Idle-sleep assertion is acquired only while Music is playing
+        // (see AppleMusicNowPlayingObserver.updateIdleSleepAssertion).
         let rootView = MacPopoverRootView(content: ContentView())
             .environmentObject(model.auth)
             .environmentObject(model.observer)

@@ -6,6 +6,10 @@ import CoreServices
 @MainActor
 final class AppleMusicNowPlayingObserver: ObservableObject {
     nonisolated private static let fallbackTrackDurationSeconds: TimeInterval = 180
+    /// While playing, poll frequently enough for accurate thresholds / UI.
+    nonisolated private static let playingPollInterval: TimeInterval = 1.0
+    /// When idle/paused/Music not running, avoid burning CPU with AppleScript.
+    nonisolated private static let idlePollInterval: TimeInterval = 30.0
 
     enum ObserverError: Error, LocalizedError {
         case musicAutomationDenied
@@ -30,6 +34,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
 
     private let logger = Logger(subsystem: "FastScrobbler", category: "MusicObserver")
     private var timer: Timer?
+    private var currentPollInterval: TimeInterval?
+    private var idleSleepActivityToken: NSObjectProtocol?
     nonisolated private static let scriptingQueue = DispatchQueue(label: "FastScrobbler.MusicAppleScript", qos: .userInitiated)
 
     init() {
@@ -72,14 +78,9 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         await refreshFromMusic()
         guard authorizationStatus == .authorized else { throw ObserverError.musicAutomationDenied }
 
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                await self?.refreshFromMusic()
-            }
-        }
-
         isRunning = true
+        schedulePollingTimer(interval: desiredPollInterval())
+        updateIdleSleepAssertion()
     }
 
     func stop() {
@@ -87,6 +88,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         isRunning = false
         timer?.invalidate()
         timer = nil
+        currentPollInterval = nil
+        endIdleSleepAssertion()
     }
 
     func skipToNextItem() {
@@ -104,7 +107,10 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             let status = await Self.determineMusicAutomationAuthorizationStatusAsync(askUserIfNeeded: false)
             applyAutomationAuthorization(status)
         }
-        guard authorizationStatus == .authorized else { return }
+        guard authorizationStatus == .authorized else {
+            syncPowerAndPolling()
+            return
+        }
 
         do {
             let snapshot = try await Self.readMusicSnapshotAsync()
@@ -128,6 +134,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
                 // Music isn't running (or still launching).
                 authorizationStatus = .authorized
                 resetPlaybackSnapshot()
+                syncPowerAndPolling()
                 return
             }
             logger.debug("AppleScript error: \(error.message, privacy: .public) (\(error.number, privacy: .public))")
@@ -136,12 +143,15 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             logger.debug("Music snapshot error: \(error.localizedDescription, privacy: .public)")
             resetPlaybackSnapshot()
         }
+
+        syncPowerAndPolling()
     }
 
     private func applyAutomationAuthorization(_ status: MPMediaLibraryAuthorizationStatus) {
         authorizationStatus = status
         guard status != .authorized else { return }
         resetPlaybackSnapshot()
+        syncPowerAndPolling()
     }
 
     private func resetPlaybackSnapshot() {
@@ -149,6 +159,53 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         playbackState = .stopped
         playbackTimeSeconds = 0
         isNowPlayingLovedInAppleMusic = nil
+    }
+
+    private func desiredPollInterval() -> TimeInterval {
+        playbackState == .playing ? Self.playingPollInterval : Self.idlePollInterval
+    }
+
+    private func syncPowerAndPolling() {
+        guard isRunning else {
+            endIdleSleepAssertion()
+            return
+        }
+        let interval = desiredPollInterval()
+        if currentPollInterval != interval {
+            schedulePollingTimer(interval: interval)
+        }
+        updateIdleSleepAssertion()
+    }
+
+    private func schedulePollingTimer(interval: TimeInterval) {
+        timer?.invalidate()
+        currentPollInterval = interval
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refreshFromMusic()
+            }
+        }
+    }
+
+    /// Hold a light idle-sleep assertion only while music is actively playing so
+    /// scrobble timers stay reliable without blocking sleep when idle.
+    private func updateIdleSleepAssertion() {
+        let shouldHold = isRunning && playbackState == .playing
+        if shouldHold {
+            guard idleSleepActivityToken == nil else { return }
+            idleSleepActivityToken = ProcessInfo.processInfo.beginActivity(
+                options: [.idleSystemSleepDisabled],
+                reason: "FastScrobbler Scrobble Engine tracking"
+            )
+        } else {
+            endIdleSleepAssertion()
+        }
+    }
+
+    private func endIdleSleepAssertion() {
+        guard let token = idleSleepActivityToken else { return }
+        ProcessInfo.processInfo.endActivity(token)
+        idleSleepActivityToken = nil
     }
 
     private func requestMusicControlPermissionWithAppleScriptFallback() async {
@@ -181,6 +238,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
     }
 
     nonisolated private static func readMusicSnapshotSync() throws -> MusicSnapshot {
+        // Duration/position are emitted as integer milliseconds so string coercion
+        // never depends on the locale decimal separator (e.g. "245,891" on pt-BR).
         let script = #"""
         tell application "Music"
             if not (it is running) then
@@ -189,9 +248,9 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
 
             set sep to (ASCII character 31)
             set ps to (get player state) as string
-            set pos to 0
+            set posMs to 0
             try
-                set pos to (get player position)
+                set posMs to (round ((get player position) * 1000))
             end try
 
             set a to ""
@@ -199,7 +258,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
             set al to ""
             set aa to ""
             set comp to ""
-            set d to 0
+            set dMs to 0
             set streamTitle to ""
             set fav to ""
             set pid to ""
@@ -222,7 +281,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
                     set comp to (compilation of t) as string
                 end try
                 try
-                    set d to duration of t
+                    set dMs to (round ((duration of t) * 1000))
                 end try
                 try
                     set fav to (favorited of t) as string
@@ -238,7 +297,7 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
                 set streamTitle to ""
             end try
 
-            return ps & sep & a & sep & n & sep & al & sep & d & sep & pos & sep & aa & sep & comp & sep & streamTitle & sep & fav & sep & pid
+            return ps & sep & a & sep & n & sep & al & sep & dMs & sep & posMs & sep & aa & sep & comp & sep & streamTitle & sep & fav & sep & pid
         end tell
         """#
 
@@ -256,8 +315,8 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         let artist = parts.count > 1 ? parts[1] : ""
         let title = parts.count > 2 ? parts[2] : ""
         let album = parts.count > 3 ? parts[3] : ""
-        let duration = parts.count > 4 ? TimeInterval(parts[4]) ?? 0 : 0
-        let position = parts.count > 5 ? TimeInterval(parts[5]) ?? 0 : 0
+        let duration = parts.count > 4 ? secondsFromMillisecondField(parts[4]) : 0
+        let position = parts.count > 5 ? secondsFromMillisecondField(parts[5]) : 0
         let albumArtist = parts.count > 6 ? parts[6] : ""
         let isCompilation = parts.count > 7 ? parseAppleScriptBool(parts[7]) : nil
         let streamTitle = parts.count > 8 ? parts[8] : ""
@@ -431,5 +490,12 @@ final class AppleMusicNowPlayingObserver: ObservableObject {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return UInt64(trimmed, radix: 16)
+    }
+
+    /// Parses AppleScript integer-millisecond fields into seconds.
+    nonisolated private static func secondsFromMillisecondField(_ value: String) -> TimeInterval {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let millis = Int(trimmed), millis > 0 else { return 0 }
+        return TimeInterval(millis) / 1000.0
     }
 }
