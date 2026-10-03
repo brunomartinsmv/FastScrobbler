@@ -17,9 +17,3 @@ FastScrobbler/NowPlaying/PlaybackHistoryImporter.swift
 FastScrobbler/NowPlaying/AppleMusicNowPlayingObserver.swift
 FastScrobbler/NowPlaying/AppleMusicRecentTracksImporter.swift
 GoogleService-Info.plist
-
-# gemini-cli settings
-.gemini/
-
-# GitHub App credentials
-gha-creds-*.json
