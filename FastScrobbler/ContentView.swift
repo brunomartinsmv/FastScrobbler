@@ -92,6 +92,26 @@ struct ContentView: View {
             light: UIColor(white: 0.72, alpha: 1.0),
             dark: UIColor(white: 0.42, alpha: 1.0)
         )
+        static let red = dynamicColor(
+            light: UIColor(red: 0.88, green: 0.26, blue: 0.28, alpha: 1.0),
+            dark: UIColor(red: 0.94, green: 0.38, blue: 0.40, alpha: 1.0)
+        )
+        static let redForeground = dynamicColor(
+            light: UIColor(red: 0.54, green: 0.16, blue: 0.18, alpha: 1.0),
+            dark: UIColor(red: 0.96, green: 0.82, blue: 0.84, alpha: 1.0)
+        )
+        static let redBorder = dynamicColor(
+            light: UIColor(red: 0.78, green: 0.24, blue: 0.26, alpha: 1.0),
+            dark: UIColor(red: 0.86, green: 0.34, blue: 0.36, alpha: 1.0)
+        )
+        static let redFill = dynamicColor(
+            light: UIColor(red: 0.95, green: 0.82, blue: 0.84, alpha: 0.20),
+            dark: UIColor(red: 0.56, green: 0.24, blue: 0.26, alpha: 0.30)
+        )
+        static let redDisabledFill = dynamicColor(
+            light: UIColor(red: 0.95, green: 0.82, blue: 0.84, alpha: 0.10),
+            dark: UIColor(red: 0.56, green: 0.24, blue: 0.26, alpha: 0.15)
+        )
         static let accountBorder = dynamicColor(
             light: UIColor(red: 0.24, green: 0.48, blue: 0.72, alpha: 1.0),
             dark: UIColor(red: 0.30, green: 0.56, blue: 0.78, alpha: 1.0)
@@ -123,18 +143,24 @@ struct ContentView: View {
     }
 
     @EnvironmentObject private var auth: LastFMAuthManager
+    @EnvironmentObject private var listenBrainzAuth: ListenBrainzAuthManager
     @EnvironmentObject private var observer: AppleMusicNowPlayingObserver
     @EnvironmentObject private var engine: ScrobbleEngine
     @EnvironmentObject private var scrobbleLog: ScrobbleLogStore
     @EnvironmentObject private var pro: ProPurchaseManager
+#if os(iOS)
+    @ObservedObject private var screenshotMode = ScreenshotModeManager.shared
+#endif
 
     @Environment(\.openURL) private var openURL
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     @AppStorage(Keys.hasSeenSetup) private var hasSeenSetup = false
     @AppStorage(AppSettings.Keys.listeningHistoryRequireConfirmationEnabled, store: AppGroup.userDefaults) private var listeningHistoryRequireConfirmationEnabled = true
     @AppStorage(AppSettings.Keys.themeSelection) private var themeSelectionRawValue = AppTheme.system.rawValue
     @AppStorage(AppSettings.Keys.buttonThemeSelection) private var buttonThemeSelectionRawValue = ButtonTheme.colorful.rawValue
+    @AppStorage(AppSettings.Keys.scanButtonLocation) private var scanButtonLocationRawValue = ScanButtonLocation.recentScrobbles.rawValue
 
     @State private var lastScrobbleLogRefreshDate: Date = .distantPast
     @State private var errorText: String?
@@ -165,26 +191,50 @@ struct ContentView: View {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     listeningHistoryRequireConfirmationEnabled = requireConfirmation
                 }
-                Task { await AppModel.shared.handleListeningHistoryRequireConfirmationChanged(isEnabled: requireConfirmation) }
+                Task {
+                    if isEnabled { isScanningListeningHistory = true }
+                    defer { if isEnabled { isScanningListeningHistory = false } }
+                    await AppModel.shared.handleListeningHistoryRequireConfirmationChanged(isEnabled: requireConfirmation)
+                }
             }
         )
     }
 
     var body: some View {
         Group {
-            // TabView keeps both tabs alive so the engine continues running in the background.
-            TabView(selection: $selectedTab) {
-                NavigationView {
-                    mainContent
+            if horizontalSizeClass == .regular {
+                HStack(spacing: 0) {
+                    NavigationView {
+                        mainContent
+                    }
+                    .navigationViewStyle(.stack)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Divider()
+
+                    settingsTabContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .tabItem { Label("Home", systemImage: UIImage(systemName: "music.note.arrow.trianglehead.clockwise") != nil ? "music.note.arrow.trianglehead.clockwise" : "music.note") }
-                .tag(Tab.home)
+            } else {
+                // TabView keeps both tabs alive so the engine continues running in the background.
+                TabView(selection: $selectedTab) {
+                    NavigationView {
+                        mainContent
+                    }
+                    .navigationViewStyle(.stack)
+                    .tabItem { Label("Home", systemImage: UIImage(systemName: "music.note.arrow.trianglehead.clockwise") != nil ? "music.note.arrow.trianglehead.clockwise" : "music.note") }
+                    .tag(Tab.home)
 
-                settingsTabContent
-                    .tabItem { Label("Settings", systemImage: "gear") }
-                    .tag(Tab.settings)
+                    settingsTabContent
+                        .tabItem { Label("Settings", systemImage: "gear") }
+                        .tag(Tab.settings)
+                }
             }
-
+        }
+        .onValueChange(of: horizontalSizeClass) { newSizeClass in
+            if newSizeClass == .compact {
+                selectedTab = .settings
+            }
         }
         .onAppear {
             refreshScrobbleLogDisplay(now: .now, forceReload: true)
@@ -213,6 +263,10 @@ struct ContentView: View {
             presentSetupIfNeeded()
             handlePendingListeningHistoryLaunchRequestIfNeeded()
         }
+        .onValueChange(of: listenBrainzAuth.userToken) { _ in
+            presentSetupIfNeeded()
+            handlePendingListeningHistoryLaunchRequestIfNeeded()
+        }
         .onValueChange(of: hasSeenSetup) { hasSeenSetup in
             guard hasSeenSetup else { return }
             presentWhatsNewIfNeeded()
@@ -220,6 +274,9 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openManualScrobble)) { _ in
             isShowingManualScrobble = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openHelp)) { _ in
+            selectedTab = .settings
         }
         .onReceive(NotificationCenter.default.publisher(for: .triggerPendingScan)) { _ in
             handlePendingListeningHistoryLaunchRequestIfNeeded()
@@ -232,7 +289,7 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $isShowingSetup) {
             SetupHelpView(mode: .setup) {
                 guard MPMediaLibrary.authorizationStatus() == .authorized else { return }
-                guard auth.sessionKey != nil else { return }
+                guard auth.sessionKey != nil || listenBrainzAuth.isConnected else { return }
                 hasSeenSetup = true
                 isShowingSetup = false
                 presentWhatsNewIfNeeded()
@@ -302,21 +359,44 @@ struct ContentView: View {
         ButtonTheme(rawValue: buttonThemeSelectionRawValue) ?? .colorful
     }
 
+    private var selectedScanButtonLocation: ScanButtonLocation {
+        ScanButtonLocation(rawValue: scanButtonLocationRawValue) ?? .recentScrobbles
+    }
+
     private var usesMonochromeButtons: Bool {
         selectedButtonTheme == .monochrome
     }
 
+    private var usesRedButtons: Bool {
+        selectedButtonTheme == .red
+    }
+
     private func actionButtonForeground(_ defaultColor: Color) -> Color {
-        usesMonochromeButtons ? ActionButtonPalette.monochromeForeground : defaultColor
+        if usesMonochromeButtons {
+            return ActionButtonPalette.monochromeForeground
+        }
+        if usesRedButtons {
+            return ActionButtonPalette.redForeground
+        }
+        return defaultColor
     }
 
     private func actionButtonTint(_ defaultColor: Color) -> Color {
-        usesMonochromeButtons ? ActionButtonPalette.monochromeFill : defaultColor
+        if usesMonochromeButtons {
+            return ActionButtonPalette.monochromeFill
+        }
+        if usesRedButtons {
+            return ActionButtonPalette.red
+        }
+        return defaultColor
     }
 
     private func actionButtonFill(_ defaultColor: Color, disabled: Bool = false) -> Color {
         if usesMonochromeButtons {
             return disabled ? ActionButtonPalette.monochromeDisabledFill : ActionButtonPalette.monochromeFill
+        }
+        if usesRedButtons {
+            return disabled ? ActionButtonPalette.redDisabledFill : ActionButtonPalette.redFill
         }
         return defaultColor
     }
@@ -325,49 +405,34 @@ struct ContentView: View {
         if usesMonochromeButtons {
             return ActionButtonPalette.monochromeForeground.opacity(disabled ? 0.35 : 0.85)
         }
+        if usesRedButtons {
+            return disabled ? ActionButtonPalette.redBorder.opacity(0.35) : ActionButtonPalette.redBorder
+        }
         return disabled ? .secondary.opacity(0.35) : defaultColor
     }
 
     private var mainContent: some View {
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 controls
-                statusCard
                 trackCard
+                statusCard
                 scrobbleLogCard
                 if let errorText {
                     Text(errorText)
-                        .foregroundColor(.red)
+                        .foregroundColor(Color.accentColor)
                         .font(.footnote)
                 }
             }
             .padding()
-            .padding(.top, 8)
+            .padding(.top, 16)
             .animation(.easeInOut(duration: 0.3), value: observer.track)
             .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
+            .animation(.easeInOut(duration: 0.3), value: listenBrainzAuth.isConnected)
             .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         }
         .refreshable {
             await refreshHome()
-        }
-        .overlay(alignment: .top) {
-            GeometryReader { proxy in
-                // Keep this overlay out of the scroll view so SwiftUI never snapshots it
-                // at full width with a transient zero-height container during modal transitions.
-                LinearGradient(
-                    colors: [
-                        Color(.systemBackground),
-                        Color(.systemBackground).opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: homeTopGradientHeight(for: proxy.size))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .ignoresSafeArea(edges: .top)
-                .allowsHitTesting(false)
-            }
-            .allowsHitTesting(false)
         }
         .onReceive(Timer.publish(every: 60, on: .main, in: .common).autoconnect()) { _ in
             refreshScrobbleLogDisplay(now: .now)
@@ -378,16 +443,6 @@ struct ContentView: View {
     private var settingsTabContent: some View {
         SettingsView(isShowingSetup: $isShowingSetup, scrollRequest: $settingsScrollRequest)
             .environment(\.isEmbeddedInTab, true)
-    }
-
-    private func homeTopGradientHeight(for size: CGSize) -> CGFloat {
-        isFourPointSevenInchPhone(size) ? 40 : 70
-    }
-
-    private func isFourPointSevenInchPhone(_ size: CGSize) -> Bool {
-        let shortSide = min(size.width, size.height)
-        let longSide = max(size.width, size.height)
-        return shortSide <= 375 && longSide <= 667
     }
 
     private var contentCardBackground: some View {
@@ -403,11 +458,56 @@ struct ContentView: View {
             }
     }
 
+    @ViewBuilder
     private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Last.fm")
+#if os(iOS)
+        if screenshotMode.isEnabled {
+            VStack(alignment: .leading, spacing: 12) {
+                singleStatusCard(service: .lastfm, isConnected: true)
+                singleStatusCard(service: .listenbrainz, isConnected: true)
+            }
+        } else {
+            normalStatusCard
+        }
+#else
+        normalStatusCard
+#endif
+    }
+
+    @ViewBuilder
+    private var normalStatusCard: some View {
+        let hasLastFM = auth.sessionKey != nil
+        let hasListenBrainz = listenBrainzAuth.isConnected
+
+        if !hasLastFM && !hasListenBrainz {
+            VStack(alignment: .leading, spacing: 12) {
+                singleStatusCard(service: .lastfm, isConnected: false)
+                singleStatusCard(service: .listenbrainz, isConnected: false)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 12) {
+                if hasLastFM {
+                    singleStatusCard(service: .lastfm, isConnected: true)
+                }
+                if hasListenBrainz {
+                    singleStatusCard(service: .listenbrainz, isConnected: true)
+                }
+            }
+        }
+    }
+
+    private func singleStatusCard(service: ScrobbleService, isConnected: Bool) -> some View {
+#if os(iOS)
+        let isScreenshot = screenshotMode.isEnabled
+        let pills = isScreenshot ? screenshotMode.serviceStatusPills : engine.statusPills(for: service)
+#else
+        let isScreenshot = false
+        let pills = engine.statusPills(for: service)
+#endif
+        return VStack(alignment: .leading, spacing: 8) {
+            Text(service.displayName)
                 .font(.title2.weight(.semibold))
-            if auth.sessionKey != nil {
+            if isConnected {
                 Text("Signed in")
                     .font(.footnote)
                     .foregroundColor(.green)
@@ -416,10 +516,24 @@ struct ContentView: View {
                     .font(.footnote)
                     .foregroundColor(.secondary)
             }
-            engineStatusText(engine.statusText)
-                .font(.footnote)
+            if isScreenshot {
+                Text(NSLocalizedString("Scrobbled.", comment: ""))
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            } else {
+                engineStatusText(for: service)
+                    .font(.footnote)
+            }
+            if !pills.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(pills) { pill in
+                        statusPillView(pill)
+                    }
+                }
+                .padding(.top, 2)
+            }
         }
-        .animation(.easeInOut(duration: 0.3), value: auth.sessionKey != nil)
+        .animation(.easeInOut(duration: 0.3), value: isConnected)
         .animation(.easeInOut(duration: 0.3), value: engine.statusText)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -427,7 +541,16 @@ struct ContentView: View {
     }
 
     private var trackCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+#if os(iOS)
+        let isScreenshot = screenshotMode.isEnabled
+        let effectiveTrack = isScreenshot ? screenshotMode.mockTrack : observer.track
+        let isPlaying = isScreenshot ? true : (observer.playbackState == .playing)
+#else
+        let isScreenshot = false
+        let effectiveTrack = observer.track
+        let isPlaying = observer.playbackState == .playing
+#endif
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Now Playing")
                     .font(.title2.weight(.semibold))
@@ -444,13 +567,19 @@ struct ContentView: View {
                 .accessibilityLabel(Text(NSLocalizedString("Open Fullscreen Now Playing", comment: "")))
 #endif
             }
-            if let t = observer.track {
+            if let t = effectiveTrack {
                 nowPlayingMetadata(for: t)
                 if let d = t.durationSeconds, d > 0 {
                     VStack(spacing: 6) {
-                        TrackPlaybackProgressView(track: t, engine: engine, formatTime: formatTime)
+                        TrackPlaybackProgressView(
+                            track: t,
+                            engine: engine,
+                            formatTime: formatTime,
+                            overridePlayedSeconds: isScreenshot ? ScreenshotModeManager.playbackSeconds : nil
+                        )
                         HStack(spacing: 32) {
                             Button {
+                                guard !isScreenshot else { return }
                                 prevBounce += 1
                                 observer.skipToPreviousItem()
                             } label: {
@@ -458,15 +587,19 @@ struct ContentView: View {
                                     .symbolEffect(.bounce, value: prevBounce)
                             }
                             .font(.title3)
-                            Button { observer.togglePlayPause() } label: {
-                                Image(systemName: observer.playbackState == .playing ? "pause.fill" : "play.fill")
+                            Button {
+                                guard !isScreenshot else { return }
+                                observer.togglePlayPause()
+                            } label: {
+                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                     .contentTransition(.symbolEffect(.replace.downUp))
-                                    .scaleEffect(observer.playbackState == .playing ? 1.0 : 1.15)
-                                    .animation(.spring(response: 0.25, dampingFraction: 0.45), value: observer.playbackState)
+                                    .scaleEffect(isPlaying ? 1.0 : 1.15)
+                                    .animation(.spring(response: 0.25, dampingFraction: 0.45), value: isPlaying)
                                     .frame(width: 32, height: 32)
                             }
                             .font(.title)
                             Button {
+                                guard !isScreenshot else { return }
                                 nextBounce += 1
                                 observer.skipToNextItem()
                             } label: {
@@ -486,8 +619,8 @@ struct ContentView: View {
                 Text("No track detected.")
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: observer.track)
-        .animation(.easeInOut(duration: 0.3), value: observer.playbackState)
+        .animation(.easeInOut(duration: 0.3), value: effectiveTrack)
+        .animation(.easeInOut(duration: 0.3), value: isPlaying)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(contentCardBackground)
@@ -528,6 +661,14 @@ struct ContentView: View {
     private var controls: some View {
         let actionButtonHeight: CGFloat = 40
         let actionButtonSpacing: CGFloat = 12
+#if os(iOS)
+        let isScreenshot = screenshotMode.isEnabled
+#else
+        let isScreenshot = false
+#endif
+        let hasAnyAccount = auth.sessionKey != nil || listenBrainzAuth.isConnected
+        let showLastFMProfile = isScreenshot || auth.sessionKey != nil
+        let showListenBrainzProfile = isScreenshot || listenBrainzAuth.isConnected
 
         return VStack(spacing: 12) {
             Button {
@@ -568,23 +709,23 @@ struct ContentView: View {
                 .prominentButtonBackground(actionButtonFill(engine.isUserPaused ? ActionButtonPalette.resumeFill : ActionButtonPalette.scrobbleNowFill))
                 .brightButtonBorder(actionButtonBorder(engine.isUserPaused ? ActionButtonPalette.resumeBorder : ActionButtonPalette.scrobbleNowBorder))
                 .buttonGlow(actionButtonTint(engine.isUserPaused ? ActionButtonPalette.resume : ActionButtonPalette.scrobbleNow))
-                .disabled(auth.sessionKey == nil)
+                .disabled(!hasAnyAccount)
 
-                if auth.sessionKey == nil {
+                if !hasAnyAccount {
                     Button {
-                        Task { await connectTapped() }
+                        isShowingSetup = true
                     } label: {
                         Label(NSLocalizedString("Sign In", comment: ""), systemImage: "person.crop.circle")
                             .font(.body.weight(.bold))
-                            .foregroundStyle(ActionButtonPalette.accountForeground)
+                            .foregroundStyle(actionButtonForeground(ActionButtonPalette.accountForeground))
                             .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
                     }
                     .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(ActionButtonPalette.account)
-                    .prominentButtonBackground(ActionButtonPalette.accountFill)
-                    .brightButtonBorder(ActionButtonPalette.accountBorder)
-                    .buttonGlow(ActionButtonPalette.account)
+                    .tint(actionButtonTint(ActionButtonPalette.account))
+                    .prominentButtonBackground(actionButtonFill(ActionButtonPalette.accountFill))
+                    .brightButtonBorder(actionButtonBorder(ActionButtonPalette.accountBorder))
+                    .buttonGlow(actionButtonTint(ActionButtonPalette.account))
                 } else {
                     Button {
                         Task { await engine.scrobbleNow(force: true) }
@@ -610,9 +751,13 @@ struct ContentView: View {
                 }
             }
 
-            if auth.sessionKey != nil {
+            if selectedScanButtonLocation == .homeTabActions {
+                scanListeningHistoryButton
+            }
+
+            if showLastFMProfile {
                 Button {
-                    if let url = auth.freshProfileURL() {
+                    if let url = auth.freshProfileURL() ?? (isScreenshot ? URL(string: "https://www.last.fm") : nil) {
                         inAppBrowserURL = url
                     }
                 } label: {
@@ -627,8 +772,30 @@ struct ContentView: View {
                 .prominentButtonBackground(actionButtonFill(ActionButtonPalette.accountFill))
                 .brightButtonBorder(actionButtonBorder(ActionButtonPalette.accountBorder))
                 .buttonGlow(actionButtonTint(ActionButtonPalette.account))
-                .disabled(auth.profileURL == nil)
+                .disabled(!isScreenshot && auth.profileURL == nil)
+            }
 
+            if showListenBrainzProfile {
+                Button {
+                    if let url = listenBrainzAuth.freshProfileURL() ?? (isScreenshot ? URL(string: "https://listenbrainz.org") : nil) {
+                        inAppBrowserURL = url
+                    }
+                } label: {
+                    Label(NSLocalizedString("View Profile in ListenBrainz", comment: ""), systemImage: "waveform.path.ecg")
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(actionButtonForeground(ActionButtonPalette.accountForeground))
+                        .frame(maxWidth: .infinity, minHeight: actionButtonHeight)
+                }
+                .buttonStyle(.bordered)
+                .pillButtonBorder()
+                .tint(actionButtonTint(ActionButtonPalette.account))
+                .prominentButtonBackground(actionButtonFill(ActionButtonPalette.accountFill))
+                .brightButtonBorder(actionButtonBorder(ActionButtonPalette.accountBorder))
+                .buttonGlow(actionButtonTint(ActionButtonPalette.account))
+                .disabled(!isScreenshot && listenBrainzAuth.profileURL == nil)
+            }
+
+            if hasAnyAccount {
                 Button {
                     isShowingManualScrobble = true
                 } label: {
@@ -648,6 +815,35 @@ struct ContentView: View {
         .sheet(isPresented: $isShowingManualScrobble) {
             ManualScrobbleView()
         }
+    }
+
+    @ViewBuilder
+    private var scanListeningHistoryButton: some View {
+        let isListeningHistoryScanDisabled = engine.isUserPaused || !canRunListeningHistoryScan || isScanningListeningHistory
+
+        Button {
+            Task { await runListeningHistoryScanFromHome(showsResultAlert: true) }
+        } label: {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: "clock.arrow.circlepath")
+                Text(isScanningListeningHistory ? NSLocalizedString("Scanning…", comment: "") : NSLocalizedString("Scan Listening History", comment: ""))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.6)
+                    .allowsTightening(true)
+            }
+            .font(.body.weight(.bold))
+            .foregroundStyle(actionButtonForeground(ActionButtonPalette.scrobbleNowForeground))
+            .frame(maxWidth: .infinity, minHeight: Self.homeListeningHistoryButtonHeight, alignment: .center)
+        }
+        .buttonStyle(.bordered)
+        .pillButtonBorder()
+        .tint(actionButtonTint(ActionButtonPalette.scrobbleNow))
+        .prominentButtonBackground(actionButtonFill(ActionButtonPalette.scrobbleNowFill, disabled: isListeningHistoryScanDisabled))
+        .brightButtonBorder(actionButtonBorder(ActionButtonPalette.scrobbleNowBorder, disabled: isListeningHistoryScanDisabled))
+        .buttonGlow(actionButtonTint(ActionButtonPalette.scrobbleNow))
+        .disabled(isListeningHistoryScanDisabled)
+        .transition(.opacity)
     }
 
     private var scrobbleLogCard: some View {
@@ -671,40 +867,16 @@ struct ContentView: View {
                 .accessibilityHint(Text("Settings"))
             }
 
-            if listeningHistoryRequireConfirmationEnabled {
-                let isListeningHistoryScanDisabled = engine.isUserPaused || !canRunListeningHistoryScan || isScanningListeningHistory
-
-                Button {
-                    Task { await runListeningHistoryScanFromHome(showsResultAlert: true) }
-                } label: {
-                    HStack(alignment: .center, spacing: 8) {
-                        Image(systemName: "clock.arrow.circlepath")
-                        Text(isScanningListeningHistory ? NSLocalizedString("Scanning…", comment: "") : NSLocalizedString("Scan Listening History", comment: ""))
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.6)
-                            .allowsTightening(true)
-                    }
-                    .font(.body.weight(.bold))
-                    .foregroundStyle(actionButtonForeground(ActionButtonPalette.scrobbleNowForeground))
-                    .frame(maxWidth: .infinity, minHeight: Self.homeListeningHistoryButtonHeight, alignment: .center)
-                }
-                .buttonStyle(.bordered)
-                .pillButtonBorder()
-                .tint(actionButtonTint(ActionButtonPalette.scrobbleNow))
-                .prominentButtonBackground(actionButtonFill(ActionButtonPalette.scrobbleNowFill, disabled: isListeningHistoryScanDisabled))
-                .brightButtonBorder(actionButtonBorder(ActionButtonPalette.scrobbleNowBorder, disabled: isListeningHistoryScanDisabled))
-                .buttonGlow(actionButtonTint(ActionButtonPalette.scrobbleNow))
-                .padding(.top, 6)
-                .disabled(isListeningHistoryScanDisabled)
-                .transition(.opacity)
+            if selectedScanButtonLocation == .recentScrobbles {
+                scanListeningHistoryButton
+                    .padding(.top, 6)
             }
 
             Toggle(isOn: autoScrobbleListeningHistoryBinding) {
                 Text("Auto-scrobble Listening History")
                     .font(.body.weight(.semibold))
             }
-                .tint(.red)
+                .tint(Color.accentColor)
                 .padding(.vertical, 10)
 
             Divider()
@@ -760,7 +932,7 @@ struct ContentView: View {
     }
 
     private var canRunListeningHistoryScan: Bool {
-        auth.sessionKey != nil
+        auth.sessionKey != nil || listenBrainzAuth.isConnected
     }
 
     @MainActor
@@ -806,19 +978,19 @@ struct ContentView: View {
         return String(format: "%d:%02d", s / 60, s % 60)
     }
 
-    private func engineStatusText(_ status: String) -> Text {
-        let parts = status
-            .split(separator: "|")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+    private func engineStatusText(for service: ScrobbleService) -> Text {
+        let parts = engine.filteredStatusParts(for: service)
+
+        guard !parts.isEmpty else {
+            return Text("Engine: ")
+        }
 
         var text = Text("Engine: ")
         for (idx, part) in parts.enumerated() {
             if idx > 0 { text = text + Text(" | ") }
             let segment = Text(part)
             if part == NSLocalizedString("error scrobbling", comment: "") {
-                text = text + segment.fontWeight(.bold).foregroundColor(.red)
-            } else if part == NSLocalizedString("now playing sent", comment: "") || part == NSLocalizedString("scrobbled", comment: "") {
-                text = text + segment.fontWeight(.bold)
+                text = text + segment.fontWeight(.bold).foregroundColor(Color.accentColor)
             } else {
                 text = text + segment
             }
@@ -826,10 +998,61 @@ struct ContentView: View {
         return text
     }
 
+    @ViewBuilder
+    private func statusPillView(_ pill: ScrobbleEngine.ServiceStatusPill) -> some View {
+        let tint: Color = {
+            switch pill.style {
+            case .success: return Color.green
+            case .warning: return Color.orange
+            case .neutral: return Color.secondary
+            }
+        }()
+        let textColor: Color = {
+            switch pill.style {
+            case .success: return Color.green
+            case .warning: return Color.orange
+            case .neutral: return Color.primary.opacity(0.85)
+            }
+        }()
+        Text(pill.text)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(textColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(tint.opacity(0.16))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(tint.opacity(0.4), lineWidth: 1)
+            )
+    }
+
+    @ViewBuilder
+    private func statusPillView(_ pill: String) -> some View {
+        let isScrobbled = ScrobbleEngine.isScrobbledStatus(pill)
+        let tint = isScrobbled ? Color.green : Color.secondary
+        Text(pill)
+            .font(.system(size: 11, weight: .bold))
+            .foregroundStyle(isScrobbled ? Color.green : Color.primary.opacity(0.85))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(tint.opacity(0.16))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(tint.opacity(0.4), lineWidth: 1)
+            )
+    }
+
     private func presentSetupIfNeeded() {
         // Re-check on every scene activation — permissions can change while the app is backgrounded.
         let mediaAuthorized = (MPMediaLibrary.authorizationStatus() == .authorized)
-        let shouldShow = (!hasSeenSetup || !mediaAuthorized || auth.sessionKey == nil)
+        let hasAnyAccount = (auth.sessionKey != nil || listenBrainzAuth.isConnected)
+        let shouldShow = (!hasSeenSetup || !mediaAuthorized || !hasAnyAccount)
         guard shouldShow else { return }
 
         if !isShowingSetup {
@@ -854,7 +1077,23 @@ struct ContentView: View {
         handlePendingListeningHistoryLaunchRequestIfNeeded()
     }
 
+    private func handlePendingManualScrobbleLaunchRequestIfNeeded() {
+        guard hasSeenSetup else { return }
+        guard !isShowingSetup && !isShowingWhatsNew else { return }
+        guard AppSettings.consumePendingManualScrobbleLaunchRequest() else { return }
+        isShowingManualScrobble = true
+    }
+
+    private func handlePendingHelpLaunchRequestIfNeeded() {
+        guard !isShowingSetup && !isShowingWhatsNew else { return }
+        guard AppSettings.consumePendingHelpLaunchRequest() else { return }
+        selectedTab = .settings
+        NotificationCenter.default.post(name: .openHelp, object: nil)
+    }
+
     private func handlePendingListeningHistoryLaunchRequestIfNeeded() {
+        handlePendingManualScrobbleLaunchRequestIfNeeded()
+        handlePendingHelpLaunchRequestIfNeeded()
         guard hasSeenSetup else { return }
         guard !isShowingSetup && !isShowingWhatsNew else { return }
         guard inAppBrowserURL == nil else { return }
@@ -1004,8 +1243,8 @@ private struct ConsecutivePlayCountBadge: View {
 private func groupedRecentScrobbleEntries(_ entries: [ScrobbleLogStore.Entry]) -> [GroupedRecentScrobbleEntry] {
     ConsecutivePlayGrouper.groups(
         from: entries,
-        shouldGroup: { $0.source == .playbackHistory },
-        dedupeKey: { $0.track.dedupeKey },
+        shouldGroup: { _ in true },
+        dedupeKey: { "\($0.source.rawValue):\($0.track.dedupeKey)" },
         memberID: \.id
     )
     .map {
@@ -1022,8 +1261,8 @@ private func groupedListeningHistoryReviewEntries(
 ) -> [GroupedListeningHistoryReviewEntry] {
     ConsecutivePlayGrouper.groups(
         from: entries,
-        shouldGroup: { $0.origin == .playbackHistory },
-        dedupeKey: { $0.track.dedupeKey },
+        shouldGroup: { _ in true },
+        dedupeKey: { "\($0.origin.rawValue):\($0.track.dedupeKey)" },
         memberID: \.id
     )
     .map {
@@ -1042,6 +1281,7 @@ struct ListeningHistoryReviewView: View {
     private let submitButtonHeight = ContentView.listeningHistoryConfirmationButtonHeight
 
     @EnvironmentObject private var auth: LastFMAuthManager
+    @EnvironmentObject private var listenBrainzAuth: ListenBrainzAuthManager
     @EnvironmentObject private var scrobbleLog: ScrobbleLogStore
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var reviewStore = ListeningHistoryReviewStore.shared
@@ -1113,7 +1353,7 @@ struct ListeningHistoryReviewView: View {
     }
 
     private var canSubmit: Bool {
-        auth.sessionKey != nil && !entries.isEmpty && !isSubmitting
+        (auth.sessionKey != nil || listenBrainzAuth.isConnected) && !entries.isEmpty && !isSubmitting
     }
 
     var body: some View {
@@ -1196,7 +1436,7 @@ struct ListeningHistoryReviewView: View {
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 10) {
-                    Button(role: .destructive) {
+                    Button {
                         handleDeleteTapped()
                     } label: {
                         Text(deleteButtonTitle)
@@ -1205,7 +1445,7 @@ struct ListeningHistoryReviewView: View {
                     }
                     .buttonStyle(.bordered)
                     .pillButtonBorder()
-                    .tint(.red)
+                    .tint(Color.accentColor)
                     .disabled(!canDelete)
 
                     Button {
@@ -1396,7 +1636,7 @@ private struct ScrobbleLogRowView: View {
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
                         .foregroundStyle(.white)
-                        .background(Color.red)
+                        .background(Color.accentColor)
                         .clipShape(Capsule())
                 }
                 if entry.source != .live {
@@ -1486,11 +1726,12 @@ private struct TrackPlaybackProgressView: View {
     let track: Track
     let engine: ScrobbleEngine
     let formatTime: (TimeInterval) -> String
+    var overridePlayedSeconds: TimeInterval? = nil
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { _ in
             let duration = track.durationSeconds ?? 0
-            let playedSeconds = engine.liveDisplayedPlayedSeconds(for: track)
+            let playedSeconds = overridePlayedSeconds ?? engine.liveDisplayedPlayedSeconds(for: track)
             let progress = duration > 0 ? min(playedSeconds / duration, 1.0) : 0
 
             VStack(spacing: 6) {

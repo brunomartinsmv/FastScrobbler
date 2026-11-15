@@ -17,6 +17,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         URLCache.shared.diskCapacity = 0
 
         AppSettings.migrateLegacyAppGroupSettingsIfNeeded()
+        AppSettings.seedScrobbleAppleMusicAPIEnabledIfNeeded()
         AppSettings.seedScrobbleOnlyNonLibraryAppleMusicAPITracksIfNeeded()
         AppSettings.removeLegacyListeningHistoryScrobblingToggleIfNeeded()
         ProSettings.migrateLegacyAppGroupSettingsIfNeeded()
@@ -49,6 +50,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+
+    func application(
+        _ application: UIApplication,
+        supportedInterfaceOrientationsFor window: UIWindow?
+    ) -> UIInterfaceOrientationMask {
+        OrientationManager.shared.supportedInterfaceOrientations(for: window)
     }
 
     private func configureFirebaseIfPossible() {

@@ -5,9 +5,12 @@ final class LiveActivityManager {
     static let shared = LiveActivityManager()
 
     static let enabledDefaultsKey = "FastScrobbler.LiveActivity.enabled"
+    static let compactModeDefaultsKey = "FastScrobbler.LiveActivity.compactModeEnabled"
     static let backgroundedAtDefaultsKey = "FastScrobbler.LiveActivity.backgroundedAt"
 
     private init() {}
+
+    func refreshActiveActivity() {}
 
     func recordEnteredBackground(at date: Date = Date()) {
         UserDefaults.standard.set(date, forKey: Self.backgroundedAtDefaultsKey)
@@ -17,7 +20,7 @@ final class LiveActivityManager {
         UserDefaults.standard.removeObject(forKey: Self.backgroundedAtDefaultsKey)
     }
 
-    func startIfPossible() {}
+    func startIfPossible() async {}
 
     func stop() async {}
 

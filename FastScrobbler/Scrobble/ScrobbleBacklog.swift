@@ -18,6 +18,7 @@ actor ScrobbleBacklog {
         var queuedAt: Date
         var attemptCount: Int
         var lastAttemptAt: Date?
+        var pendingServices: Set<ScrobbleService> = [.lastfm, .listenbrainz]
     }
 
     struct FlushResult: Sendable {
@@ -52,6 +53,7 @@ actor ScrobbleBacklog {
         static let maxPendingItems = 1_000
         static let maxItemAge: TimeInterval = 14 * 24 * 60 * 60
         static let maxAttemptCount = 10
+        static let maxTombstoneAge: TimeInterval = 7 * 24 * 60 * 60
     }
 
     private struct PersistedTrack: Codable {
@@ -113,6 +115,7 @@ actor ScrobbleBacklog {
         var queuedAt: Date
         var attemptCount: Int
         var lastAttemptAt: Date?
+        var pendingServices: Set<ScrobbleService>?
 
         private enum CodingKeys: String, CodingKey {
             case id = "i"
@@ -123,6 +126,7 @@ actor ScrobbleBacklog {
             case queuedAt = "q"
             case attemptCount = "a"
             case lastAttemptAt = "l"
+            case pendingServices = "psv"
         }
 
         init(item: Item) {
@@ -134,6 +138,7 @@ actor ScrobbleBacklog {
             queuedAt = item.queuedAt
             attemptCount = item.attemptCount
             lastAttemptAt = item.lastAttemptAt
+            pendingServices = item.pendingServices
         }
 
         var item: Item {
@@ -145,7 +150,8 @@ actor ScrobbleBacklog {
                 wasAppleMusicFavorite: wasAppleMusicFavorite,
                 queuedAt: queuedAt,
                 attemptCount: attemptCount,
-                lastAttemptAt: lastAttemptAt
+                lastAttemptAt: lastAttemptAt,
+                pendingServices: (pendingServices == nil || pendingServices?.isEmpty == true) ? [.lastfm] : pendingServices!
             )
         }
     }
@@ -154,6 +160,8 @@ actor ScrobbleBacklog {
     private var isLoaded = false
     private var isFlushing = false
     private var items: [Item] = []
+    private var tombstones: [UUID: Date] = [:]
+    private static let tombstonesDefaultsKey = "FastScrobbler.ScrobbleBacklog.tombstones"
 
     private init() {}
 
@@ -165,6 +173,11 @@ actor ScrobbleBacklog {
     func syncedItemsSnapshot() async -> [Item] {
         await loadIfNeeded()
         return items
+    }
+
+    func syncedTombstonesSnapshot() async -> [UUID: Date] {
+        await loadIfNeeded()
+        return tombstones
     }
 
     func storageSizeBytes() async -> Int64 {
@@ -201,6 +214,10 @@ actor ScrobbleBacklog {
             await save(pruneBeforeWrite: false)
             return
         }
+        let now = Date()
+        for item in items {
+            tombstones[item.id] = now
+        }
         items = []
         await save(pruneBeforeWrite: false)
     }
@@ -215,6 +232,7 @@ actor ScrobbleBacklog {
             startTimestamp: startTimestamp,
             origin: origin,
             wasAppleMusicFavorite: nil,
+            pendingServices: [.lastfm, .listenbrainz],
             allowExactDuplicates: false
         )
     }
@@ -224,6 +242,7 @@ actor ScrobbleBacklog {
         startTimestamp: Int,
         origin: Origin?,
         wasAppleMusicFavorite: Bool?,
+        pendingServices: Set<ScrobbleService> = [.lastfm, .listenbrainz],
         allowExactDuplicates: Bool = false
     ) async {
         await loadIfNeeded()
@@ -247,7 +266,8 @@ actor ScrobbleBacklog {
                 wasAppleMusicFavorite: wasAppleMusicFavorite,
                 queuedAt: Date(),
                 attemptCount: 0,
-                lastAttemptAt: nil
+                lastAttemptAt: nil,
+                pendingServices: pendingServices
             )
         )
         await save()
@@ -359,9 +379,16 @@ actor ScrobbleBacklog {
     func removeAll(origin targetOrigin: Origin) async -> Int {
         await loadIfNeeded()
 
-        let originalCount = items.count
-        items.removeAll { $0.origin == targetOrigin }
-        let removedCount = originalCount - items.count
+        let initialCount = items.count
+        let now = Date()
+        items.removeAll { item in
+            if item.origin == targetOrigin {
+                tombstones[item.id] = now
+                return true
+            }
+            return false
+        }
+        let removedCount = initialCount - items.count
 
         if removedCount > 0 {
             await save()
@@ -371,10 +398,19 @@ actor ScrobbleBacklog {
     }
 
     func flush(sessionKey: String, maxItems: Int = 25) async -> FlushResult {
-        await flush(sessionKey: sessionKey, maxItems: maxItems, ignoreBackoff: false)
+        await flush(sessionKey: sessionKey, listenBrainzToken: nil, maxItems: maxItems, ignoreBackoff: false)
     }
 
     func flush(sessionKey: String, maxItems: Int = 25, ignoreBackoff: Bool) async -> FlushResult {
+        await flush(sessionKey: sessionKey, listenBrainzToken: nil, maxItems: maxItems, ignoreBackoff: ignoreBackoff)
+    }
+
+    func flush(
+        sessionKey: String? = nil,
+        listenBrainzToken: String? = nil,
+        maxItems: Int = 25,
+        ignoreBackoff: Bool = false
+    ) async -> FlushResult {
         await loadIfNeeded()
         guard !isFlushing else {
             logger.debug("flush skipped (already in progress)")
@@ -388,48 +424,191 @@ actor ScrobbleBacklog {
         defer { isFlushing = false }
 
         let loveOnFavoriteEnabled = ProSettings.loveOnFavoriteEnabled()
-
         let now = Date()
         var sentCount = 0
         var skippedCount = 0
         var sentItems: [FlushResult.SentItem] = []
 
-        do {
-            let client = try LastFMClient()
+        let lastFMClient = try? LastFMClient()
+        let listenBrainzClient = ListenBrainzClient()
 
-            items.sort(by: { $0.startTimestamp < $1.startTimestamp })
-            var idx = 0
-            while idx < items.count, sentCount < maxItems {
-                var item = items[idx]
+        items.sort(by: { $0.startTimestamp < $1.startTimestamp })
 
-                if item.startTimestamp <= 0 || item.attemptCount >= 10 {
-                    logger.warning("discarding backlog item after \(item.attemptCount, privacy: .public) attempts: \(item.track.artist, privacy: .public) – \(item.track.title, privacy: .public)")
-                    items.remove(at: idx)
-                    continue
-                }
+        var batchScrobbledItemIDs: Set<UUID> = []
+
+        // Batch Last.fm scrobbles if sessionKey is present
+        if let sessionKey, !sessionKey.isEmpty, let lastFMClient {
+            var eligibleIndices: [Int] = []
+            var lastFMItemsToBatch: [(track: Track, startTimestamp: Int)] = []
+
+            for (idx, item) in items.enumerated() {
+                if lastFMItemsToBatch.count >= maxItems { break }
+                guard item.startTimestamp > 0, item.attemptCount < 10 else { continue }
+                var pending = item.pendingServices
+                if listenBrainzToken?.isEmpty ?? true { pending.remove(.listenbrainz) }
+                guard pending.contains(.lastfm) else { continue }
 
                 if !ignoreBackoff, let last = item.lastAttemptAt {
-                    // Exponential backoff: 1 min, 2 min, 4 min … up to 60 min, plus ±30s jitter.
                     let baseDelay = min(TimeInterval(60 * (1 << min(item.attemptCount - 1, 6))), 60 * 60)
                     let jitter = TimeInterval(Int.random(in: -30...30))
                     if now.timeIntervalSince(last) < baseDelay + jitter {
-                        skippedCount += 1
-                        idx += 1
                         continue
                     }
                 }
 
+                eligibleIndices.append(idx)
+                lastFMItemsToBatch.append((track: item.track, startTimestamp: item.startTimestamp))
+            }
+
+            if !lastFMItemsToBatch.isEmpty {
                 do {
-                    try await client.scrobble(track: item.track, sessionKey: sessionKey, startTimestamp: item.startTimestamp)
-                    var lovedOnLastFM = false
-                    if item.wasAppleMusicFavorite == true, loveOnFavoriteEnabled {
-                        do {
-                            try await client.love(track: item.track, sessionKey: sessionKey)
-                            lovedOnLastFM = true
-                        } catch {
-                            // Keep silent; scrobble succeeded even if loving fails.
+                    try await lastFMClient.scrobbleBatch(items: lastFMItemsToBatch, sessionKey: sessionKey)
+                    for idx in eligibleIndices {
+                        items[idx].pendingServices.remove(.lastfm)
+                        batchScrobbledItemIDs.insert(items[idx].id)
+                    }
+                } catch {
+                    let shouldRetry = (error as? LastFMClient.ClientError)?.shouldRetryScrobble ?? true
+                    for idx in eligibleIndices {
+                        if !shouldRetry {
+                            items[idx].pendingServices.remove(.lastfm)
+                        } else {
+                            items[idx].attemptCount += 1
+                            items[idx].lastAttemptAt = now
                         }
                     }
+                }
+            }
+        }
+
+        // Batch ListenBrainz scrobbles if token is present
+        if let listenBrainzToken, !listenBrainzToken.isEmpty {
+            var eligibleIndices: [Int] = []
+            var listensToBatch: [(track: Track, timestamp: Date)] = []
+
+            for (idx, item) in items.enumerated() {
+                if listensToBatch.count >= maxItems { break }
+                guard item.startTimestamp > 0, item.attemptCount < 10 else { continue }
+                var pending = item.pendingServices
+                if sessionKey?.isEmpty ?? true { pending.remove(.lastfm) }
+                guard pending.contains(.listenbrainz) else { continue }
+
+                if !ignoreBackoff, let last = item.lastAttemptAt {
+                    let baseDelay = min(TimeInterval(60 * (1 << min(item.attemptCount - 1, 6))), 60 * 60)
+                    let jitter = TimeInterval(Int.random(in: -30...30))
+                    if now.timeIntervalSince(last) < baseDelay + jitter {
+                        continue
+                    }
+                }
+
+                eligibleIndices.append(idx)
+                listensToBatch.append((track: item.track, timestamp: Date(timeIntervalSince1970: TimeInterval(item.startTimestamp))))
+            }
+
+            if !listensToBatch.isEmpty {
+                do {
+                    try await listenBrainzClient.submitBatch(listens: listensToBatch, userToken: listenBrainzToken)
+                    for idx in eligibleIndices {
+                        items[idx].pendingServices.remove(.listenbrainz)
+                        batchScrobbledItemIDs.insert(items[idx].id)
+                    }
+                } catch {
+                    let shouldRetry = (error as? ListenBrainzClient.ClientError)?.shouldRetryScrobble ?? true
+                    for idx in eligibleIndices {
+                        if !shouldRetry {
+                            items[idx].pendingServices.remove(.listenbrainz)
+                        } else {
+                            items[idx].attemptCount += 1
+                            items[idx].lastAttemptAt = now
+                        }
+                    }
+                }
+            }
+        }
+
+        var idx = 0
+        while idx < items.count, sentCount < maxItems {
+            var item = items[idx]
+            var scrobbledInThisFlush = batchScrobbledItemIDs.contains(item.id)
+
+            if item.startTimestamp <= 0 || item.attemptCount >= 10 || (item.pendingServices.isEmpty && !scrobbledInThisFlush) {
+                logger.warning("discarding backlog item after \(item.attemptCount, privacy: .public) attempts: \(item.track.artist, privacy: .public) – \(item.track.title, privacy: .public)")
+                items.remove(at: idx)
+                continue
+            }
+
+            if !ignoreBackoff, let last = item.lastAttemptAt {
+                let baseDelay = min(TimeInterval(60 * (1 << min(item.attemptCount - 1, 6))), 60 * 60)
+                let jitter = TimeInterval(Int.random(in: -30...30))
+                if now.timeIntervalSince(last) < baseDelay + jitter {
+                    skippedCount += 1
+                    idx += 1
+                    continue
+                }
+            }
+
+            var itemFailed = false
+            var lovedOnLastFM = false
+
+            let hasLastFM = sessionKey?.isEmpty == false
+            let hasListenBrainz = listenBrainzToken?.isEmpty == false
+
+            if !hasLastFM {
+                item.pendingServices.remove(.lastfm)
+            }
+            if !hasListenBrainz {
+                item.pendingServices.remove(.listenbrainz)
+            }
+
+            // 1. Process Last.fm if pending
+            if item.pendingServices.contains(.lastfm) {
+                if let sessionKey, let lastFMClient {
+                    do {
+                        try await lastFMClient.scrobble(track: item.track, sessionKey: sessionKey, startTimestamp: item.startTimestamp)
+                        item.pendingServices.remove(.lastfm)
+                        scrobbledInThisFlush = true
+                        if item.wasAppleMusicFavorite == true, loveOnFavoriteEnabled {
+                            do {
+                                try await lastFMClient.love(track: item.track, sessionKey: sessionKey)
+                                lovedOnLastFM = true
+                            } catch {
+                                // Keep silent
+                            }
+                        }
+                    } catch {
+                        if let clientError = error as? LastFMClient.ClientError, !clientError.shouldRetryScrobble {
+                            item.pendingServices.remove(.lastfm)
+                        } else {
+                            itemFailed = true
+                        }
+                    }
+                }
+            }
+
+            // 2. Process ListenBrainz if pending
+            if item.pendingServices.contains(.listenbrainz) {
+                if let listenBrainzToken, !listenBrainzToken.isEmpty {
+                    do {
+                        try await listenBrainzClient.submitScrobble(
+                            track: item.track,
+                            timestamp: Date(timeIntervalSince1970: TimeInterval(item.startTimestamp)),
+                            userToken: listenBrainzToken
+                        )
+                        item.pendingServices.remove(.listenbrainz)
+                        scrobbledInThisFlush = true
+                    } catch {
+                        if let clientError = error as? ListenBrainzClient.ClientError,
+                           !clientError.shouldRetryScrobble {
+                            item.pendingServices.remove(.listenbrainz)
+                        } else {
+                            itemFailed = true
+                        }
+                    }
+                }
+            }
+
+            if item.pendingServices.isEmpty {
+                if scrobbledInThisFlush {
                     sentItems.append(
                         FlushResult.SentItem(
                             track: item.track,
@@ -439,53 +618,71 @@ actor ScrobbleBacklog {
                             lovedOnLastFM: lovedOnLastFM
                         )
                     )
-                    if idx < items.count, items[idx].id == item.id {
-                        items.remove(at: idx)
-                    } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
-                        items.remove(at: currentIndex)
-                    } else {
-                        // Item was already removed (or the backlog was mutated unexpectedly while awaiting).
-                    }
                     sentCount += 1
-                } catch {
-                    if let clientError = error as? LastFMClient.ClientError,
-                       !clientError.shouldRetryScrobble {
-                        logger.warning("discarding non-retryable backlog item: \(error.localizedDescription, privacy: .public)")
-                        if idx < items.count, items[idx].id == item.id {
-                            items.remove(at: idx)
-                        } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
-                            items.remove(at: currentIndex)
-                        }
-                    } else {
-                        item.attemptCount += 1
-                        item.lastAttemptAt = now
-                        if idx < items.count, items[idx].id == item.id {
-                            items[idx] = item
-                        } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
-                            items[currentIndex] = item
-                        } else {
-                            // Item was already removed (or the backlog was mutated unexpectedly while awaiting).
-                        }
-                        idx += 1
-                    }
-                    logger.warning("backlog scrobble failed: \(error.localizedDescription, privacy: .public)")
                 }
+                if idx < items.count, items[idx].id == item.id {
+                    items.remove(at: idx)
+                    tombstones[item.id] = now
+                } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
+                    items.remove(at: currentIndex)
+                    tombstones[item.id] = now
+                }
+            } else {
+                if itemFailed {
+                    item.attemptCount += 1
+                    item.lastAttemptAt = now
+                }
+                if idx < items.count, items[idx].id == item.id {
+                    items[idx] = item
+                } else if let currentIndex = items.firstIndex(where: { $0.id == item.id }) {
+                    items[currentIndex] = item
+                }
+                idx += 1
             }
-        } catch {
-            logger.warning("failed to init LastFMClient for backlog flush: \(error.localizedDescription, privacy: .public)")
         }
 
         await save()
         return FlushResult(sentCount: sentCount, skippedCount: skippedCount, remainingCount: items.count, sentItems: sentItems)
     }
 
-    func replaceItemsForSync(_ syncedItems: [Item]) async {
+    func replaceSyncState(items newItems: [Item], tombstones newTombstones: [UUID: Date]) async {
         await loadIfNeeded()
-        items = Self.mergedSyncedItems(local: [], remote: syncedItems)
+        let merged = Self.mergedSyncedState(
+            localItems: [],
+            localTombstones: tombstones,
+            remoteItems: newItems,
+            remoteTombstones: newTombstones
+        )
+        items = merged.items
+        tombstones = merged.tombstones
         await save()
     }
 
-    static func mergedSyncedItems(local: [Item], remote: [Item]) -> [Item] {
+    func replaceItemsForSync(_ syncedItems: [Item]) async {
+        await replaceSyncState(items: syncedItems, tombstones: [:])
+    }
+
+    static func mergedSyncedState(
+        localItems: [Item],
+        localTombstones: [UUID: Date],
+        remoteItems: [Item],
+        remoteTombstones: [UUID: Date],
+        now: Date = Date()
+    ) -> (items: [Item], tombstones: [UUID: Date]) {
+        let cutoff = now.addingTimeInterval(-CleanupLimits.maxTombstoneAge)
+
+        var mergedTombstones: [UUID: Date] = [:]
+        for (id, date) in localTombstones where date >= cutoff {
+            mergedTombstones[id] = date
+        }
+        for (id, date) in remoteTombstones where date >= cutoff {
+            if let existing = mergedTombstones[id] {
+                mergedTombstones[id] = max(existing, date)
+            } else {
+                mergedTombstones[id] = date
+            }
+        }
+
         var mergedByID: [UUID: Item] = [:]
 
         func mutationDate(for item: Item) -> Date {
@@ -504,7 +701,10 @@ actor ScrobbleBacklog {
             return candidate.startTimestamp > existing.startTimestamp
         }
 
-        for item in local + remote {
+        for item in localItems + remoteItems {
+            if let tombstoneDate = mergedTombstones[item.id], mutationDate(for: item) <= tombstoneDate {
+                continue
+            }
             if let existing = mergedByID[item.id] {
                 if shouldReplace(existing: existing, with: item) {
                     mergedByID[item.id] = item
@@ -514,17 +714,24 @@ actor ScrobbleBacklog {
             }
         }
 
-        return mergedByID.values.sorted {
+        let sortedItems = mergedByID.values.sorted {
             if $0.startTimestamp == $1.startTimestamp {
                 return $0.queuedAt > $1.queuedAt
             }
             return $0.startTimestamp > $1.startTimestamp
         }
+
+        return (items: sortedItems, tombstones: mergedTombstones)
+    }
+
+    static func mergedSyncedItems(local: [Item], remote: [Item]) -> [Item] {
+        mergedSyncedState(localItems: local, localTombstones: [:], remoteItems: remote, remoteTombstones: [:]).items
     }
 
     private func loadIfNeeded() async {
         guard !isLoaded else { return }
         isLoaded = true
+        loadTombstones()
 
         if let sharedURL = sharedFileURL() {
             let fm = FileManager.default
@@ -557,6 +764,7 @@ actor ScrobbleBacklog {
     }
 
     private func save(pruneBeforeWrite: Bool = true) async {
+        saveTombstones()
         let url = fileURL()
         do {
             if pruneBeforeWrite {
@@ -576,6 +784,24 @@ actor ScrobbleBacklog {
             ICloudSyncLocalChangeNotifier.post(.backlog)
         } catch {
             logger.warning("failed to persist backlog: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    private func loadTombstones() {
+        guard let data = AppGroup.userDefaults.data(forKey: Self.tombstonesDefaultsKey),
+              let decoded = try? JSONDecoder().decode([UUID: Date].self, from: data) else {
+            return
+        }
+        let cutoff = Date().addingTimeInterval(-CleanupLimits.maxTombstoneAge)
+        tombstones = decoded.filter { $0.value >= cutoff }
+    }
+
+    private func saveTombstones() {
+        let cutoff = Date().addingTimeInterval(-CleanupLimits.maxTombstoneAge)
+        let pruned = tombstones.filter { $0.value >= cutoff }
+        tombstones = pruned
+        if let data = try? JSONEncoder().encode(pruned) {
+            AppGroup.userDefaults.set(data, forKey: Self.tombstonesDefaultsKey)
         }
     }
 
